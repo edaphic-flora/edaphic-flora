@@ -15,6 +15,200 @@ library(DBI)
 library(RPostgres)
 library(pool)
 
+#Force reading of .Renviron file
+readRenviron("C:/Users/toddt/OneDrive/Desktop/ShinyPlants/.Renviron")
+
+# Database connection pool
+pool <- dbPool(
+  drv = Postgres(),
+  dbname = Sys.getenv("POSTGRES_DB"),
+  host = Sys.getenv("POSTGRES_HOST"),
+  port = Sys.getenv("POSTGRES_PORT"),
+  user = Sys.getenv("POSTGRES_USER"),
+  password = Sys.getenv("POSTGRES_PASSWORD"),
+  minSize = 1,
+  maxSize = 25
+)
+
+# Ensure pool is closed when app stops
+onStop(function() {
+  poolClose(pool)
+})
+
+# Initialize database tables
+# Initialize database tables
+tryCatch({
+  # Create soil_samples table
+  dbExecute(pool, "
+    CREATE TABLE IF NOT EXISTS soil_samples (
+      id SERIAL PRIMARY KEY,
+      species VARCHAR(255),
+      ph NUMERIC(4,2),
+      organic_matter NUMERIC(5,2),
+      nitrate_ppm NUMERIC,
+      ammonium_ppm NUMERIC,
+      phosphorus_ppm NUMERIC,
+      potassium_ppm NUMERIC,
+      calcium_ppm NUMERIC,
+      magnesium_ppm NUMERIC,
+      soluble_salts_ppm NUMERIC,
+      texture_sand NUMERIC(5,2),
+      texture_silt NUMERIC(5,2),
+      texture_clay NUMERIC(5,2),
+      texture_class VARCHAR(50),
+      location_lat NUMERIC(10,6),
+      location_long NUMERIC(10,6),
+      date DATE,
+      ecoregion_l4 VARCHAR(255),
+      ecoregion_l4_code VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )")
+  
+  # Create sample_files table
+  dbExecute(pool, "
+    CREATE TABLE IF NOT EXISTS sample_files (
+      id SERIAL PRIMARY KEY,
+      sample_id INTEGER REFERENCES soil_samples(id),
+      filename VARCHAR(255),
+      file_type VARCHAR(50),
+      file_size INTEGER,
+      storage_path VARCHAR(255),
+      upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )")
+  
+  # Create indices
+  dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
+  dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
+  
+}, error = function(e) {
+  message("Error creating tables: ", e$message)
+})
+
+# Database helper functions
+db_get_all_samples <- function() {
+  tryCatch({
+    dbGetQuery(pool, "SELECT * FROM soil_samples ORDER BY created_at DESC")
+  }, error = function(e) {
+    message("Error fetching samples: ", e$message)
+    data.frame()
+  })
+}
+
+soil_data <- data.frame(
+  species = character(),
+  ph = numeric(),
+  organic_matter = numeric(),
+  nitrate_ppm = numeric(),
+  ammonium_ppm = numeric(),
+  phosphorus_ppm = numeric(),
+  potassium_ppm = numeric(),
+  calcium_ppm = numeric(),
+  magnesium_ppm = numeric(),
+  soluble_salts_ppm = numeric(),
+  texture_sand = numeric(),
+  texture_silt = numeric(),
+  texture_clay = numeric(),
+  texture_class = character(),
+  location_lat = numeric(),
+  location_long = numeric(),
+  date = as.Date(character()),
+  ecoregion_l4 = character(),
+  ecoregion_l4_code = character(),
+  stringsAsFactors = FALSE
+)
+
+db_get_species_data <- function(species) {
+  if (is.null(species) || nchar(trimws(species)) == 0) {
+    return(data.frame())
+  }
+  
+  tryCatch({
+    query <- "SELECT * FROM soil_samples WHERE species = $1 ORDER BY created_at DESC"
+    result <- dbGetQuery(pool, query, params = list(species))
+    
+    if (nrow(result) == 0) {
+      message("No data found for species: ", species)
+    }
+    return(result)
+  }, error = function(e) {
+    message("Error fetching species data: ", e$message)
+    return(data.frame())
+  })
+}
+
+db_get_unique_species <- function() {
+  tryCatch({
+    result <- dbGetQuery(pool, "SELECT DISTINCT species FROM soil_samples ORDER BY species")
+    result$species
+  }, error = function(e) {
+    message("Error fetching unique species: ", e$message)
+    character()
+  })
+}
+
+db_add_file <- function(sample_id, filename, file_type, file_size, storage_path) {
+  tryCatch({
+    dbExecute(pool, "
+      INSERT INTO sample_files (sample_id, filename, file_type, file_size, storage_path)
+      VALUES (?, ?, ?, ?, ?)",
+              params = list(sample_id, filename, file_type, file_size, storage_path)
+    )
+  }, error = function(e) {
+    message("Error adding file: ", e$message)
+    return(FALSE)
+  })
+}
+
+db_get_files <- function(sample_id = NULL) {
+  tryCatch({
+    if (is.null(sample_id)) {
+      dbGetQuery(pool, "SELECT * FROM sample_files ORDER BY upload_date DESC")
+    } else {
+      dbGetQuery(pool, 
+                 "SELECT * FROM sample_files WHERE sample_id = ? ORDER BY upload_date DESC",
+                 params = list(sample_id))
+    }
+  }, error = function(e) {
+    message("Error fetching files: ", e$message)
+    data.frame()
+  })
+}
+
+db_add_sample <- function(sample_data) {
+  tryCatch({
+    # Convert date to proper format
+    if ("date" %in% names(sample_data)) {
+      sample_data$date <- as.character(as.Date(sample_data$date))
+    }
+    
+    # Create vectors of field names and values
+    fields <- names(sample_data)
+    values <- as.list(unname(sample_data))  # Unname the values
+    
+    # Create the SQL query using $n instead of ?
+    placeholders <- paste0("$", seq_along(fields))
+    query <- sprintf(
+      "INSERT INTO soil_samples (%s) VALUES (%s) RETURNING id",
+      paste(fields, collapse = ", "),
+      paste(placeholders, collapse = ", ")
+    )
+    
+    # Debug output
+    message("Query: ", query)
+    message("Number of fields: ", length(fields))
+    message("Number of values: ", length(values))
+    
+    # Execute the query
+    result <- dbGetQuery(pool, query, params = values)
+    
+    return(result$id[1])
+  }, error = function(e) {
+    message("Error details in db_add_sample: ", e$message)
+    message("Data being inserted: ", paste(names(sample_data), collapse=", "))
+    message("Values being inserted: ", paste(unlist(sample_data), collapse=", "))
+    return(NULL)
+  })
+}
 
 # Load and prepare species data
 species_db <- read.csv("wcvp_names.csv", sep="|", quote="", 
@@ -53,32 +247,6 @@ soil_texture_classes <- data.frame(
   Silt_Max = c(40, 60, 60, 60, 52, 100, 88, 20, 50, 45, 50, 30, 14),
   Sand_Min = c(0, 0, 0, 0, 20, 0, 0, 45, 23, 45, 50, 70, 86),
   Sand_Max = c(45, 20, 45, 20, 45, 20, 50, 65, 52, 80, 70, 86, 100)
-)
-
-# Initialize empty data frame
-soil_data <- data.frame(
-  species = character(),
-  ph = numeric(),
-  organic_matter = numeric(),
-  nitrate_ppm = numeric(),
-  ammonium_ppm = numeric(),
-  phosphorus_ppm = numeric(),
-  potassium_ppm = numeric(),
-  calcium_ppm = numeric(),
-  magnesium_ppm = numeric(),
-  soluble_salts_ppm = numeric(),
-  texture_sand = numeric(),
-  texture_silt = numeric(),
-  texture_clay = numeric(),
-  texture_class = character(),
-  location_lat = numeric(),
-  location_long = numeric(),
-  date = as.Date(character()),
-  ecoregion_l4 = character(),
-  photo_path = character(),
-  pdf_path = character(),
-  ecoregion_l4_code = character(),
-  stringsAsFactors = FALSE
 )
 
 # Create directory for file uploads if it doesn't exist
@@ -183,15 +351,12 @@ ui <- page_fluid(
       downloadButton("export_data", "Export All Data"),
       
       # Sample Photos and PDFs
-      fileInput("photo_upload", "Upload Plant Photo",
+      fileInput("photo_upload", "Upload Sample Photos",
                 accept = c('image/png', 'image/jpeg', 'image/jpg'),
                 multiple = TRUE),
-      fileInput("pdf_upload", "Upload Soil Lab Report (PDF)",
+      fileInput("pdf_upload", "Upload Lab Reports (PDF)",
                 accept = c('application/pdf'),
                 multiple = TRUE),
-      
-      # Display uploaded files
-      h4("Uploaded Files"),
       DTOutput("uploaded_files_table")
     ),
     
@@ -230,24 +395,14 @@ ui <- page_fluid(
 )
 
 server <- function(input, output, session) {
-  # Reactive values to store data
-  rv <- reactiveVal(soil_data)
-  # Additional reactive value for file tracking
-  uploaded_files <- reactiveVal(data.frame(
-    filename = character(),
-    type = character(),
-    size = numeric(),
-    timestamp = character(),
-    stringsAsFactors = FALSE
-  ))
-  
   # CSV Template Download
   output$download_template <- downloadHandler(
     filename = function() {
       "soil_data_template.csv"
     },
     content = function(file) {
-      template <- soil_data[0, !names(soil_data) %in% c("photo_path", "pdf_path")]
+      # Use soil_data structure for template
+      template <- soil_data[0, ]
       write.csv(template, file, row.names = FALSE)
     }
   )
@@ -258,19 +413,26 @@ server <- function(input, output, session) {
       paste0("soil_data_export_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
     },
     content = function(file) {
-      write.csv(rv(), file, row.names = FALSE)
+      data <- db_get_all_samples()  # Use database function instead
+      write.csv(data, file, row.names = FALSE)
     }
   )
   
-  # CSV Import Handler
+  # CSV import handler
   observeEvent(input$csv_import, {
     req(input$csv_import)
     
     tryCatch({
       imported_data <- read.csv(input$csv_import$datapath)
       
-      # Validate column names
-      required_cols <- names(soil_data)[!names(soil_data) %in% c("photo_path", "pdf_path")]
+      # Validate required columns
+      required_cols <- c("species", "ph", "organic_matter", "nitrate_ppm",
+                         "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
+                         "calcium_ppm", "magnesium_ppm", "soluble_salts_ppm",
+                         "texture_sand", "texture_silt", "texture_clay",
+                         "texture_class", "location_lat", "location_long",
+                         "date", "ecoregion_l4", "ecoregion_l4_code")
+      
       missing_cols <- setdiff(required_cols, names(imported_data))
       
       if (length(missing_cols) > 0) {
@@ -281,79 +443,156 @@ server <- function(input, output, session) {
         return()
       }
       
-      # Add empty photo_path and pdf_path columns if they don't exist
-      if (!"photo_path" %in% names(imported_data)) {
-        imported_data$photo_path <- NA_character_
-      }
-      if (!"pdf_path" %in% names(imported_data)) {
-        imported_data$pdf_path <- NA_character_
+      # Add each row to database
+      for(i in 1:nrow(imported_data)) {
+        db_add_sample(imported_data[i,])
       }
       
-      # Update reactive value with new data
-      rv(rbind(rv(), imported_data))
       showNotification("CSV data imported successfully!", type = "message")
-      
     }, error = function(e) {
       showNotification(paste("Error importing CSV:", e$message), type = "error")
     })
   })
   
   # File Upload Handler
-  observe({
-    # Handle photo uploads
-    if (!is.null(input$photo_upload)) {
-      for (i in 1:nrow(input$photo_upload)) {
-        file <- input$photo_upload[i,]
-        ext <- tools::file_ext(file$name)
-        new_filename <- paste0("photo_", format(Sys.time(), "%Y%m%d_%H%M%S"), "_", i, ".", ext)
-        file.copy(file$datapath, file.path("www/uploads", new_filename))
-        
-        # Update uploaded files table
-        current_files <- uploaded_files()
-        new_file <- data.frame(
-          filename = new_filename,
-          type = "photo",
-          size = file$size,
-          timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-          stringsAsFactors = FALSE
-        )
-        uploaded_files(rbind(current_files, new_file))
-      }
-    }
+  observeEvent(input$photo_upload, {
+    req(input$photo_upload)
     
-    # Handle PDF uploads
-    if (!is.null(input$pdf_upload)) {
-      for (i in 1:nrow(input$pdf_upload)) {
-        file <- input$pdf_upload[i,]
-        new_filename <- paste0("pdf_", format(Sys.time(), "%Y%m%d_%H%M%S"), "_", i, ".pdf")
-        file.copy(file$datapath, file.path("www/uploads", new_filename))
-        
-        # Update uploaded files table
-        current_files <- uploaded_files()
-        new_file <- data.frame(
-          filename = new_filename,
-          type = "pdf",
-          size = file$size,
-          timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-          stringsAsFactors = FALSE
+    # Create directory if it doesn't exist
+    dir.create(file.path("www", "uploads"), showWarnings = FALSE, recursive = TRUE)
+    
+    for (i in 1:nrow(input$photo_upload)) {
+      file <- input$photo_upload[i,]
+      ext <- tools::file_ext(file$name)
+      new_filename <- paste0(
+        "photo_", 
+        format(Sys.time(), "%Y%m%d_%H%M%S"), 
+        "_", 
+        i, 
+        ".", 
+        ext
+      )
+      
+      # Create full path
+      storage_path <- file.path("uploads", new_filename)
+      full_path <- file.path("www", storage_path)
+      
+      # Copy file to uploads directory
+      file.copy(file$datapath, full_path, overwrite = TRUE)
+      
+      # Add file record to database with error handling
+      tryCatch({
+        db_add_file(
+          sample_id = NULL,  # Will be updated when linked to a sample
+          filename = file$name,
+          file_type = "photo",
+          file_size = file$size,
+          storage_path = storage_path  # Store relative path
         )
-        uploaded_files(rbind(current_files, new_file))
-      }
+        showNotification(sprintf("Uploaded: %s", file$name), type = "message")
+      }, error = function(e) {
+        showNotification(sprintf("Error uploading %s: %s", file$name, e$message), type = "error")
+      })
     }
   })
   
-  # Display uploaded files table
-  output$uploaded_files_table <- renderDT({
-    files_data <- uploaded_files()
-    if (nrow(files_data) > 0) {
-      files_data$size <- paste0(round(files_data$size / 1024, 1), " KB")
-      files_data$actions <- paste0(
-        '<a href="uploads/', files_data$filename, '" target="_blank">View</a>'
+  observeEvent(input$pdf_upload, {
+    req(input$pdf_upload)
+    
+    # Create directory if it doesn't exist
+    dir.create(file.path("www", "uploads"), showWarnings = FALSE, recursive = TRUE)
+    
+    for (i in 1:nrow(input$pdf_upload)) {
+      file <- input$pdf_upload[i,]
+      new_filename <- paste0(
+        "pdf_", 
+        format(Sys.time(), "%Y%m%d_%H%M%S"), 
+        "_", 
+        i, 
+        ".pdf"
       )
+      
+      # Create full path
+      storage_path <- file.path("uploads", new_filename)
+      full_path <- file.path("www", storage_path)
+      
+      # Copy file to uploads directory
+      file.copy(file$datapath, full_path, overwrite = TRUE)
+      
+      # Add file record to database with error handling
+      tryCatch({
+        db_add_file(
+          sample_id = NULL,  # Will be updated when linked to a sample
+          filename = file$name,
+          file_type = "pdf",
+          file_size = file$size,
+          storage_path = storage_path  # Store relative path
+        )
+        showNotification(sprintf("Uploaded: %s", file$name), type = "message")
+      }, error = function(e) {
+        showNotification(sprintf("Error uploading %s: %s", file$name, e$message), type = "error")
+      })
+    }
+  })
+  
+  observeEvent(input$pdf_upload, {
+    req(input$pdf_upload)
+    for (i in 1:nrow(input$pdf_upload)) {
+      file <- input$pdf_upload[i,]
+      new_filename <- paste0(
+        "pdf_", 
+        format(Sys.time(), "%Y%m%d_%H%M%S"), 
+        "_", 
+        i, 
+        ".pdf"
+      )
+      
+      # Create full path
+      storage_path <- file.path("uploads", new_filename)
+      full_path <- file.path("www", storage_path)
+      
+      # Copy file to uploads directory
+      file.copy(file$datapath, full_path)
+      
+      # Add file record to database
+      db_add_file(
+        sample_id = NULL,  # Will be updated when linked to a sample
+        filename = file$name,
+        file_type = "pdf",
+        file_size = file$size,
+        storage_path = storage_path  # Store relative path
+      )
+    }
+    showNotification("PDFs uploaded successfully!", type = "message")
+  })
+  
+  # Display uploaded files
+  output$uploaded_files_table <- renderDT({
+    files_data <- db_get_files()
+    if (nrow(files_data) > 0) {
+      # Create display data frame
+      display_data <- data.frame(
+        Filename = files_data$filename,
+        Type = files_data$file_type,
+        Size = paste0(round(files_data$file_size / 1024, 1), " KB"),
+        Uploaded = files_data$upload_date,
+        Actions = sprintf(
+          '<a href="%s" target="_blank" class="btn btn-sm btn-info">View</a>',
+          files_data$storage_path
+        ),
+        stringsAsFactors = FALSE
+      )
+      
       datatable(
-        files_data,
+        display_data,
         escape = FALSE,
-        options = list(pageLength = 5),
+        options = list(
+          pageLength = 5,
+          dom = 'rtip',
+          columnDefs = list(
+            list(targets = 4, className = 'dt-center')
+          )
+        ),
         selection = 'none'
       )
     }
@@ -542,6 +781,11 @@ server <- function(input, output, session) {
     # Get ecoregion data using the input coordinates directly
     eco <- get_ecoregion(input$latitude, input$longitude)
     
+    # Get texture percentages based on input type
+    if(input$texture_input_type == "class") {
+      texture_pcts <- get_texture_percentages(input$texture_class)
+    }
+    
     new_data <- data.frame(
       species = input$species,
       ph = input$ph,
@@ -554,6 +798,9 @@ server <- function(input, output, session) {
       magnesium_ppm = input$magnesium,
       soluble_salts_ppm = input$soluble_salts,
       texture_class = if(input$texture_input_type == "pct") texture_class() else input$texture_class,
+      texture_sand = if(input$texture_input_type == "pct") input$sand else texture_pcts$sand,
+      texture_silt = if(input$texture_input_type == "pct") input$silt else texture_pcts$silt,
+      texture_clay = if(input$texture_input_type == "pct") input$clay else texture_pcts$clay,
       ecoregion_l4 = eco$name,
       ecoregion_l4_code = eco$code,
       location_lat = input$latitude,
@@ -561,21 +808,14 @@ server <- function(input, output, session) {
       date = input$date
     )
     
-    # Add texture percentages based on input type
-    if(input$texture_input_type == "pct") {
-      new_data$texture_sand <- input$sand
-      new_data$texture_silt <- input$silt
-      new_data$texture_clay <- input$clay
-    } else {
-      # Get approximate percentages from texture class
-      texture_pcts <- get_texture_percentages(input$texture_class)
-      new_data$texture_sand <- texture_pcts$sand
-      new_data$texture_silt <- texture_pcts$silt
-      new_data$texture_clay <- texture_pcts$clay
-    }
+    # Add to database
+    sample_id <- db_add_sample(new_data)
     
-    rv(rbind(rv(), new_data))
-    showNotification("Data added successfully!", type = "message")
+    if (!is.null(sample_id)) {
+      showNotification("Data added successfully!", type = "message")
+    } else {
+      showNotification("Error adding data", type = "error")
+    }
   })
   
   # Initialize the species inputs
@@ -588,6 +828,7 @@ server <- function(input, output, session) {
     # Update the main species input
     updateSelectizeInput(session, "species",
                          choices = species_choices,
+                         selected = "",
                          server = TRUE,
                          options = list(
                            maxItems = 1,
@@ -597,20 +838,29 @@ server <- function(input, output, session) {
     )
   })
   
-  # Update analysis species choices whenever rv() changes
-  observeEvent(rv(), {
-    species_list <- unique(rv()$species)
-    if(length(species_list) > 0) {
-      updateSelectInput(session, "analysis_species", 
-                        choices = species_list,
-                        selected = species_list[1])
-    }
+  # Update analysis species choices
+  observe({
+    species_list <- tryCatch({
+      result <- dbGetQuery(pool, "SELECT DISTINCT species FROM soil_samples ORDER BY species")
+      if(nrow(result) > 0) result$species else character(0)
+    }, error = function(e) {
+      message("Error fetching species list: ", e$message)
+      character(0)
+    })
+    
+    updateSelectInput(session, "analysis_species", 
+                      choices = c("Select a species" = "", species_list),
+                      selected = "")
   })
   
   # Summary statistics
   output$summary_stats <- renderTable({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
+    
+    if(nrow(species_data) == 0) {
+      return(data.frame(Measure = "No data available", Value = ""))
+    }
     
     data.frame(
       Measure = c("Number of Samples", "Average pH", "pH Range", 
@@ -620,12 +870,12 @@ server <- function(input, output, session) {
                   "Average Potassium (ppm)"),
       Value = c(
         nrow(species_data),
-        round(mean(species_data$ph), 2),
-        paste(round(range(species_data$ph), 2), collapse = " - "),
-        round(mean(species_data$organic_matter), 2),
-        round(mean(species_data$nitrate_ppm), 2),
-        round(mean(species_data$phosphorus_ppm), 2),
-        round(mean(species_data$potassium_ppm), 2)
+        round(mean(species_data$ph, na.rm = TRUE), 2),
+        paste(round(range(species_data$ph, na.rm = TRUE), 2), collapse = " - "),
+        round(mean(species_data$organic_matter, na.rm = TRUE), 2),
+        round(mean(species_data$nitrate_ppm, na.rm = TRUE), 2),
+        round(mean(species_data$phosphorus_ppm, na.rm = TRUE), 2),
+        round(mean(species_data$potassium_ppm, na.rm = TRUE), 2)
       )
     )
   })
@@ -633,7 +883,11 @@ server <- function(input, output, session) {
   # pH distribution plot
   output$ph_plot <- renderPlot({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
+    
+    if(nrow(species_data) == 0) {
+      return(NULL)
+    }
     
     ggplot(species_data, aes(x = ph)) +
       geom_histogram(bins = 15, fill = "skyblue", color = "black") +
@@ -645,12 +899,16 @@ server <- function(input, output, session) {
   # Soil texture plot
   output$texture_plot <- renderPlot({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
     
     # Remove any rows where texture data is NA
     species_data <- species_data[!is.na(species_data$texture_sand) & 
                                    !is.na(species_data$texture_silt) & 
                                    !is.na(species_data$texture_clay), ]
+    
+    if(nrow(species_data) == 0) {
+      return(NULL)
+    }
     
     p <- ggtern(species_data, aes(x = texture_sand, y = texture_silt, z = texture_clay)) +
       geom_point(alpha = 0.6) +
@@ -678,7 +936,11 @@ server <- function(input, output, session) {
   # Nutrient analysis plot
   output$nutrient_plot <- renderPlot({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
+    
+    if(nrow(species_data) == 0) {
+      return(NULL)
+    }
     
     nutrient_data <- species_data %>%
       select(nitrate_ppm, phosphorus_ppm, potassium_ppm, 
@@ -699,7 +961,11 @@ server <- function(input, output, session) {
   # pH vs Organic Matter relationship plot
   output$ph_om_plot <- renderPlot({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
+    
+    if(nrow(species_data) == 0) {
+      return(NULL)
+    }
     
     ggplot(species_data, aes(x = ph, y = organic_matter)) +
       geom_point(aes(color = texture_class), size = 3, alpha = 0.6) +
@@ -718,7 +984,11 @@ server <- function(input, output, session) {
   # Parameter correlation heatmap
   output$heatmap_plot <- renderPlot({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
+    
+    if(nrow(species_data) == 0) {
+      return(NULL)
+    }
     
     # Select numeric columns for correlation
     numeric_cols <- c("ph", "organic_matter", "nitrate_ppm", "phosphorus_ppm", 
@@ -767,7 +1037,11 @@ server <- function(input, output, session) {
   # Geographic distribution plot
   output$map_plot <- renderPlot({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
+    
+    if(nrow(species_data) == 0) {
+      return(NULL)
+    }
     
     # Get US map data
     us_map <- map_data("usa")
@@ -805,9 +1079,10 @@ server <- function(input, output, session) {
   # Raw data table
   output$raw_data <- renderDT({
     req(input$analysis_species)
-    species_data <- rv()[rv()$species == input$analysis_species, ]
+    species_data <- db_get_species_data(input$analysis_species)
     datatable(species_data)
   })
 }
 
+# Create Shiny app
 shinyApp(ui, server)
