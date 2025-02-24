@@ -1,0 +1,14 @@
+Texture,Clay_Min,Clay_Max,Silt_Min,Silt_Max,Sand_Min,Sand_Max
+Heavy Clay,60,100,0,40,0,45
+Silty Clay,40,60,40,60,0,20
+Clay,40,60,40,60,0,45
+Silty Clay Loam,27,40,40,60,0,20
+Clay Loam,27,40,15,52,20,45
+Silt,0,12,88,100,0,20
+Silty Loam,0,27,74,88,0,50
+Sandy Clay,35,55,0,20,45,65
+Loam,7,27,28,50,23,52
+Sandy Clay Loam,20,35,20,45,45,80
+Sandy Loam,0,20,0,50,50,70
+Loamy Sand,0,15,0,30,70,86
+Sand,0,10,0,14,86,100
