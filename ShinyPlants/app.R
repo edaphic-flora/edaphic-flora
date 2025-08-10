@@ -36,13 +36,13 @@ onStop(function() {
 })
 
 # Initialize database tables
-# Initialize database tables
 tryCatch({
   # Create soil_samples table
   dbExecute(pool, "
     CREATE TABLE IF NOT EXISTS soil_samples (
       id SERIAL PRIMARY KEY,
       species VARCHAR(255),
+      cultivar VARCHAR(255),
       ph NUMERIC(4,2),
       organic_matter NUMERIC(5,2),
       nitrate_ppm NUMERIC,
@@ -61,6 +61,7 @@ tryCatch({
       date DATE,
       ecoregion_l4 VARCHAR(255),
       ecoregion_l4_code VARCHAR(50),
+      notes TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )")
   
@@ -96,6 +97,7 @@ db_get_all_samples <- function() {
 
 soil_data <- data.frame(
   species = character(),
+  cultivar = character(),
   ph = numeric(),
   organic_matter = numeric(),
   nitrate_ppm = numeric(),
@@ -114,6 +116,7 @@ soil_data <- data.frame(
   date = as.Date(character()),
   ecoregion_l4 = character(),
   ecoregion_l4_code = character(),
+  notes = character(),
   stringsAsFactors = FALSE
 )
 
@@ -282,7 +285,10 @@ ui <- page_fluid(
         helpText("Start typing to search for species from the database.")
       ),
       
-      # Basic soil parameters
+      # Cultivar input
+      textInput("cultivar", "Cultivar (optional)", ""),
+      
+      # Basic soil parameters and cultivar and note sections
       numericInput("ph", "Soil pH", value = 7.0, min = 0, max = 14, step = 0.1),
       numericInput("organic_matter", "Organic Matter (%)", value = 2, min = 0, max = 100),
       
@@ -336,6 +342,7 @@ ui <- page_fluid(
       numericInput("latitude", "Latitude", value = 0, min = -90, max = 90),
       numericInput("longitude", "Longitude", value = 0, min = -180, max = 180),
       dateInput("date", "Sample Date", value = Sys.Date()),
+      textAreaInput("notes", "Notes", "", height = "100px"),
       actionButton("submit", "Submit Data", class = "btn-primary")
     ),
     
@@ -351,10 +358,10 @@ ui <- page_fluid(
       downloadButton("export_data", "Export All Data"),
       
       # Sample Photos and PDFs
-      fileInput("photo_upload", "Upload Sample Photos",
+      fileInput("photo_upload", "Upload Plant Photo",
                 accept = c('image/png', 'image/jpeg', 'image/jpg'),
                 multiple = TRUE),
-      fileInput("pdf_upload", "Upload Lab Reports (PDF)",
+      fileInput("pdf_upload", "Upload Soil Report (PDF)",
                 accept = c('application/pdf'),
                 multiple = TRUE),
       DTOutput("uploaded_files_table")
@@ -395,6 +402,7 @@ ui <- page_fluid(
 )
 
 server <- function(input, output, session) {
+  data_changed <- reactiveVal(0)
   # CSV Template Download
   output$download_template <- downloadHandler(
     filename = function() {
@@ -443,12 +451,24 @@ server <- function(input, output, session) {
         return()
       }
       
+      # Validate species against database
+      invalid_species <- setdiff(imported_data$species, species_db$taxon_name)
+      if (length(invalid_species) > 0) {
+        showNotification(
+          paste("Invalid species found:", paste(invalid_species, collapse = ", "),
+                "\nPlease ensure all species match the database."),
+          type = "error"
+        )
+        return()
+      }
+      
       # Add each row to database
       for(i in 1:nrow(imported_data)) {
         db_add_sample(imported_data[i,])
       }
       
       showNotification("CSV data imported successfully!", type = "message")
+      data_changed(data_changed() + 1)
     }, error = function(e) {
       showNotification(paste("Error importing CSV:", e$message), type = "error")
     })
@@ -788,6 +808,7 @@ server <- function(input, output, session) {
     
     new_data <- data.frame(
       species = input$species,
+      cultivar = input$cultivar,
       ph = input$ph,
       organic_matter = input$organic_matter,
       nitrate_ppm = input$nitrate,
@@ -805,6 +826,7 @@ server <- function(input, output, session) {
       ecoregion_l4_code = eco$code,
       location_lat = input$latitude,
       location_long = input$longitude,
+      notes = input$notes,
       date = input$date
     )
     
@@ -813,6 +835,7 @@ server <- function(input, output, session) {
     
     if (!is.null(sample_id)) {
       showNotification("Data added successfully!", type = "message")
+      data_changed(data_changed() + 1)  # Increment the counter to trigger update
     } else {
       showNotification("Error adding data", type = "error")
     }
@@ -840,6 +863,8 @@ server <- function(input, output, session) {
   
   # Update analysis species choices
   observe({
+    data_changed()
+    
     species_list <- tryCatch({
       result <- dbGetQuery(pool, "SELECT DISTINCT species FROM soil_samples ORDER BY species")
       if(nrow(result) > 0) result$species else character(0)
