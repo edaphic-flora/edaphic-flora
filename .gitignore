@@ -1,0 +1,28 @@
+# RStudio / R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.Rprofile
+
+# Secrets (never commit)
+.Renviron
+.env
+
+# renv (keep only renv.lock in git)
+renv/library/
+renv/staging/
+renv/profiles/
+
+# Shiny / deploy artifacts
+rsconnect/
+www/uploads/          # user uploads – keep out of git
+*.sqlite
+*.db
+*.Rds
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
