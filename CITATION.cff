@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: Edaphic Flora
+message: "If you use this software or dataset, please cite it as below."
+type: software
+authors:
+  - family-names: Testerman
+    given-names: Todd
+repository-code: "https://github.com/todd-testerman/EdaphicFlora"
+license: AGPL-3.0-or-later
+keywords: [plants, soils, ecology, shiny, R]
+version: 0.1.0
+date-released: 2025-08-24
