@@ -64,7 +64,10 @@ polished::polished_config(
 # ---------------------------
 
 base_ui <- page_navbar(
- title = span(icon("seedling"), "Edaphic Flora"),
+ title = span(
+   HTML('<svg width="24" height="20" viewBox="0 0 345 279" style="vertical-align: middle; margin-right: 6px;"><path d="M345 279C345 186.448 265.385 -18.4897 0 1.34294C0 173.226 112.788 279 345 279Z" fill="currentColor"/></svg>'),
+   "Edaphic Flora"
+ ),
  theme = edaphic_bs_theme(),
  fillable = TRUE,
 
