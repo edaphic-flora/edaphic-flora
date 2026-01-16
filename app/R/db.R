@@ -77,6 +77,18 @@ db_migrate <- function() {
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
 
+    # PDF extraction rate limiting table
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS pdf_extractions (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        tokens_used INTEGER,
+        filename TEXT
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_pdf_extractions_user ON pdf_extractions(user_id)")
+
     TRUE
   }, error = function(e) {
     message("DB migration error: ", e$message)
@@ -134,4 +146,122 @@ db_add_sample <- function(sample_data) {
     message("db_add_sample error: ", e$message)
     NULL
   })
+}
+
+# ---------------------------
+# Edit/Delete Functions
+# ---------------------------
+
+db_get_sample_by_id <- function(id) {
+  tryCatch({
+    dbGetQuery(pool, "SELECT * FROM soil_samples WHERE id = $1", params = list(id))
+  }, error = function(e) {
+    message("Error fetching sample by id: ", e$message)
+    data.frame()
+  })
+}
+
+db_get_user_samples <- function(user_id) {
+  if (is.null(user_id) || !nzchar(trimws(user_id))) return(data.frame())
+  tryCatch({
+    dbGetQuery(pool, "SELECT * FROM soil_samples WHERE created_by = $1 ORDER BY created_at DESC",
+               params = list(user_id))
+  }, error = function(e) {
+    message("Error fetching user samples: ", e$message)
+    data.frame()
+  })
+}
+
+db_update_sample <- function(id, sample_data, user_id, is_admin = FALSE) {
+  tryCatch({
+    # Verify ownership (unless admin)
+    existing <- dbGetQuery(pool, "SELECT created_by FROM soil_samples WHERE id = $1", params = list(id))
+    if (nrow(existing) == 0) {
+      message("Sample not found: ", id)
+      return(FALSE)
+    }
+    if (!is_admin && (is.na(existing$created_by[1]) || existing$created_by[1] != user_id)) {
+      message("User does not own this sample")
+      return(FALSE)
+    }
+
+    # Format date if present
+    if ("date" %in% names(sample_data)) {
+      sample_data$date <- as.character(as.Date(sample_data$date))
+    }
+
+    # Build UPDATE statement
+    fields <- names(sample_data)
+    set_clauses <- paste0(fields, " = $", seq_along(fields))
+    values <- as.list(unname(sample_data))
+    values <- c(values, list(id))  # Add id as last parameter
+
+    sql <- sprintf("UPDATE soil_samples SET %s WHERE id = $%d",
+                   paste(set_clauses, collapse = ", "), length(fields) + 1)
+    dbExecute(pool, sql, params = values)
+    TRUE
+  }, error = function(e) {
+    message("db_update_sample error: ", e$message)
+    FALSE
+  })
+}
+
+db_delete_sample <- function(id, user_id, is_admin = FALSE) {
+  tryCatch({
+    # Verify ownership (unless admin)
+    existing <- dbGetQuery(pool, "SELECT created_by FROM soil_samples WHERE id = $1", params = list(id))
+    if (nrow(existing) == 0) {
+      message("Sample not found: ", id)
+      return(FALSE)
+    }
+    if (!is_admin && (is.na(existing$created_by[1]) || existing$created_by[1] != user_id)) {
+      message("User does not own this sample")
+      return(FALSE)
+    }
+
+    dbExecute(pool, "DELETE FROM soil_samples WHERE id = $1", params = list(id))
+    TRUE
+  }, error = function(e) {
+    message("db_delete_sample error: ", e$message)
+    FALSE
+  })
+}
+
+# ---------------------------
+# PDF Extraction Rate Limiting
+# ---------------------------
+
+db_get_extraction_count_today <- function(user_id) {
+  tryCatch({
+    result <- dbGetQuery(pool,
+      "SELECT COUNT(*) as count FROM pdf_extractions
+       WHERE user_id = $1 AND extracted_at >= CURRENT_DATE",
+      params = list(user_id))
+    result$count[1]
+  }, error = function(e) {
+    message("Error getting extraction count: ", e$message)
+    0
+  })
+}
+
+db_log_extraction <- function(user_id, filename = NULL, tokens_used = NULL) {
+  tryCatch({
+    dbExecute(pool,
+      "INSERT INTO pdf_extractions (user_id, filename, tokens_used) VALUES ($1, $2, $3)",
+      params = list(user_id, filename, tokens_used))
+    TRUE
+  }, error = function(e) {
+    message("Error logging extraction: ", e$message)
+    FALSE
+  })
+}
+
+db_can_extract <- function(user_id, daily_limit = 5) {
+  count <- db_get_extraction_count_today(user_id)
+  count < daily_limit
+}
+
+db_get_remaining_extractions <- function(user_id, daily_limit = 5) {
+  count <- db_get_extraction_count_today(user_id)
+  max(0, daily_limit - count)
 }
