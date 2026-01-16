@@ -1,0 +1,24 @@
+# --- Postgres (Neon)
+POSTGRES_HOST=ep-xxxxx.neon.tech
+POSTGRES_PORT=5432
+POSTGRES_DB=neondb
+POSTGRES_USER=shiny_app
+POSTGRES_PASSWORD=change_me
+POSTGRES_SSLMODE=require
+
+# --- S3 (uploads)
+S3_BUCKET=shinyplantsbucket
+AWS_DEFAULT_REGION=us-east-2
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+
+# --- Polished + Firebase
+POLISHED_APP_NAME=edaphic-flora
+POLISHED_API_KEY=your-polished-api-key
+FIREBASE_API_KEY=your-firebase-web-api-key
+FIREBASE_AUTH_DOMAIN=REDACTED_FIREBASE_DOMAIN
+FIREBASE_PROJECT_ID=edaphic-flora
+
+# --- App guards
+MAX_FILE_SIZE_MB=20
+MAX_FILES_PER_USER_PER_DAY=200
