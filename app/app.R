@@ -631,10 +631,21 @@ base_ui <- page_navbar(
              "by researchers, gardeners, and educators. Your email is stored for attribution but not publicly displayed."),
 
            h5("What species can I enter?"),
-           p(class = "text-muted",
+           p(class = "text-muted mb-4",
              "The species search uses the ",
              tags$a(href = "https://powo.science.kew.org/", target = "_blank", "World Checklist of Vascular Plants (WCVP)"),
-             ", which includes over 360,000 accepted plant species. If you can't find a species, try the scientific name without the author citation.")
+             ", which includes over 360,000 accepted plant species. If you can't find a species, try the scientific name without the author citation."),
+
+           hr(class = "my-4"),
+           div(class = "text-center text-muted small",
+             tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/blob/main/PRIVACY.md", target = "_blank", "Privacy Policy"),
+             span(class = "mx-2", "|"),
+             tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/blob/main/TERMS.md", target = "_blank", "Terms of Service"),
+             span(class = "mx-2", "|"),
+             tags$a(href = "https://github.com/todd-testerman/EdaphicFlora", target = "_blank", "GitHub"),
+             span(class = "mx-2", "|"),
+             tags$a(href = "https://buymeacoffee.com/toddtesterman", target = "_blank", "Support")
+           )
          )
        )
      )
