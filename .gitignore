@@ -29,5 +29,8 @@ test_soil_reports/
 # These are already loaded into the database; keep locally but don't commit
 app/data/cache/
 
+# Deployment scripts (may contain credentials)
+deploy.R
+
 # Windows artifacts
 nul
