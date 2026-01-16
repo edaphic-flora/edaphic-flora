@@ -88,7 +88,35 @@ get_usda_characteristics_for_name <- function(gs_name, pool) {
  if (is.null(row)) return(NULL)
 
  tryCatch({
+   # Try ref_usda_traits first (new table from fetch_usda_data.R)
    result <- DBI::dbGetQuery(pool, "
+     SELECT
+       r.taxon_id,
+       t.usda_symbol,
+       t.scientific_name,
+       r.soil_ph_min,
+       r.soil_ph_max,
+       r.salinity_tolerance,
+       r.shade_tolerance,
+       r.drought_tolerance,
+       r.moisture_use,
+       r.bloom_period,
+       r.duration,
+       r.growth_habit,
+       r.native_status,
+       r.precip_min_in,
+       r.precip_max_in,
+       r.temp_min_f
+     FROM ref_usda_traits r
+     JOIN ref_taxon t ON t.id = r.taxon_id
+     WHERE r.taxon_id = $1
+     LIMIT 1",
+     params = list(row$taxon_id))
+
+   if (nrow(result) > 0) return(result)
+
+   # Fallback to ref_usda_characteristics (legacy table)
+   result2 <- DBI::dbGetQuery(pool, "
      SELECT
        c.taxon_id,
        t.usda_symbol,
@@ -98,9 +126,6 @@ get_usda_characteristics_for_name <- function(gs_name, pool) {
        c.salinity_tolerance,
        c.shade_tolerance,
        c.drought_tolerance,
-       c.soil_texture_coarse,
-       c.soil_texture_medium,
-       c.soil_texture_fine,
        c.precipitation_min_mm,
        c.precipitation_max_mm,
        c.min_temp_c
@@ -110,8 +135,8 @@ get_usda_characteristics_for_name <- function(gs_name, pool) {
      LIMIT 1",
      params = list(row$taxon_id))
 
-   if (nrow(result) == 0) return(NULL)
-   result
+   if (nrow(result2) == 0) return(NULL)
+   result2
  }, error = function(e) {
    message("get_usda_characteristics_for_name error: ", e$message)
    NULL
