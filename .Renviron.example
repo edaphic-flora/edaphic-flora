@@ -1,0 +1,34 @@
+# Edaphic Flora Environment Configuration
+# Copy this file to .Renviron and fill in your values
+# For dev/prod separation, you can create:
+#   - .Renviron.dev (development settings)
+#   - .Renviron.prod (production settings)
+# Then set ENV=dev or ENV=prod to switch
+
+# Environment (dev or prod)
+ENV=dev
+
+# Database (Neon/Postgres)
+# For dev, consider using a Neon branch: https://neon.tech/docs/manage/branches
+POSTGRES_HOST=
+POSTGRES_PORT=5432
+POSTGRES_DB=neondb
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_SSLMODE=require
+
+# Auth (Polished + Firebase)
+POLISHED_APP_NAME=
+POLISHED_API_KEY=
+FIREBASE_API_KEY=
+FIREBASE_AUTH_DOMAIN=
+FIREBASE_PROJECT_ID=
+
+# Admin (comma-separated email list)
+ADMIN_EMAILS=your-email@example.com
+
+# Claude API for PDF soil report extraction
+ANTHROPIC_API_KEY=your-api-key-here
+
+# PDF extraction rate limit (extractions per day per user, default 5)
+PDF_EXTRACT_DAILY_LIMIT=5
