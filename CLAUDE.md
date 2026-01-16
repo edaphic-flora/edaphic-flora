@@ -27,6 +27,35 @@ Rscript -e "shiny::runApp('app/app.R', port=7420, host='127.0.0.1')"
 cd app && Rscript generate_species_db.R
 ```
 
+## Dev/Prod Environment Setup
+
+The app supports separate development and production environments:
+
+1. **Environment Variable**: Set `ENV=dev` or `ENV=prod` in `.Renviron`
+2. **Dev Indicator**: When `ENV=dev`, a yellow "DEV" badge appears in the navbar
+3. **Database Separation**: Use Neon branches for dev database:
+   - Production: main Neon branch
+   - Development: create a branch at https://console.neon.tech
+
+### Recommended Workflow
+```bash
+# Local development
+1. Copy .Renviron.example to .Renviron
+2. Set ENV=dev and configure dev database credentials
+3. Test locally on port 7420
+
+# Production deployment
+1. Configure production .Renviron (or platform env vars)
+2. Set ENV=prod (or omit - defaults to prod)
+3. Use main database branch
+```
+
+### Neon Database Branching
+Neon allows creating database branches (like git branches):
+- Create a dev branch from production for safe testing
+- Changes in dev branch don't affect production data
+- Merge or discard branches as needed
+
 ## Architecture
 
 ```
@@ -53,10 +82,13 @@ app/
 
 ### UI Structure
 
-The app uses `page_navbar` with three main tabs:
-1. **Data Entry**: Sidebar form with accordion sections + recent entries table
-2. **Analysis**: Species selector sidebar + tabbed visualizations (8 tabs)
-3. **Data Management**: Import/export functionality
+The app uses `page_navbar` with these main sections:
+1. **Welcome**: Landing page with app overview and stats
+2. **Data Entry**: Sidebar form with accordion sections + recent entries table (users can edit/delete their own entries)
+3. **Analysis**: Species selector sidebar + tabbed visualizations (8 tabs)
+4. **Data Management**: Import/export functionality
+5. **Admin**: Admin-only data management (requires ADMIN_EMAILS config)
+6. **Help Menu**: Field Guide and FAQ
 
 ### Visualization Stack
 
@@ -97,7 +129,16 @@ POLISHED_API_KEY=
 FIREBASE_API_KEY=
 FIREBASE_AUTH_DOMAIN=
 FIREBASE_PROJECT_ID=
+
+# Admin (comma-separated email list for admin access)
+ADMIN_EMAILS=admin@example.com,owner@example.com
 ```
+
+### Admin Features
+Admin users (defined by `ADMIN_EMAILS`) can:
+- Edit/delete any user's entries (not just their own)
+- Access the Admin tab with full data management
+- Export all data from the admin panel
 
 ## Key Dependencies
 
