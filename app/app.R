@@ -192,22 +192,24 @@ base_ui <- page_navbar(
        width = 380,
        bg = "#f8f9fa",
 
-       # PDF Upload Section (conditional on API key availability)
+       # Soil Report Upload Section (conditional on API key availability)
        if (is_pdf_extraction_available()) {
          div(
            class = "mb-3 p-3 border rounded bg-light",
            div(class = "d-flex align-items-center mb-2",
-               icon("file-pdf", class = "text-danger me-2"),
+               icon("file-lines", class = "text-success me-2"),
                strong("Upload Soil Report"),
                span(class = "badge bg-info ms-2", "Beta")),
            fileInput("pdf_upload", NULL,
-                     accept = "application/pdf",
-                     buttonLabel = "Choose PDF",
+                     accept = c("application/pdf", ".pdf", ".rtf", ".txt",
+                                "image/png", "image/jpeg", "image/gif", "image/webp",
+                                ".png", ".jpg", ".jpeg", ".gif", ".webp"),
+                     buttonLabel = "Choose File",
                      placeholder = "No file selected"),
            uiOutput("pdf_extract_status"),
            helpText(class = "text-muted small",
-                    "Upload a soil test PDF to auto-fill the form. ",
-                    "You can review and correct values before submitting.")
+                    "Upload a soil report to auto-fill the form. ",
+                    "Supports PDF, RTF, TXT, and images (PNG, JPG).")
          )
        },
 
@@ -234,6 +236,15 @@ base_ui <- page_navbar(
            icon = icon("flask"),
            numericInput("ph", "Soil pH", value = NA, min = 0, max = 14, step = 0.1),
            numericInput("organic_matter", "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1),
+           selectInput("organic_matter_class", "Organic Matter (Qualitative)",
+                       choices = c("Select if no % available" = "",
+                                   "Very Low" = "Very Low",
+                                   "Low" = "Low",
+                                   "Medium Low" = "Medium Low",
+                                   "Medium" = "Medium",
+                                   "Medium High" = "Medium High",
+                                   "High" = "High",
+                                   "Very High" = "Very High")),
            numericInput("cec", "Cation Exchange Capacity (meq/100g)", value = NA, min = 0, step = 0.1),
            numericInput("soluble_salts", "Soluble Salts (ppm)", value = NA, min = 0)
          ),
@@ -590,6 +601,13 @@ base_ui <- page_navbar(
              "Submit what you have! Leave fields blank if you don't have that data—they'll be excluded from analysis ",
              "rather than treated as zeros. pH and organic matter are the most valuable parameters to include."),
 
+           h5("How does the soil report upload work?"),
+           p(class = "text-muted mb-4",
+             "You can upload soil test reports (PDF, RTF, TXT, or image files) and the app will automatically extract ",
+             "values to pre-fill the form. This uses AI to read your report - always review the extracted values before submitting. ",
+             tags$strong("Tip for multi-sample reports:"), " If your report contains multiple samples, use your computer's ",
+             "screenshot/snipping tool to crop just the sample you want, then upload the cropped image."),
+
            h5("How are ecoregions determined?"),
            p(class = "text-muted mb-4",
              "When you enter coordinates, the app automatically identifies the ",
@@ -661,7 +679,10 @@ edit_modal_ui <- modalDialog(
       selectInput("edit_site_hydrology", "Site Hydrology",
                   choices = c("Select..." = "", "Dry", "Mesic", "Wet")),
       numericInput("edit_ph", "pH", value = NA, min = 0, max = 14, step = 0.1),
-      numericInput("edit_organic_matter", "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1)
+      numericInput("edit_organic_matter", "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1),
+      selectInput("edit_organic_matter_class", "OM Class (Qualitative)",
+                  choices = c("Select..." = "", "Very Low", "Low", "Medium Low",
+                              "Medium", "Medium High", "High", "Very High"))
     ),
 
     # Right column
@@ -798,6 +819,9 @@ server_inner <- function(input, output, session) {
      # Soil Properties
      if (!is.null(data$ph)) updateNumericInput(session, "ph", value = data$ph)
      if (!is.null(data$organic_matter)) updateNumericInput(session, "organic_matter", value = data$organic_matter)
+     if (!is.null(data$organic_matter_class) && nzchar(data$organic_matter_class)) {
+       updateSelectInput(session, "organic_matter_class", selected = data$organic_matter_class)
+     }
      if (!is.null(data$cec_meq)) updateNumericInput(session, "cec", value = data$cec_meq)
      if (!is.null(data$soluble_salts_ppm)) updateNumericInput(session, "soluble_salts", value = data$soluble_salts_ppm)
 
@@ -817,11 +841,21 @@ server_inner <- function(input, output, session) {
      if (!is.null(data$boron_ppm)) updateNumericInput(session, "boron", value = data$boron_ppm)
      if (!is.null(data$copper_ppm)) updateNumericInput(session, "copper", value = data$copper_ppm)
 
-     # Texture
-     if (!is.null(data$texture_sand)) updateNumericInput(session, "sand", value = data$texture_sand)
-     if (!is.null(data$texture_silt)) updateNumericInput(session, "silt", value = data$texture_silt)
-     if (!is.null(data$texture_clay)) updateNumericInput(session, "clay", value = data$texture_clay)
-     if (!is.null(data$texture_class)) updateSelectInput(session, "texture_class_dropdown", selected = data$texture_class)
+     # Texture - handle both percentage and classification inputs
+     has_percentages <- !is.null(data$texture_sand) || !is.null(data$texture_silt) || !is.null(data$texture_clay)
+     has_class <- !is.null(data$texture_class) && nzchar(data$texture_class)
+
+     if (has_percentages) {
+       # If we have percentages, use percentage mode
+       updateRadioButtons(session, "texture_input_type", selected = "pct")
+       if (!is.null(data$texture_sand)) updateNumericInput(session, "sand", value = data$texture_sand)
+       if (!is.null(data$texture_silt)) updateNumericInput(session, "silt", value = data$texture_silt)
+       if (!is.null(data$texture_clay)) updateNumericInput(session, "clay", value = data$texture_clay)
+     } else if (has_class) {
+       # If we only have class (no percentages), use classification mode
+       updateRadioButtons(session, "texture_input_type", selected = "class")
+       updateSelectInput(session, "texture_class", selected = data$texture_class)
+     }
 
      # Date
      if (!is.null(data$sample_date)) {
@@ -833,6 +867,9 @@ server_inner <- function(input, output, session) {
      # Notes - append extraction info
      notes_text <- ""
      if (!is.null(data$lab_name)) notes_text <- paste0("Lab: ", data$lab_name)
+     if (!is.null(data$sample_id) && nzchar(data$sample_id)) {
+       notes_text <- paste(notes_text, paste0("Sample ID: ", data$sample_id), sep = if (nzchar(notes_text)) "; " else "")
+     }
      if (!is.null(data$notes) && nzchar(data$notes)) {
        notes_text <- paste(notes_text, data$notes, sep = if (nzchar(notes_text)) "; " else "")
      }
@@ -842,7 +879,19 @@ server_inner <- function(input, output, session) {
        updateTextAreaInput(session, "notes", value = new_notes)
      }
 
-     showNotification("PDF data extracted! Please review values before submitting.", type = "message", duration = 5)
+     # Handle extraction warnings
+     warning_msg <- NULL
+     if (!is.null(data$extraction_warnings) && length(data$extraction_warnings) > 0) {
+       warnings_list <- unlist(data$extraction_warnings)
+       warning_msg <- paste(warnings_list, collapse = "; ")
+       showNotification(
+         paste("Extraction warnings:", warning_msg),
+         type = "warning",
+         duration = 10
+       )
+     }
+
+     showNotification("Data extracted! Please review values before submitting.", type = "message", duration = 5)
 
    } else {
      showNotification(paste("Extraction failed:", result$error), type = "error", duration = 8)
@@ -1162,6 +1211,7 @@ server_inner <- function(input, output, session) {
        inat_url = get_sp_input("inat", sp),
        ph = input$ph,
        organic_matter = input$organic_matter,
+       organic_matter_class = if (nzchar(input$organic_matter_class)) input$organic_matter_class else NA,
        cec_meq = input$cec,
        soluble_salts_ppm = input$soluble_salts,
        nitrate_ppm = input$nitrate,
@@ -1801,6 +1851,7 @@ server_inner <- function(input, output, session) {
    updateSelectInput(session, "edit_site_hydrology", selected = entry$site_hydrology[1] %||% "")
    updateNumericInput(session, "edit_ph", value = entry$ph[1])
    updateNumericInput(session, "edit_organic_matter", value = entry$organic_matter[1])
+   updateSelectInput(session, "edit_organic_matter_class", selected = entry$organic_matter_class[1] %||% "")
    updateNumericInput(session, "edit_nitrate", value = entry$nitrate_ppm[1])
    updateNumericInput(session, "edit_phosphorus", value = entry$phosphorus_ppm[1])
    updateNumericInput(session, "edit_potassium", value = entry$potassium_ppm[1])
@@ -1835,6 +1886,7 @@ server_inner <- function(input, output, session) {
      site_hydrology = if (nzchar(input$edit_site_hydrology)) input$edit_site_hydrology else NA,
      ph = input$edit_ph,
      organic_matter = input$edit_organic_matter,
+     organic_matter_class = if (nzchar(input$edit_organic_matter_class)) input$edit_organic_matter_class else NA,
      nitrate_ppm = input$edit_nitrate,
      phosphorus_ppm = input$edit_phosphorus,
      potassium_ppm = input$edit_potassium,
