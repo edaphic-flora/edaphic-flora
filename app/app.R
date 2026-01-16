@@ -65,8 +65,34 @@ polished::polished_config(
 
 base_ui <- page_navbar(
  title = span(
-   HTML('<svg width="24" height="20" viewBox="0 0 345 279" style="vertical-align: middle; margin-right: 6px;"><path d="M345 279C345 186.448 265.385 -18.4897 0 1.34294C0 173.226 112.788 279 345 279Z" fill="currentColor"/></svg>'),
-   "Edaphic Flora"
+   class = "brand-name",
+   HTML('<svg width="36" height="28" viewBox="170 0 250 280" style="vertical-align: middle; margin-right: 8px;">
+     <path d="M233.399 149.972L237.399 149.972L237.399 270.114L233.399 270.114L233.399 149.972Z" fill="#7A9A86"/>
+     <path d="M280.485 171.514C280.485 183.114 270.542 208.8 237.399 206.314C237.399 184.772 251.485 171.514 280.485 171.514Z" fill="#7A9A86"/>
+     <path d="M280.485 217.086C280.485 228.686 270.542 254.372 237.399 251.886C237.399 230.343 251.485 217.086 280.485 217.086Z" fill="#7A9A86"/>
+     <path d="M234.085 252.054C234.085 240.454 224.142 214.768 190.999 217.254C190.999 238.797 205.085 252.054 234.085 252.054Z" fill="#7A9A86"/>
+     <path d="M234.085 206.483C234.085 194.883 224.142 169.197 190.999 171.683C190.999 193.226 205.085 206.483 234.085 206.483Z" fill="#7A9A86"/>
+     <path d="M293.742 91.9716C293.742 124.004 267.775 149.972 235.742 149.972C203.71 149.972 177.742 124.004 177.742 91.9716H293.742Z" fill="#7A9A86"/>
+     <path d="M198.457 87.8286C198.457 81.8797 203.094 77.0572 208.814 77.0572C214.534 77.0572 219.171 81.8797 219.171 87.8286L198.457 87.8286Z" fill="#7A9A86"/>
+     <path d="M224.97 87.8286C224.97 81.8797 229.607 77.0572 235.327 77.0572C241.048 77.0572 245.685 81.8797 245.685 87.8286L224.97 87.8286Z" fill="#7A9A86"/>
+     <path d="M251.485 87.8286C251.485 81.8797 256.122 77.0572 261.842 77.0572C267.562 77.0572 272.199 81.8797 272.199 87.8286L251.485 87.8286Z" fill="#7A9A86"/>
+     <path d="M349.742 70.4288L353.742 70.4288L353.742 270.114L349.742 270.114L349.742 70.4288Z" fill="#7A9A86"/>
+     <path d="M396.485 171.514C396.485 183.114 386.542 208.8 353.399 206.314C353.399 184.772 367.485 171.514 396.485 171.514Z" fill="#7A9A86"/>
+     <path d="M396.485 125.943C396.485 137.543 386.542 163.229 353.399 160.743C353.399 139.2 367.485 125.943 396.485 125.943Z" fill="#7A9A86"/>
+     <path d="M396.485 80.3716C396.485 91.9716 386.542 117.657 353.399 115.172C353.399 93.6287 367.485 80.3716 396.485 80.3716Z" fill="#7A9A86"/>
+     <path d="M396.485 217.086C396.485 228.686 386.542 254.372 353.399 251.886C353.399 230.343 367.485 217.086 396.485 217.086Z" fill="#7A9A86"/>
+     <path d="M350.085 252.054C350.085 240.454 340.142 214.768 306.999 217.254C306.999 238.797 321.085 252.054 350.085 252.054Z" fill="#7A9A86"/>
+     <path d="M350.085 206.483C350.085 194.883 340.142 169.197 306.999 171.683C306.999 193.226 321.085 206.483 350.085 206.483Z" fill="#7A9A86"/>
+     <path d="M350.085 160.911C350.085 149.311 340.142 123.626 306.999 126.111C306.999 147.654 321.085 160.911 350.085 160.911Z" fill="#7A9A86"/>
+     <path d="M350.085 115.34C350.085 103.74 340.142 78.0541 306.999 80.5398C306.999 102.083 321.085 115.34 350.085 115.34Z" fill="#7A9A86"/>
+     <path d="M409.742 14.9144C409.742 46.9469 383.775 72.9144 351.742 72.9144C319.71 72.9144 293.742 46.9469 293.742 14.9144H409.742Z" fill="#7A9A86"/>
+     <path d="M314.457 10.7715C314.457 4.82259 319.094 5.6113e-05 324.814 5.6613e-05C330.534 5.71131e-05 335.171 4.82259 335.171 10.7715L314.457 10.7715Z" fill="#7A9A86"/>
+     <path d="M340.97 10.7715C340.97 4.82259 345.607 5.6113e-05 351.327 5.6613e-05C357.048 5.71131e-05 361.685 4.82259 361.685 10.7715L340.97 10.7715Z" fill="#7A9A86"/>
+     <path d="M367.485 10.7715C367.485 4.82259 372.122 5.6113e-05 377.842 5.6613e-05C383.562 5.71131e-05 388.199 4.82259 388.199 10.7715L367.485 10.7715Z" fill="#7A9A86"/>
+   </svg>'),
+   span(class = "brand-name-edaphic", "edaphic"),
+   " ",
+   span(class = "brand-name-flora", "flora")
  ),
  theme = edaphic_bs_theme(),
  fillable = TRUE,
@@ -76,7 +102,9 @@ base_ui <- page_navbar(
    tags$head(
      tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
      tags$link(rel = "stylesheet",
-               href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css")
+               href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+     tags$link(rel = "stylesheet",
+               href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap")
    )
  ),
 
@@ -92,8 +120,10 @@ base_ui <- page_navbar(
        card_header(
          class = "bg-transparent border-0 pt-4",
          div(class = "text-center",
-             HTML('<svg width="60" height="48" viewBox="0 0 345 279" style="margin-bottom: 1rem;"><path d="M345 279C345 186.448 265.385 -18.4897 0 1.34294C0 173.226 112.788 279 345 279Z" fill="#7A9A86"/></svg>'),
-             h2("Welcome to Edaphic Flora"),
+             h1(class = "welcome-brand mb-3",
+                span(class = "brand-name-edaphic", "edaphic"),
+                " ",
+                span(class = "brand-name-flora", "flora")),
              p(class = "lead text-muted", "A community database for soil conditions and plant species")
          )
        ),
@@ -168,25 +198,42 @@ base_ui <- page_navbar(
            title = "Soil Properties",
            value = "soil_props",
            icon = icon("flask"),
-           numericInput("ph", "Soil pH", value = 7.0, min = 0, max = 14, step = 0.1),
-           numericInput("organic_matter", "Organic Matter (%)", value = 2, min = 0, max = 100, step = 0.1)
+           numericInput("ph", "Soil pH", value = NA, min = 0, max = 14, step = 0.1),
+           numericInput("organic_matter", "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1),
+           numericInput("cec", "Cation Exchange Capacity (meq/100g)", value = NA, min = 0, step = 0.1),
+           numericInput("soluble_salts", "Soluble Salts (ppm)", value = NA, min = 0)
          ),
 
-         # Nutrients
+         # Macronutrients
          accordion_panel(
-           title = "Nutrients (ppm)",
-           value = "nutrients",
+           title = "Macronutrients (ppm)",
+           value = "macronutrients",
            icon = icon("leaf"),
            layout_column_wrap(
              width = 1/2,
-             numericInput("nitrate", "Nitrate", value = 0, min = 0),
-             numericInput("ammonium", "Ammonium", value = 0, min = 0),
-             numericInput("phosphorus", "Phosphorus", value = 0, min = 0),
-             numericInput("potassium", "Potassium", value = 0, min = 0),
-             numericInput("calcium", "Calcium", value = 0, min = 0),
-             numericInput("magnesium", "Magnesium", value = 0, min = 0)
-           ),
-           numericInput("soluble_salts", "Soluble Salts", value = 0, min = 0)
+             numericInput("nitrate", "Nitrate (N)", value = NA, min = 0),
+             numericInput("ammonium", "Ammonium (N)", value = NA, min = 0),
+             numericInput("phosphorus", "Phosphorus (P)", value = NA, min = 0),
+             numericInput("potassium", "Potassium (K)", value = NA, min = 0),
+             numericInput("calcium", "Calcium (Ca)", value = NA, min = 0),
+             numericInput("magnesium", "Magnesium (Mg)", value = NA, min = 0),
+             numericInput("sulfur", "Sulfur (S)", value = NA, min = 0)
+           )
+         ),
+
+         # Micronutrients
+         accordion_panel(
+           title = "Micronutrients (ppm)",
+           value = "micronutrients",
+           icon = icon("seedling"),
+           layout_column_wrap(
+             width = 1/2,
+             numericInput("iron", "Iron (Fe)", value = NA, min = 0),
+             numericInput("manganese", "Manganese (Mn)", value = NA, min = 0),
+             numericInput("zinc", "Zinc (Zn)", value = NA, min = 0),
+             numericInput("copper", "Copper (Cu)", value = NA, min = 0),
+             numericInput("boron", "Boron (B)", value = NA, min = 0, step = 0.1)
+           )
          ),
 
          # Texture
@@ -294,13 +341,13 @@ base_ui <- page_navbar(
          uiOutput("summary_ui")
        ),
        nav_panel(
-         title = "pH Distribution",
+         title = "pH",
          icon = icon("chart-bar"),
          uiOutput("ph_plot_ui")
        ),
        nav_panel(
-         title = "pH vs Organic Matter",
-         icon = icon("chart-scatter"),
+         title = "pH vs OM",
+         icon = icon("circle-nodes"),
          uiOutput("ph_om_plot_ui")
        ),
        nav_panel(
@@ -444,7 +491,30 @@ base_ui <- page_navbar(
              tags$dt(class = "col-sm-3", "Correlations"),
              tags$dd(class = "col-sm-9", "Heatmap showing statistical correlations between soil parameters. ",
                      "Red = positive correlation, Blue = negative correlation.")
-           )
+           ),
+
+           h4(class = "mt-4", "External Resources"),
+           tags$ul(
+             tags$li(tags$a(href = "https://plants.usda.gov/", target = "_blank", "USDA PLANTS Database"),
+                     " - Comprehensive plant information including characteristics and distributions"),
+             tags$li(tags$a(href = "https://soilhealthlab.cals.cornell.edu/", target = "_blank", "Cornell Soil Health Lab"),
+                     " - Comprehensive soil health assessment and testing"),
+             tags$li(tags$a(href = "https://ohioline.osu.edu/factsheet/agf-0514", target = "_blank", "Interpreting Soil Test Reports (Ohio State)"),
+                     " - Guide to understanding lab results"),
+             tags$li(tags$a(href = "https://www.nrcs.usda.gov/wps/portal/nrcs/detail/soils/survey/", target = "_blank", "USDA Web Soil Survey"),
+                     " - Detailed soil information by location"),
+             tags$li(tags$a(href = "https://powo.science.kew.org/", target = "_blank", "Plants of the World Online (Kew)"),
+                     " - Authoritative plant taxonomy and nomenclature"),
+             tags$li(tags$a(href = "https://www.inaturalist.org/", target = "_blank", "iNaturalist"),
+                     " - Citizen science platform for species observations")
+           ),
+
+           div(class = "mt-4 p-3 bg-light rounded",
+               tags$small(class = "text-muted",
+                          icon("book"), " ",
+                          tags$strong("References: "),
+                          "Nutrient guidelines adapted from university extension publications. ",
+                          "Species data from WCVP (Royal Botanic Gardens, Kew) and USDA PLANTS Database."))
          )
        )
      )
@@ -463,8 +533,11 @@ base_ui <- page_navbar(
 
            h5("Where should my soil test come from?"),
            p(class = "text-muted mb-4",
-             "Use results from a professional soil testing lab (university extension services, commercial labs) ",
-             "or a reliable home soil test kit. For best results, collect samples from the root zone of the plants you're recording."),
+             "Use results from a professional soil testing lab (",
+             tags$a(href = "https://www.nifa.usda.gov/grants/programs/cooperative-extension-system", target = "_blank", "university extension services"),
+             ", commercial labs) or a reliable home soil test kit. For best results, collect samples from the root zone of the plants you're recording. ",
+             "See the ", tags$a(href = "https://soilhealthlab.cals.cornell.edu/", target = "_blank", "Cornell Soil Health Lab"),
+             " for detailed sampling guidance."),
 
            h5("Can I submit data for plants that died or failed?"),
            p(class = "text-muted mb-4",
@@ -473,18 +546,20 @@ base_ui <- page_navbar(
 
            h5("What if I don't have all the soil test values?"),
            p(class = "text-muted mb-4",
-             "Submit what you have. pH and organic matter are the most important. Leave other nutrient fields at 0 ",
-             "or their defaults if you don't have that data."),
+             "Submit what you have! Leave fields blank if you don't have that data—they'll be excluded from analysis ",
+             "rather than treated as zeros. pH and organic matter are the most valuable parameters to include."),
 
            h5("How are ecoregions determined?"),
            p(class = "text-muted mb-4",
-             "When you enter coordinates, the app automatically identifies the EPA Level IV ecoregion. ",
-             "This provides ecological context—plants in the same ecoregion often face similar conditions."),
+             "When you enter coordinates, the app automatically identifies the ",
+             tags$a(href = "https://www.epa.gov/eco-research/ecoregions", target = "_blank", "EPA Level IV ecoregion"),
+             ". This provides ecological context—plants in the same ecoregion often face similar soil, climate, and vegetation conditions."),
 
            h5("What is USDA reference data?"),
            p(class = "text-muted mb-4",
-             "The USDA PLANTS database provides characteristics for many species including preferred pH range, ",
-             "drought tolerance, and shade tolerance. When available, this data is shown alongside your samples for comparison."),
+             "The ", tags$a(href = "https://plants.usda.gov/", target = "_blank", "USDA PLANTS Database"),
+             " provides characteristics for many species including preferred pH range, drought tolerance, and shade tolerance. ",
+             "When available, this reference data is shown alongside your samples for comparison."),
 
            h5("Can I edit or delete my submissions?"),
            p(class = "text-muted mb-4",
@@ -497,8 +572,9 @@ base_ui <- page_navbar(
 
            h5("What species can I enter?"),
            p(class = "text-muted",
-             "The species search uses the World Checklist of Vascular Plants (WCVP), which includes over 360,000 accepted ",
-             "plant species. If you can't find a species, try the scientific name without the author citation.")
+             "The species search uses the ",
+             tags$a(href = "https://powo.science.kew.org/", target = "_blank", "World Checklist of Vascular Plants (WCVP)"),
+             ", which includes over 360,000 accepted plant species. If you can't find a species, try the scientific name without the author citation.")
          )
        )
      )
@@ -847,13 +923,20 @@ server_inner <- function(input, output, session) {
        inat_url = get_sp_input("inat", sp),
        ph = input$ph,
        organic_matter = input$organic_matter,
+       cec_meq = input$cec,
+       soluble_salts_ppm = input$soluble_salts,
        nitrate_ppm = input$nitrate,
        ammonium_ppm = input$ammonium,
        phosphorus_ppm = input$phosphorus,
        potassium_ppm = input$potassium,
        calcium_ppm = input$calcium,
        magnesium_ppm = input$magnesium,
-       soluble_salts_ppm = input$soluble_salts,
+       sulfur_ppm = input$sulfur,
+       iron_ppm = input$iron,
+       manganese_ppm = input$manganese,
+       zinc_ppm = input$zinc,
+       copper_ppm = input$copper,
+       boron_ppm = input$boron,
        texture_class = texture_class_val,
        texture_sand = if (input$texture_input_type == "pct") input$sand else texture_pcts$sand,
        texture_silt = if (input$texture_input_type == "pct") input$silt else texture_pcts$silt,
@@ -1005,7 +1088,14 @@ server_inner <- function(input, output, session) {
        return(empty_state("database", "No Data", "No samples or USDA pH reference available"))
      }
    }
-   plotlyOutput("ph_plot", height = "500px")
+   tagList(
+     plotlyOutput("ph_plot", height = "500px"),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "This histogram shows the distribution of pH values from user-submitted samples. ",
+            "The green shaded region (if visible) indicates the USDA reference pH range for this species. ",
+            "Soil pH affects nutrient availability; most plants prefer slightly acidic to neutral conditions (6.0-7.0).")
+   )
  })
 
  output$ph_plot <- renderPlotly({
@@ -1057,7 +1147,7 @@ server_inner <- function(input, output, session) {
  # --- pH vs OM (Plotly) ---
  output$ph_om_plot_ui <- renderUI({
    if (is.null(input$analysis_species) || input$analysis_species == "") {
-     return(empty_state("chart-scatter", "No Species Selected", "Choose a species from the sidebar"))
+     return(empty_state("circle-nodes", "No Species Selected", "Choose a species from the sidebar"))
    }
    dat <- db_get_species_data(input$analysis_species)
    # Allow reference-only mode if USDA data exists
@@ -1067,7 +1157,14 @@ server_inner <- function(input, output, session) {
        return(empty_state("database", "No Data", "No samples or USDA pH reference available"))
      }
    }
-   plotlyOutput("ph_om_plot", height = "500px")
+   tagList(
+     plotlyOutput("ph_om_plot", height = "500px"),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "This scatter plot shows the relationship between soil pH and organic matter content. ",
+            "Points represent individual samples. Higher organic matter generally improves soil structure and water retention. ",
+            "The green shaded region shows the USDA reference pH range if available.")
+   )
  })
 
  output$ph_om_plot <- renderPlotly({
@@ -1129,7 +1226,14 @@ server_inner <- function(input, output, session) {
    if (nrow(dat) == 0) {
      return(empty_state("database", "No Data", "No samples available"))
    }
-   plotlyOutput("nutrient_plot", height = "500px")
+   tagList(
+     plotlyOutput("nutrient_plot", height = "500px"),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "Box plots showing the distribution of nutrient concentrations (ppm) across all samples. ",
+            "N-P-K (nitrogen, phosphorus, potassium) are primary macronutrients. Ca, Mg, and S are secondary macronutrients. ",
+            "Fe, Mn, Zn, Cu, and B are micronutrients needed in smaller quantities. Only nutrients with data are shown.")
+   )
  })
 
  output$nutrient_plot <- renderPlotly({
@@ -1137,18 +1241,37 @@ server_inner <- function(input, output, session) {
    dat <- db_get_species_data(input$analysis_species)
    if (nrow(dat) == 0) return(NULL)
 
+   nutrient_cols <- c("nitrate_ppm", "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
+                      "calcium_ppm", "magnesium_ppm", "sulfur_ppm",
+                      "iron_ppm", "manganese_ppm", "zinc_ppm", "copper_ppm", "boron_ppm")
+   # Only include columns that exist in the data
+   nutrient_cols <- intersect(nutrient_cols, names(dat))
+
    nutrient_data <- dat %>%
-     select(nitrate_ppm, phosphorus_ppm, potassium_ppm, calcium_ppm, magnesium_ppm) %>%
+     select(all_of(nutrient_cols)) %>%
      pivot_longer(everything(), names_to = "nutrient", values_to = "value") %>%
+     filter(!is.na(value)) %>%  # Exclude NA values from analysis
      mutate(nutrient = case_when(
-       nutrient == "nitrate_ppm" ~ "Nitrate",
-       nutrient == "phosphorus_ppm" ~ "Phosphorus",
-       nutrient == "potassium_ppm" ~ "Potassium",
-       nutrient == "calcium_ppm" ~ "Calcium",
-       nutrient == "magnesium_ppm" ~ "Magnesium"
+       nutrient == "nitrate_ppm" ~ "Nitrate (N)",
+       nutrient == "ammonium_ppm" ~ "Ammonium (N)",
+       nutrient == "phosphorus_ppm" ~ "Phosphorus (P)",
+       nutrient == "potassium_ppm" ~ "Potassium (K)",
+       nutrient == "calcium_ppm" ~ "Calcium (Ca)",
+       nutrient == "magnesium_ppm" ~ "Magnesium (Mg)",
+       nutrient == "sulfur_ppm" ~ "Sulfur (S)",
+       nutrient == "iron_ppm" ~ "Iron (Fe)",
+       nutrient == "manganese_ppm" ~ "Manganese (Mn)",
+       nutrient == "zinc_ppm" ~ "Zinc (Zn)",
+       nutrient == "copper_ppm" ~ "Copper (Cu)",
+       nutrient == "boron_ppm" ~ "Boron (B)",
+       TRUE ~ nutrient
      ))
 
-   p <- ggplot(nutrient_data, aes(x = reorder(nutrient, value, FUN = median),
+   if (nrow(nutrient_data) == 0) {
+     return(plotly_empty() %>% layout(title = "No nutrient data available"))
+   }
+
+   p <- ggplot(nutrient_data, aes(x = reorder(nutrient, value, FUN = function(x) median(x, na.rm = TRUE)),
                                    y = value, fill = nutrient)) +
      geom_boxplot(alpha = 0.8) +
      coord_flip() +
@@ -1171,7 +1294,14 @@ server_inner <- function(input, output, session) {
    if (nrow(dat) < 3) {
      return(empty_state("database", "Insufficient Data", "Need at least 3 samples for correlations"))
    }
-   plotlyOutput("heatmap_plot", height = "550px")
+   tagList(
+     plotlyOutput("heatmap_plot", height = "550px"),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "Correlation matrix showing relationships between soil parameters. Blue indicates positive correlation (when one increases, so does the other); ",
+            "red indicates negative correlation. Values range from -1 (perfect negative) to +1 (perfect positive). ",
+            "Strong correlations (|r| > 0.7) suggest linked soil processes.")
+   )
  })
 
  output$heatmap_plot <- renderPlotly({
@@ -1179,14 +1309,28 @@ server_inner <- function(input, output, session) {
    dat <- db_get_species_data(input$analysis_species)
    if (nrow(dat) < 3) return(NULL)
 
-   numeric_cols <- c("ph", "organic_matter", "nitrate_ppm", "phosphorus_ppm",
-                     "potassium_ppm", "calcium_ppm", "magnesium_ppm", "soluble_salts_ppm")
-   nice_labels <- c(ph = "pH", organic_matter = "Organic Matter", nitrate_ppm = "Nitrate",
+   numeric_cols <- c("ph", "organic_matter", "cec_meq", "soluble_salts_ppm",
+                     "nitrate_ppm", "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
+                     "calcium_ppm", "magnesium_ppm", "sulfur_ppm",
+                     "iron_ppm", "manganese_ppm", "zinc_ppm", "copper_ppm", "boron_ppm")
+   nice_labels <- c(ph = "pH", organic_matter = "Organic Matter", cec_meq = "CEC",
+                    soluble_salts_ppm = "Soluble Salts",
+                    nitrate_ppm = "Nitrate", ammonium_ppm = "Ammonium",
                     phosphorus_ppm = "Phosphorus", potassium_ppm = "Potassium",
-                    calcium_ppm = "Calcium", magnesium_ppm = "Magnesium",
-                    soluble_salts_ppm = "Soluble Salts")
+                    calcium_ppm = "Calcium", magnesium_ppm = "Magnesium", sulfur_ppm = "Sulfur",
+                    iron_ppm = "Iron", manganese_ppm = "Manganese", zinc_ppm = "Zinc",
+                    copper_ppm = "Copper", boron_ppm = "Boron")
 
-   cor_matrix <- cor(dat[, numeric_cols], use = "complete.obs")
+   # Only include columns that exist and have non-NA data
+   numeric_cols <- intersect(numeric_cols, names(dat))
+   has_data <- sapply(numeric_cols, function(col) sum(!is.na(dat[[col]])) >= 3)
+   numeric_cols <- numeric_cols[has_data]
+
+   if (length(numeric_cols) < 2) {
+     return(plotly_empty() %>% layout(title = "Insufficient data for correlations"))
+   }
+
+   cor_matrix <- cor(dat[, numeric_cols, drop = FALSE], use = "pairwise.complete.obs")
    rownames(cor_matrix) <- nice_labels[rownames(cor_matrix)]
    colnames(cor_matrix) <- nice_labels[colnames(cor_matrix)]
 
@@ -1212,7 +1356,14 @@ server_inner <- function(input, output, session) {
    if (nrow(dat) == 0) {
      return(empty_state("database", "No Texture Data", "No samples with texture data"))
    }
-   plotOutput("texture_plot", height = "550px")
+   tagList(
+     plotOutput("texture_plot", height = "550px"),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "Ternary diagram showing soil texture composition (% sand, silt, and clay). ",
+            "Points are colored by USDA texture class. Soil texture affects drainage, water retention, and root penetration. ",
+            "Sandy soils drain quickly; clay soils retain water and nutrients but may become compacted.")
+   )
  })
 
  output$texture_plot <- renderPlot({
@@ -1252,7 +1403,13 @@ server_inner <- function(input, output, session) {
    if (nrow(dat) == 0) {
      return(empty_state("map-marker-alt", "No Location Data", "No samples with coordinates"))
    }
-   leafletOutput("map_plot", height = "550px")
+   tagList(
+     leafletOutput("map_plot", height = "550px"),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "Geographic distribution of sample locations. Click markers to view soil data and ecoregion information. ",
+            "Clustering samples by geography helps identify regional soil patterns and growing conditions.")
+   )
  })
 
  output$map_plot <- renderLeaflet({
@@ -1298,9 +1455,15 @@ server_inner <- function(input, output, session) {
    if (is.null(tr) || nrow(tr) == 0) {
      return(empty_state("book", "No USDA Data", paste("No USDA traits found for", input$analysis_species)))
    }
-   card_body(
-     tags$h5(class = "mb-3", icon("leaf"), " USDA Plant Characteristics"),
-     tableOutput("traits_table")
+   tagList(
+     card_body(
+       tags$h5(class = "mb-3", icon("leaf"), " USDA Plant Characteristics"),
+       tableOutput("traits_table")
+     ),
+     tags$p(class = "text-muted small mt-2 px-3",
+            icon("info-circle"), " ",
+            "Reference data from the USDA PLANTS Database. These values represent typical growing conditions and tolerances ",
+            "observed for this species, serving as a baseline to compare against your actual soil samples.")
    )
  })
 

@@ -154,7 +154,7 @@ edaphic_bs_theme <- function() {
     warning = edaphic_colors$warning,
     danger = edaphic_colors$danger,
     base_font = bslib::font_google("Inter"),
-    heading_font = bslib::font_google("Inter"),
+    heading_font = bslib::font_google("Quicksand"),
     "navbar-bg" = edaphic_colors$primary,
     "card-border-radius" = "0.5rem"
   )
@@ -227,6 +227,14 @@ edaphic_css <- function() {
       border-bottom: 3px solid #7A9A86;
       font-weight: 600;
     }
+    .nav-tabs .nav-link {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+    }
+    .navset-card-tab .nav-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
 
     /* Navbar user info */
     .navbar-text {
@@ -236,6 +244,41 @@ edaphic_css <- function() {
     /* Species search highlight */
     .selectize-dropdown-content .active {
       background-color: rgba(39, 174, 96, 0.15);
+    }
+
+    /* Brand name styling - uses Quicksand to match logo */
+    .brand-name {
+      font-family: 'Quicksand', sans-serif;
+      letter-spacing: 1px;
+      text-transform: lowercase;
+    }
+    .brand-name-edaphic {
+      font-weight: 600;
+      color: #7A9A86;
+    }
+    .brand-name-flora {
+      font-weight: 400;
+      color: #373D3C;
+    }
+    /* Navbar brand text needs lighter flora color */
+    .navbar .brand-name-flora {
+      color: rgba(255,255,255,0.9);
+    }
+
+    /* Welcome page brand styling */
+    .welcome-brand {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 2.5rem;
+      letter-spacing: 2px;
+      text-transform: lowercase;
+    }
+    .welcome-brand .brand-name-edaphic {
+      font-weight: 600;
+      color: #7A9A86;
+    }
+    .welcome-brand .brand-name-flora {
+      font-weight: 400;
+      color: #373D3C;
     }
   "))
 }
