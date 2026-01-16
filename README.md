@@ -1,6 +1,6 @@
 # Edaphic Flora
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/edaphicflora)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/toddtesterman)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 **A community-driven soil database for gardeners, researchers, and plant enthusiasts.**
@@ -159,7 +159,7 @@ For commercial licensing inquiries, contact: todd@edaphicgardenconsulting.com
 
 Edaphic Flora is free and open-source. If you find it useful, consider supporting development:
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/edaphicflora)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/toddtesterman)
 
 Donations help cover:
 - **Database hosting** (Neon PostgreSQL)
