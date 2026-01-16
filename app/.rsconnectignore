@@ -1,0 +1,7 @@
+# Exclude large cache files from deployment
+# These are already loaded into the database
+data/cache/
+
+# Large ecoregion files (grid lookup is small enough to include)
+data/ecoregions_simplified.rds
+# data/ecoregion_grid.rds  # This one IS included - small enough for prod
