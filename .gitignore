@@ -9,17 +9,19 @@
 
 # Environment files with secrets (use .renviron.example as template)
 .Renviron
-ShinyPlants/.Renviron
+app/.Renviron
 
-# Claude Code session files
+# Claude Code files (local development only)
 .claude/
+CLAUDE.md
+Claude To-do.txt
 
-# Archived reference folder (extracted to ShinyPlants/)
+# Archived reference folder
 for_claude_EdaphicFlora/
 
 # Large cache files (~67MB, 10K+ JSON files)
 # These are already loaded into the database; keep locally but don't commit
-ShinyPlants/data/cache/
+app/data/cache/
 
 # Windows artifacts
 nul

@@ -1,6 +1,0 @@
-Claude To-Do for Edaphic Flora
-
-- Denoting or separate submission for plants that failed/died in the specific soil conditions being submitted. This would help users assess if a specific factor seen over many samples (low phosphorus, for example) might explain why a species (eastern redbud, for example) consistently fails in a given culture condition
-- It would be valuable since so many cultivars are sold, to be able to add that info per each species being added. 
-- Could we update the option photo section to actually implicitly ask for iNaturalist observation links? Actually spinning off of this and relating to the cultivar point above, would there be a means to have some data pieces be tied to the selected species (cultivar, link to the iNat observation, site hydrology, sun exposure, etc.) and then the overall soil profile would cover all selected species? Let’s think about this. 
-- Overall, I think a welcome page, help page, and FAQ page would be useful additions along with short explanatory notes for some of the figures/analyses. Could you take a crack at adding all of that and I can proof them all once implemented?
