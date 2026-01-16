@@ -16,11 +16,95 @@ load_species_db <- function() {
 # Ecoregions
 # ---------------------------
 
+# Load full shapefile (dev only - uses ~95MB memory)
 load_ecoregions <- function() {
-  data(ContinentalUsEcoregion4)
+  data(ContinentalUsEcoregion4, package = "ecoregions")
   st_as_sf(ContinentalUsEcoregion4) %>%
     st_make_valid() %>%
     st_transform(4326)
+}
+
+# Load pre-computed grid lookup (prod - uses ~2MB memory)
+load_ecoregion_grid <- function() {
+  grid_path <- "data/ecoregion_grid.rds"
+  if (file.exists(grid_path)) {
+    message("Loading ecoregion grid lookup...")
+    return(readRDS(grid_path))
+  }
+  warning("Ecoregion grid not found: ", grid_path)
+  NULL
+}
+
+# Grid-based ecoregion lookup (for production)
+# Rounds coordinates to nearest grid cell and returns matching ecoregion
+get_ecoregion_from_grid <- function(lat, lon, grid, resolution = 0.1) {
+  if (is.null(grid) || is.na(lat) || is.na(lon)) {
+    return(list(name = NA_character_, code = NA_character_))
+  }
+
+  # Round to nearest grid cell
+  grid_lat <- round(lat / resolution) * resolution
+  grid_lon <- round(lon / resolution) * resolution
+
+  # Find matching row
+  match_idx <- which(abs(grid$lat - grid_lat) < 0.001 &
+                     abs(grid$lon - grid_lon) < 0.001)
+
+  if (length(match_idx) > 0) {
+    list(
+      name = grid$ecoregion_name[match_idx[1]],
+      code = grid$ecoregion_code[match_idx[1]]
+    )
+  } else {
+    list(name = NA_character_, code = NA_character_)
+  }
+}
+
+# ---------------------------
+# Zipcode Lookup
+# ---------------------------
+
+load_zipcode_db <- function() {
+  rds_path <- "data/zipcode_lookup.rds"
+  csv_path <- "data/zipcode_lookup.csv"
+
+  if (file.exists(rds_path)) {
+    message("Loading zipcode lookup...")
+    return(readRDS(rds_path))
+  } else if (file.exists(csv_path)) {
+    message("Loading zipcode lookup from CSV...")
+    return(read.csv(csv_path, stringsAsFactors = FALSE, colClasses = c(zipcode = "character")))
+  }
+
+  warning("Zipcode lookup not found")
+  NULL
+}
+
+lookup_zipcode <- function(zipcode, zipcode_db) {
+  if (is.null(zipcode_db) || is.null(zipcode) || !nzchar(zipcode)) {
+    return(NULL)
+  }
+
+  # Clean zipcode (remove spaces, take first 5 digits)
+  zip_clean <- gsub("[^0-9]", "", zipcode)
+  zip_clean <- substr(zip_clean, 1, 5)
+
+  if (nchar(zip_clean) != 5) {
+    return(NULL)
+  }
+
+  match_idx <- which(zipcode_db$zipcode == zip_clean)
+  if (length(match_idx) > 0) {
+    row <- zipcode_db[match_idx[1], ]
+    list(
+      city = row$city,
+      state = row$state,
+      latitude = row$latitude,
+      longitude = row$longitude
+    )
+  } else {
+    NULL
+  }
 }
 
 # ---------------------------
