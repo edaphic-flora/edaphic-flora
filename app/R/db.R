@@ -58,6 +58,12 @@ db_migrate <- function() {
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS created_by TEXT")
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS photo_url TEXT")
 
+    # Per-species metadata columns (added 2025-01)
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS inat_url TEXT")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS sun_exposure VARCHAR(50)")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS site_hydrology VARCHAR(50)")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)")
+
     # Indices
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
