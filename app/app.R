@@ -71,6 +71,7 @@ base_ui <- page_navbar(
  header = tagList(
    edaphic_css(),
    tags$head(
+     tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
      tags$link(rel = "stylesheet",
                href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css")
    )
