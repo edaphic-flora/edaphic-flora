@@ -140,7 +140,7 @@ This project uses a dual-license model:
 - **Code**: [AGPL-3.0-or-later](LICENSE) - Free to use, modify, and distribute with source code disclosure
 - **Data**: [CC BY-NC 4.0](LICENSE-data.md) - Free for non-commercial use with attribution
 
-For commercial licensing inquiries, contact: ttesterman.13@gmail.com
+For commercial licensing inquiries, contact: todd@edaphicgardenconsulting.com
 
 ## Acknowledgments
 
@@ -151,7 +151,7 @@ For commercial licensing inquiries, contact: ttesterman.13@gmail.com
 
 ## Author
 
-**Todd Testerman** - ttesterman.13@gmail.com
+**Todd Testerman** - todd@edaphicgardenconsulting.com
 
 ---
 

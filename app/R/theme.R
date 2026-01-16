@@ -6,40 +6,41 @@ library(ggplot2)
 # Color Palette
 # ---------------------------
 
-# Earth-toned palette appropriate for soil/plant application
+# Brand palette from Edaphic Garden Consulting
+# Sage: #7A9A86, Charcoal: #373D3C, Limestone: #F7F4E8
 edaphic_colors <- list(
 
-# Primary colors
-  primary   = "#2c3e50",
-  secondary = "#8B4513",
-  accent    = "#27ae60",
+# Primary colors (brand)
+  primary   = "#373D3C",
+  secondary = "#7A9A86",
+  accent    = "#7A9A86",
 
 # UI colors
-  success = "#27ae60",
-  warning = "#f39c12",
-  danger  = "#e74c3c",
-  info    = "#3498db",
+  success = "#7A9A86",
+  warning = "#D4A574",
+  danger  = "#C17C74",
+  info    = "#6B8E9F",
 
 # Neutrals
-  light = "#ecf0f1",
-  dark  = "#34495e",
-  muted = "#95a5a6",
+  light = "#F7F4E8",
+  dark  = "#373D3C",
+  muted = "#8B9A8E",
 
 # Soil gradient (for continuous scales)
   soil = c("#DEB887", "#D2691E", "#A0522D", "#8B4513", "#654321"),
 
-# Categorical palette (for discrete scales)
+# Categorical palette (for discrete scales, brand-harmonious)
   categorical = c(
-    "#2c3e50",
-    "#27ae60",
-    "#3498db",
-    "#9b59b6",
-    "#e74c3c",
-    "#f39c12",
-    "#1abc9c",
-    "#e67e22",
-    "#34495e",
-    "#16a085"
+    "#7A9A86",
+    "#373D3C",
+    "#6B8E9F",
+    "#A67B5B",
+    "#8B9A8E",
+    "#D4A574",
+    "#5D7A6A",
+    "#9B8B7A",
+    "#4A5D5A",
+    "#C4B7A6"
   )
 )
 
@@ -182,7 +183,7 @@ edaphic_css <- function() {
     /* Accordion styling */
     .accordion-button:not(.collapsed) {
       background-color: rgba(39, 174, 96, 0.1);
-      color: #27ae60;
+      color: #7A9A86;
     }
     .accordion-button:focus {
       box-shadow: 0 0 0 0.2rem rgba(39, 174, 96, 0.25);
@@ -191,22 +192,22 @@ edaphic_css <- function() {
     /* Form styling */
     .form-label {
       font-weight: 600;
-      color: #2c3e50;
+      color: #373D3C;
       margin-bottom: 0.3rem;
     }
     .form-control:focus, .form-select:focus {
-      border-color: #27ae60;
+      border-color: #7A9A86;
       box-shadow: 0 0 0 0.2rem rgba(39, 174, 96, 0.25);
     }
 
     /* Button styling */
     .btn-primary {
-      background-color: #27ae60;
-      border-color: #27ae60;
+      background-color: #7A9A86;
+      border-color: #7A9A86;
     }
     .btn-primary:hover {
-      background-color: #219a52;
-      border-color: #219a52;
+      background-color: #6A8A76;
+      border-color: #6A8A76;
     }
 
     /* Empty state */
@@ -223,7 +224,7 @@ edaphic_css <- function() {
 
     /* Analysis tabs */
     .nav-tabs .nav-link.active {
-      border-bottom: 3px solid #27ae60;
+      border-bottom: 3px solid #7A9A86;
       font-weight: 600;
     }
 
