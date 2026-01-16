@@ -80,6 +80,63 @@ base_ui <- page_navbar(
    )
  ),
 
+ # ========== WELCOME TAB ==========
+ nav_panel(
+   title = "Welcome",
+   icon = icon("home"),
+   layout_columns(
+     col_widths = c(8, 4),
+
+     # Main welcome content
+     card(
+       card_header(
+         class = "bg-transparent border-0 pt-4",
+         div(class = "text-center",
+             HTML('<svg width="60" height="48" viewBox="0 0 345 279" style="margin-bottom: 1rem;"><path d="M345 279C345 186.448 265.385 -18.4897 0 1.34294C0 173.226 112.788 279 345 279Z" fill="#7A9A86"/></svg>'),
+             h2("Welcome to Edaphic Flora"),
+             p(class = "lead text-muted", "A community database for soil conditions and plant species")
+         )
+       ),
+       card_body(
+         div(class = "px-md-5",
+             h4("What is Edaphic Flora?"),
+             p("Edaphic Flora helps gardeners, horticulturists, and researchers understand the relationship ",
+               "between soil conditions and plant success. By collecting real-world soil data from locations ",
+               "where specific plants grow, we build a reference database that can guide planting decisions."),
+
+             h4(class = "mt-4", "How It Works"),
+             tags$ol(
+               tags$li(tags$strong("Submit soil data"), " - Enter soil test results along with the species growing in that soil"),
+               tags$li(tags$strong("Include location"), " - Geocode your sample location for ecoregion analysis"),
+               tags$li(tags$strong("Analyze patterns"), " - View pH distributions, nutrient levels, and texture profiles"),
+               tags$li(tags$strong("Compare to references"), " - See how your data compares to USDA plant characteristics")
+             ),
+
+             h4(class = "mt-4", "Getting Started"),
+             p("Head to the ", tags$strong("Data Entry"), " tab to submit your first soil sample. ",
+               "You can enter data for multiple species that share the same soil conditions."),
+             p("Use the ", tags$strong("Analysis"), " tab to explore existing data by species."),
+
+             div(class = "mt-4 p-3 bg-light rounded",
+                 tags$small(class = "text-muted",
+                            icon("info-circle"), " ",
+                            tags$strong("Data Usage: "),
+                            "All submitted data is shared under CC BY-NC 4.0. ",
+                            "By contributing, you help build a free resource for the gardening and research community."))
+         )
+       )
+     ),
+
+     # Quick stats sidebar
+     card(
+       card_header(icon("chart-simple"), "Database Stats"),
+       card_body(
+         uiOutput("welcome_stats")
+       )
+     )
+   )
+ ),
+
  # ========== DATA ENTRY TAB ==========
  nav_panel(
    title = "Data Entry",
@@ -322,6 +379,130 @@ base_ui <- page_navbar(
    )
  ),
 
+ # ========== HELP MENU ==========
+ nav_menu(
+   title = "Help",
+   icon = icon("circle-question"),
+   align = "right",
+
+   # Help Page
+   nav_panel(
+     title = "Field Guide",
+     icon = icon("book-open"),
+     layout_columns(
+       col_widths = 12,
+       card(
+         card_header(icon("book-open"), "Field Guide"),
+         card_body(
+           class = "px-md-5",
+
+           h4("Soil Properties"),
+           tags$dl(class = "row",
+             tags$dt(class = "col-sm-3", "Soil pH"),
+             tags$dd(class = "col-sm-9", "Measures acidity/alkalinity on a scale of 0-14. Most plants prefer 6.0-7.0. ",
+                     "Values below 7 are acidic; above 7 are alkaline."),
+             tags$dt(class = "col-sm-3", "Organic Matter (%)"),
+             tags$dd(class = "col-sm-9", "Decomposed plant/animal material. Higher values (3-5%) indicate fertile soil ",
+                     "with good water retention and microbial activity.")
+           ),
+
+           h4(class = "mt-4", "Nutrients (ppm)"),
+           tags$dl(class = "row",
+             tags$dt(class = "col-sm-3", "Nitrate (NO₃)"),
+             tags$dd(class = "col-sm-9", "Primary nitrogen source for plants. Optimal: 25-50 ppm for most crops."),
+             tags$dt(class = "col-sm-3", "Phosphorus (P)"),
+             tags$dd(class = "col-sm-9", "Essential for root development and flowering. Optimal: 25-50 ppm."),
+             tags$dt(class = "col-sm-3", "Potassium (K)"),
+             tags$dd(class = "col-sm-9", "Supports overall plant health and disease resistance. Optimal: 150-250 ppm."),
+             tags$dt(class = "col-sm-3", "Calcium (Ca)"),
+             tags$dd(class = "col-sm-9", "Structural component of cell walls. Optimal: 1000-2000 ppm."),
+             tags$dt(class = "col-sm-3", "Magnesium (Mg)"),
+             tags$dd(class = "col-sm-9", "Central atom in chlorophyll. Optimal: 50-120 ppm."),
+             tags$dt(class = "col-sm-3", "Soluble Salts"),
+             tags$dd(class = "col-sm-9", "Total dissolved salts. High values (>1000 ppm) can stress plants.")
+           ),
+
+           h4(class = "mt-4", "Soil Texture"),
+           p("Texture is determined by the proportions of sand, silt, and clay particles:"),
+           tags$ul(
+             tags$li(tags$strong("Sand"), " (0.05-2mm): Large particles, drains quickly, low nutrient retention"),
+             tags$li(tags$strong("Silt"), " (0.002-0.05mm): Medium particles, good moisture retention"),
+             tags$li(tags$strong("Clay"), " (<0.002mm): Tiny particles, holds water and nutrients but may drain poorly")
+           ),
+           p("The texture triangle in the Analysis tab shows your samples plotted by their sand/silt/clay percentages."),
+
+           h4(class = "mt-4", "Analysis Charts Explained"),
+           tags$dl(class = "row",
+             tags$dt(class = "col-sm-3", "pH Distribution"),
+             tags$dd(class = "col-sm-9", "Histogram showing the range of pH values for a species. ",
+                     "The green shaded area shows the USDA reference pH range when available."),
+             tags$dt(class = "col-sm-3", "pH vs Organic Matter"),
+             tags$dd(class = "col-sm-9", "Scatter plot exploring the relationship between soil acidity and organic content. ",
+                     "Points are colored by texture class."),
+             tags$dt(class = "col-sm-3", "Correlations"),
+             tags$dd(class = "col-sm-9", "Heatmap showing statistical correlations between soil parameters. ",
+                     "Red = positive correlation, Blue = negative correlation.")
+           )
+         )
+       )
+     )
+   ),
+
+   # FAQ Page
+   nav_panel(
+     title = "FAQ",
+     icon = icon("circle-question"),
+     layout_columns(
+       col_widths = 12,
+       card(
+         card_header(icon("circle-question"), "Frequently Asked Questions"),
+         card_body(
+           class = "px-md-5",
+
+           h5("Where should my soil test come from?"),
+           p(class = "text-muted mb-4",
+             "Use results from a professional soil testing lab (university extension services, commercial labs) ",
+             "or a reliable home soil test kit. For best results, collect samples from the root zone of the plants you're recording."),
+
+           h5("Can I submit data for plants that died or failed?"),
+           p(class = "text-muted mb-4",
+             "Yes! Data from unsuccessful plantings is valuable—it helps identify soil conditions that certain species ",
+             "struggle with. Note the outcome in the Notes field for now. (A dedicated outcome field is coming soon.)"),
+
+           h5("What if I don't have all the soil test values?"),
+           p(class = "text-muted mb-4",
+             "Submit what you have. pH and organic matter are the most important. Leave other nutrient fields at 0 ",
+             "or their defaults if you don't have that data."),
+
+           h5("How are ecoregions determined?"),
+           p(class = "text-muted mb-4",
+             "When you enter coordinates, the app automatically identifies the EPA Level IV ecoregion. ",
+             "This provides ecological context—plants in the same ecoregion often face similar conditions."),
+
+           h5("What is USDA reference data?"),
+           p(class = "text-muted mb-4",
+             "The USDA PLANTS database provides characteristics for many species including preferred pH range, ",
+             "drought tolerance, and shade tolerance. When available, this data is shown alongside your samples for comparison."),
+
+           h5("Can I edit or delete my submissions?"),
+           p(class = "text-muted mb-4",
+             "Currently, direct editing isn't available in the app. Contact the administrator if you need to correct data."),
+
+           h5("How is my data used?"),
+           p(class = "text-muted mb-4",
+             "All submitted data is shared under a CC BY-NC 4.0 license. It's freely available for non-commercial use ",
+             "by researchers, gardeners, and educators. Your email is stored for attribution but not publicly displayed."),
+
+           h5("What species can I enter?"),
+           p(class = "text-muted",
+             "The species search uses the World Checklist of Vascular Plants (WCVP), which includes over 360,000 accepted ",
+             "plant species. If you can't find a species, try the scientific name without the author citation.")
+         )
+       )
+     )
+   )
+ ),
+
  # ========== NAV SPACER & USER INFO ==========
  nav_spacer(),
  nav_item(
@@ -457,6 +638,32 @@ server_inner <- function(input, output, session) {
      res$n[1]
    }, error = function(e) 0)
    paste(n, "total")
+ })
+
+ # --- Welcome page stats ---
+ output$welcome_stats <- renderUI({
+   data_changed()
+   stats <- tryCatch({
+     list(
+       samples = dbGetQuery(pool, "SELECT COUNT(*) as n FROM soil_samples")$n[1],
+       species = dbGetQuery(pool, "SELECT COUNT(DISTINCT species) as n FROM soil_samples")$n[1],
+       users = dbGetQuery(pool, "SELECT COUNT(DISTINCT created_by) as n FROM soil_samples")$n[1],
+       ecoregions = dbGetQuery(pool, "SELECT COUNT(DISTINCT ecoregion_l4) as n FROM soil_samples WHERE ecoregion_l4 IS NOT NULL")$n[1]
+     )
+   }, error = function(e) list(samples = 0, species = 0, users = 0, ecoregions = 0))
+
+   stat_box <- function(value, label, icon_name) {
+     div(class = "text-center py-3 border-bottom",
+         div(class = "fs-2 fw-bold", style = "color: #7A9A86;", value),
+         div(class = "text-muted small", icon(icon_name), " ", label))
+   }
+
+   tagList(
+     stat_box(stats$samples, "Soil Samples", "flask"),
+     stat_box(stats$species, "Species", "seedling"),
+     stat_box(stats$users, "Contributors", "users"),
+     stat_box(stats$ecoregions, "Ecoregions", "map")
+   )
  })
 
  # --- Recent entries table ---
