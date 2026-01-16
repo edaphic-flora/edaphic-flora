@@ -73,6 +73,9 @@ db_migrate <- function() {
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS copper_ppm NUMERIC")
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS cec_meq NUMERIC")
 
+    # Qualitative organic matter class (added 2025-01)
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS organic_matter_class VARCHAR(50)")
+
     # Indices
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
