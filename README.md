@@ -1,18 +1,24 @@
 # Edaphic Flora
 
-An R Shiny application for recording and analyzing soil conditions for plant species across geographic locations.
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/edaphicflora)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-Edaphic Flora provides a database interface for soil sample data entry, interactive analysis visualizations, and CSV import/export. It integrates with USDA PLANTS database for species reference data and NWPL wetland indicators.
+**A community-driven soil database for gardeners, researchers, and plant enthusiasts.**
+
+Edaphic Flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource to help people understand what soil conditions different species actually thrive in—not just what's listed in general references.
+
+> *"Edaphic" means relating to the soil, especially as it affects living organisms.*
 
 ## Features
 
 - **Multi-species soil data entry** - Record soil samples for up to 20 species at once
+- **AI-powered soil report extraction** - Upload PDF, RTF, or image files from soil labs and auto-extract values
 - **Interactive visualizations** - pH distribution, nutrient analysis, soil texture ternary diagrams, correlation heatmaps
 - **Geographic mapping** - Leaflet maps with automatic geocoding and EPA Level IV ecoregion detection
 - **USDA integration** - Reference data for soil/climate preferences and wetland indicators
 - **Species validation** - 360K+ accepted species from World Checklist of Vascular Plants (WCVP)
 - **Data management** - CSV import/export with bulk data handling
-- **Authentication** - Firebase/Polished integration for user accounts
+- **User accounts** - Firebase authentication with edit/delete capabilities for your own data
 
 ## Screenshots
 
@@ -149,10 +155,19 @@ For commercial licensing inquiries, contact: todd@edaphicgardenconsulting.com
 - [EPA Ecoregions](https://www.epa.gov/eco-research/ecoregions) for geographic classification
 - [Polished](https://polished.tech/) for authentication infrastructure
 
+## Support the Project
+
+Edaphic Flora is free and open-source. If you find it useful, consider supporting development:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/edaphicflora)
+
+Donations help cover:
+- **Database hosting** (Neon PostgreSQL)
+- **AI extraction costs** (Claude API for soil report processing)
+- **Ongoing development** and new features
+
 ## Author
 
-**Todd Testerman** - todd@edaphicgardenconsulting.com
+**Todd Testerman** - [Edaphic Garden Consulting](https://edaphicgardenconsulting.com)
 
----
-
-*Edaphic: relating to the soil, especially as it affects living organisms.*
+todd@edaphicgardenconsulting.com
