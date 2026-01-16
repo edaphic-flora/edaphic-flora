@@ -29,6 +29,14 @@ test_soil_reports/
 # These are already loaded into the database; keep locally but don't commit
 app/data/cache/
 
+# Generated data files (run generate_*.R scripts locally to create)
+app/data/ecoregion_grid.*
+app/data/ecoregions_simplified.*
+app/data/zipcode_lookup.*
+
+# shinyapps.io deployment metadata
+app/rsconnect/
+
 # Deployment scripts (may contain credentials)
 deploy.R
 

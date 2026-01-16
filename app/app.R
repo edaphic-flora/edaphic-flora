@@ -42,7 +42,41 @@ db_migrate()
 onStop(function() poolClose(pool))
 
 species_db <- load_species_db()
-eco_sf <- load_ecoregions()
+zipcode_db <- tryCatch(load_zipcode_db(), error = function(e) NULL)
+
+# Ecoregions: use full shapefile in dev, lightweight grid lookup in prod
+is_prod <- Sys.getenv("ENV", "dev") != "dev"
+eco_sf <- NULL
+eco_grid <- NULL
+
+if (is_prod) {
+  # Production: use pre-computed grid (~2MB vs ~95MB)
+  eco_grid <- tryCatch({
+    load_ecoregion_grid()
+  }, error = function(e) {
+    message("Warning: Could not load ecoregion grid: ", e$message)
+    NULL
+  })
+} else {
+  # Development: use full shapefile for accuracy
+  eco_sf <- tryCatch({
+    load_ecoregions()
+  }, error = function(e) {
+    message("Warning: Could not load ecoregions data: ", e$message)
+    NULL
+  })
+}
+
+# Unified ecoregion lookup function
+lookup_ecoregion <- function(lat, lon) {
+  if (!is.null(eco_sf)) {
+    get_ecoregion(lat, lon, eco_sf)
+  } else if (!is.null(eco_grid)) {
+    get_ecoregion_from_grid(lat, lon, eco_grid)
+  } else {
+    list(name = NA_character_, code = NA_character_)
+  }
+}
 
 # --- Auth config
 firebase_cfg <- list(
@@ -311,6 +345,8 @@ base_ui <- page_navbar(
            value = "location",
            icon = icon("map-marker-alt"),
            textInput("street", "Street Address (optional)", ""),
+           textInput("zipcode", "Zip Code", "", placeholder = "Enter 5-digit zip to auto-fill city/state"),
+           div(class = "small text-muted mb-2", uiOutput("zipcode_status")),
            textInput("city", "City/Town", ""),
            selectInput("state", "State", choices = state.name, selected = "New York"),
            actionButton("geocode", "Get Coordinates", class = "btn-info btn-sm w-100",
@@ -1134,6 +1170,60 @@ server_inner <- function(input, output, session) {
    }
  })
 
+ # --- Zipcode Lookup ---
+ observeEvent(input$zipcode, {
+   zip <- input$zipcode
+
+   # Only lookup when we have 5 digits
+   zip_clean <- gsub("[^0-9]", "", zip)
+   if (nchar(zip_clean) != 5) {
+     output$zipcode_status <- renderUI(NULL)
+     return()
+   }
+
+   result <- lookup_zipcode(zip_clean, zipcode_db)
+
+   if (!is.null(result)) {
+     # Auto-fill city and state (convert abbreviation to full name for dropdown)
+     state_full <- state.name[match(result$state, state.abb)]
+     if (is.na(state_full)) state_full <- result$state  # Fallback if not found
+
+     updateTextInput(session, "city", value = result$city)
+     updateSelectInput(session, "state", selected = state_full)
+
+     # Also set coordinates from zipcode centroid
+     if (!is.na(result$latitude) && !is.na(result$longitude)) {
+       updateNumericInput(session, "latitude", value = round(result$latitude, 6))
+       updateNumericInput(session, "longitude", value = round(result$longitude, 6))
+
+       # Lookup ecoregion
+       eco <- tryCatch(lookup_ecoregion(result$latitude, result$longitude),
+                       error = function(e) list(name = NA, code = NA))
+
+       output$zipcode_status <- renderUI({
+         tagList(
+           icon("check-circle", class = "text-success"),
+           sprintf(" %s, %s", result$city, result$state),
+           if (!is.null(eco$name) && !is.na(eco$name)) {
+             span(class = "text-muted", sprintf(" - %s", eco$name))
+           }
+         )
+       })
+     } else {
+       output$zipcode_status <- renderUI({
+         tagList(
+           icon("check-circle", class = "text-success"),
+           sprintf(" %s, %s", result$city, result$state)
+         )
+       })
+     }
+   } else {
+     output$zipcode_status <- renderUI({
+       tagList(icon("times-circle", class = "text-warning"), " Zipcode not found")
+     })
+   }
+ }, ignoreInit = TRUE)
+
  # --- Geocoding ---
  observeEvent(input$geocode, {
    req(input$city, input$state)
@@ -1142,33 +1232,41 @@ server_inner <- function(input, output, session) {
      div(class = "text-info", icon("spinner", class = "fa-spin"), " Looking up address...")
    })
 
-   address <- paste(
-     if (nzchar(input$street)) paste0(input$street, ", ") else "",
-     input$city, ", ", input$state
-   )
+   tryCatch({
+     address <- paste(
+       if (nzchar(input$street)) paste0(input$street, ", ") else "",
+       input$city, ", ", input$state
+     )
 
-   res <- tryCatch({ geo(address = address, method = "osm") }, error = function(e) NULL)
+     res <- tryCatch({ geo(address = address, method = "osm") }, error = function(e) NULL)
 
-   if (!is.null(res) && nrow(res) > 0 && !is.na(res$lat[1])) {
-     updateNumericInput(session, "latitude", value = round(res$lat[1], 6))
-     updateNumericInput(session, "longitude", value = round(res$long[1], 6))
+     if (!is.null(res) && nrow(res) > 0 && !is.na(res$lat[1])) {
+       updateNumericInput(session, "latitude", value = round(res$lat[1], 6))
+       updateNumericInput(session, "longitude", value = round(res$long[1], 6))
 
-     eco <- get_ecoregion(res$lat[1], res$long[1], eco_sf)
+       # Ecoregion lookup
+       eco <- tryCatch(lookup_ecoregion(res$lat[1], res$long[1]),
+                       error = function(e) list(name = NA, code = NA))
 
+       output$geocode_status <- renderUI({
+         tagList(
+           div(class = "text-success", icon("check-circle"),
+               sprintf(" Found: %.4f, %.4f", res$lat[1], res$long[1])),
+           if (!is.null(eco$name) && !is.na(eco$name)) {
+             div(class = "text-muted mt-1", icon("map"), " ", eco$name)
+           }
+         )
+       })
+     } else {
+       output$geocode_status <- renderUI({
+         div(class = "text-danger", icon("times-circle"), " Address not found")
+       })
+     }
+   }, error = function(e) {
      output$geocode_status <- renderUI({
-       tagList(
-         div(class = "text-success", icon("check-circle"),
-             sprintf(" Found: %.4f, %.4f", res$lat[1], res$long[1])),
-         if (!is.na(eco$name)) {
-           div(class = "text-muted mt-1", icon("map"), " ", eco$name)
-         }
-       )
+       div(class = "text-danger", icon("times-circle"), " Geocoding error: ", e$message)
      })
-   } else {
-     output$geocode_status <- renderUI({
-       div(class = "text-danger", icon("times-circle"), " Address not found")
-     })
-   }
+   })
  })
 
  # --- Submit sample ---
@@ -1194,7 +1292,8 @@ server_inner <- function(input, output, session) {
    }
 
    # Calculate shared values once
-   eco <- get_ecoregion(input$latitude, input$longitude, eco_sf)
+   eco <- tryCatch(lookup_ecoregion(input$latitude, input$longitude),
+                   error = function(e) list(name = NA, code = NA))
    texture_pcts <- if (input$texture_input_type == "class") {
      get_texture_percentages(input$texture_class, soil_texture_classes)
    } else NULL
@@ -1822,13 +1921,6 @@ server_inner <- function(input, output, session) {
  # Edit/Delete Handlers
  # ---------------------------
 
- # Populate edit modal species dropdown
- observe({
-   updateSelectizeInput(session, "edit_species",
-                        choices = sort(species_db$taxon_name),
-                        server = TRUE)
- })
-
  # Handle edit button click
  observeEvent(input$edit_entry, {
    entry_id <- input$edit_entry
@@ -1855,7 +1947,11 @@ server_inner <- function(input, output, session) {
 
    # Populate modal fields
    updateNumericInput(session, "edit_id", value = entry$id[1])
-   updateSelectizeInput(session, "edit_species", selected = entry$species[1])
+   # For server-side selectize, must provide choices with selected value
+   updateSelectizeInput(session, "edit_species",
+                        choices = sort(species_db$taxon_name),
+                        selected = entry$species[1],
+                        server = TRUE)
    updateTextInput(session, "edit_cultivar", value = entry$cultivar[1] %||% "")
    updateSelectInput(session, "edit_outcome", selected = entry$outcome[1] %||% "")
    updateSelectInput(session, "edit_sun_exposure", selected = entry$sun_exposure[1] %||% "")

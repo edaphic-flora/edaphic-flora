@@ -210,6 +210,18 @@ The app integrates USDA PLANTS database reference data for species traits and we
 
 ## Future Improvements
 
+### Ecoregion Lookup (Disabled in Production)
+The ecoregion lookup feature is currently disabled in production due to memory constraints on shinyapps.io's free tier. The `ecoregions` package loads a large shapefile (~95MB in memory) that causes OOM crashes. Even simplified versions (~93MB) exceed limits.
+
+**Current behavior**: Ecoregion fields (`ecoregion_l4`, `ecoregion_l4_code`) are saved as NA in production.
+
+**Solutions to re-enable**:
+1. **Pre-computed grid lookup (recommended)** - Generate a CSV mapping lat/long grid cells to ecoregions. At runtime, round coordinates to nearest cell and do simple table lookup. Minimal memory usage.
+2. Use an external API for ecoregion lookup (e.g., EPA services)
+3. Upgrade to a paid shinyapps.io plan with more memory (2GB+)
+
+**Development workflow note**: Avoid small incremental changes followed by 5-10 minute redeployments. Batch fixes together and test locally before deploying.
+
 ### USDA Data Expansion (Priority)
 Currently only ~335 species have detailed characteristics. Implement continuous querying:
 1. When a species is searched/selected in the app, check if we have characteristics data
