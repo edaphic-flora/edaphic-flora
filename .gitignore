@@ -22,6 +22,9 @@ for_claude_EdaphicFlora/
 # Branding assets (local only)
 branding/
 
+# Test files with personal data
+test_soil_reports/
+
 # Large cache files (~67MB, 10K+ JSON files)
 # These are already loaded into the database; keep locally but don't commit
 app/data/cache/
