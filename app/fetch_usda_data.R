@@ -7,13 +7,15 @@
 #   1. Make sure your .Renviron is loaded (restart R if you just added it)
 #   2. Set working directory to app folder: setwd("app")
 #   3. Source this script: source("fetch_usda_data.R")
-#   4. Run: fetch_usda_batch(limit = 100)  # Fetch 100 species
+#   4. Run: usda_stats()                    # Check progress
+#   5. Run: fetch_usda_batch(limit = 100)   # Fetch 100 species
 #
 # The script will:
-#   - Find species in ref_taxon that are missing USDA characteristics
+#   - Find species in ref_taxon that haven't been attempted yet
 #   - Fetch data from USDA PLANTS API
 #   - Cache responses locally (won't re-fetch already cached)
-#   - Store characteristics in database
+#   - Store characteristics in database (even if empty, to track attempts)
+#   - Track fetch status: 'success', 'no_data', 'api_error', 'no_symbol'
 # =============================================================================
 
 library(httr2)
@@ -21,6 +23,9 @@ library(jsonlite)
 library(DBI)
 library(RPostgres)
 library(dplyr)
+
+# Null coalescing operator
+`%||%` <- function(a, b) if (is.null(a) || (length(a) == 1 && is.na(a))) b else a
 
 # --- Database connection ---
 get_db_connection <- function() {
@@ -35,12 +40,120 @@ get_db_connection <- function() {
   )
 }
 
+# --- Ensure fetch_status column exists ---
+ensure_schema <- function(con) {
+  # Add fetch_status column if it doesn't exist
+  tryCatch({
+    dbExecute(con, "
+      ALTER TABLE ref_usda_traits
+      ADD COLUMN IF NOT EXISTS fetch_status TEXT DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS fetch_attempted_at TIMESTAMPTZ DEFAULT NULL
+    ")
+  }, error = function(e) {
+    # Column might already exist, that's fine
+    if (!grepl("already exists", e$message, ignore.case = TRUE)) {
+      warning("Schema update warning: ", e$message)
+    }
+  })
+}
+
+# --- Progress statistics ---
+#' Show USDA fetch progress statistics
+usda_stats <- function() {
+  con <- tryCatch(get_db_connection(), error = function(e) {
+    stop("Database connection failed. Check your .Renviron settings.\n", e$message)
+  })
+  on.exit(dbDisconnect(con), add = TRUE)
+
+  ensure_schema(con)
+
+  stats <- dbGetQuery(con, "
+    WITH taxon_counts AS (
+      SELECT
+        COUNT(*) AS total_taxa,
+        COUNT(*) FILTER (WHERE usda_symbol IS NOT NULL AND usda_symbol != '') AS with_usda_symbol
+      FROM ref_taxon
+    ),
+    trait_counts AS (
+      SELECT
+        COUNT(*) AS attempted,
+        COUNT(*) FILTER (WHERE fetch_status = 'success') AS success,
+        COUNT(*) FILTER (WHERE fetch_status = 'no_data') AS no_data,
+        COUNT(*) FILTER (WHERE fetch_status IN ('api_error', 'no_symbol', 'profile_failed', 'no_plant_id')) AS failed,
+        COUNT(*) FILTER (WHERE fetch_status IS NULL) AS legacy,
+        COUNT(*) FILTER (WHERE soil_ph_min IS NOT NULL) AS has_ph,
+        COUNT(*) FILTER (WHERE shade_tolerance IS NOT NULL) AS has_shade,
+        COUNT(*) FILTER (WHERE drought_tolerance IS NOT NULL) AS has_drought
+      FROM ref_usda_traits
+    ),
+    remaining AS (
+      SELECT COUNT(*) AS not_attempted
+      FROM ref_taxon t
+      LEFT JOIN ref_usda_traits r ON r.taxon_id = t.id
+      WHERE t.usda_symbol IS NOT NULL
+        AND t.usda_symbol != ''
+        AND r.taxon_id IS NULL
+    )
+    SELECT
+      tc.total_taxa,
+      tc.with_usda_symbol,
+      COALESCE(trc.attempted, 0) AS attempted,
+      COALESCE(trc.success, 0) AS success,
+      COALESCE(trc.no_data, 0) AS no_data,
+      COALESCE(trc.failed, 0) AS failed,
+      COALESCE(trc.legacy, 0) AS legacy,
+      COALESCE(trc.has_ph, 0) AS has_ph,
+      COALESCE(trc.has_shade, 0) AS has_shade,
+      COALESCE(trc.has_drought, 0) AS has_drought,
+      COALESCE(r.not_attempted, 0) AS not_attempted
+    FROM taxon_counts tc
+    CROSS JOIN trait_counts trc
+    CROSS JOIN remaining r
+  ")
+
+  # Convert to integers for display
+  s <- lapply(stats, as.integer)
+
+  message("\n=== USDA Data Fetch Progress ===\n")
+  message(sprintf("Total taxa in database:     %6d", s$total_taxa))
+  message(sprintf("Taxa with USDA symbols:     %6d (fetchable)", s$with_usda_symbol))
+  message("")
+  message(sprintf("Already attempted:          %6d", s$attempted))
+  message(sprintf("  - Success (has data):     %6d", s$success))
+  message(sprintf("  - No data from USDA:      %6d", s$no_data))
+  message(sprintf("  - API/fetch errors:       %6d", s$failed))
+  message(sprintf("  - Legacy (status unknown):%6d", s$legacy))
+  message("")
+  message(sprintf("Remaining to fetch:         %6d", s$not_attempted))
+  message("")
+
+  pct_complete <- if (s$with_usda_symbol > 0) {
+    round(100 * s$attempted / s$with_usda_symbol, 1)
+  } else 0
+
+  message(sprintf("Progress: %.1f%% complete (%d/%d)",
+                  pct_complete, s$attempted, s$with_usda_symbol))
+  message("")
+  message("Data quality (of attempted):")
+  message(sprintf("  - Has pH data:            %6d (%.1f%%)",
+                  s$has_ph, 100 * s$has_ph / max(s$attempted, 1)))
+  message(sprintf("  - Has shade tolerance:    %6d (%.1f%%)",
+                  s$has_shade, 100 * s$has_shade / max(s$attempted, 1)))
+  message(sprintf("  - Has drought tolerance:  %6d (%.1f%%)",
+                  s$has_drought, 100 * s$has_drought / max(s$attempted, 1)))
+
+  invisible(stats)
+}
+
 # --- HTTP fetch with caching ---
 fetch_usda_json <- function(url, cache_file) {
   # Return cached if exists
   if (file.exists(cache_file)) {
     return(list(
-      data = fromJSON(readLines(cache_file, warn = FALSE), simplifyVector = TRUE),
+      data = tryCatch(
+        fromJSON(readLines(cache_file, warn = FALSE), simplifyVector = TRUE),
+        error = function(e) NULL
+      ),
       cached = TRUE
     ))
   }
@@ -63,7 +176,7 @@ fetch_usda_json <- function(url, cache_file) {
   dir.create(dirname(cache_file), recursive = TRUE, showWarnings = FALSE)
   writeLines(body, cache_file)
 
-  list(data = fromJSON(body, simplifyVector = TRUE), cached = FALSE)
+  list(data = tryCatch(fromJSON(body, simplifyVector = TRUE), error = function(e) NULL), cached = FALSE)
 }
 
 # --- Extract characteristics from USDA API response ---
@@ -112,13 +225,16 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
   )
 
   if (is.null(profile$data)) {
-    return(list(success = FALSE, reason = "profile_failed"))
+    # Record the failed attempt
+    record_attempt(con, taxon_id, symbol, list(), "profile_failed")
+    return(list(success = FALSE, reason = "profile_failed", cached = profile$cached))
   }
 
   # Extract plant ID from profile
   plant_id <- profile$data$Id[1]
   if (is.null(plant_id) || is.na(plant_id)) {
-    return(list(success = FALSE, reason = "no_plant_id"))
+    record_attempt(con, taxon_id, symbol, list(), "no_plant_id")
+    return(list(success = FALSE, reason = "no_plant_id", cached = profile$cached))
   }
 
   # Extract basic info from profile
@@ -129,7 +245,8 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
   native_status <- profile$data$NativeStatus[1]
 
   # 2. Fetch characteristics
-  Sys.sleep(0.3)  # Rate limiting
+  if (!isTRUE(profile$cached)) Sys.sleep(0.3)  # Rate limiting only for fresh requests
+
   char_cache <- file.path(cache_dir, paste0("char_", plant_id, ".json"))
   chars <- fetch_usda_json(
     sprintf("https://plantsservices.sc.egov.usda.gov/api/PlantCharacteristics/%s", plant_id),
@@ -143,10 +260,24 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
   char_data$duration <- duration
   char_data$growth_habit <- growth_habit
   char_data$native_status <- native_status
-  char_data$usda_symbol <- symbol
-  char_data$taxon_id <- taxon_id
 
-  # Upsert to database
+  # Determine status based on what data we got
+  has_any_data <- length(char_data) > 0 || !is.na(duration) || !is.na(native_status)
+  status <- if (has_any_data) "success" else "no_data"
+
+  # Record the attempt (success or no_data)
+  record_attempt(con, taxon_id, symbol, char_data, status)
+
+  list(
+    success = TRUE,
+    status = status,
+    cached = isTRUE(profile$cached) && isTRUE(chars$cached),
+    traits = length(char_data)
+  )
+}
+
+# --- Record fetch attempt in database ---
+record_attempt <- function(con, taxon_id, symbol, char_data, status) {
   tryCatch({
     # Check if record exists
     existing <- dbGetQuery(con,
@@ -154,25 +285,29 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
       params = list(taxon_id))
 
     if (nrow(existing) == 0) {
-      # Insert new record
+      # Insert new record with status
       dbExecute(con, "
-        INSERT INTO ref_usda_traits (taxon_id, usda_symbol, duration, growth_habit, native_status,
+        INSERT INTO ref_usda_traits (
+          taxon_id, usda_symbol, duration, growth_habit, native_status,
           soil_ph_min, soil_ph_max, precip_min_in, precip_max_in, temp_min_f,
-          shade_tolerance, drought_tolerance, salinity_tolerance, moisture_use, bloom_period)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          shade_tolerance, drought_tolerance, salinity_tolerance, moisture_use, bloom_period,
+          fetch_status, fetch_attempted_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
       ", params = list(
-        char_data$taxon_id, char_data$usda_symbol,
+        taxon_id, symbol,
         char_data$duration %||% NA, char_data$growth_habit %||% NA, char_data$native_status %||% NA,
         char_data$soil_ph_min %||% NA, char_data$soil_ph_max %||% NA,
         char_data$precip_min_in %||% NA, char_data$precip_max_in %||% NA, char_data$temp_min_f %||% NA,
         char_data$shade_tolerance %||% NA, char_data$drought_tolerance %||% NA,
-        char_data$salinity_tolerance %||% NA, char_data$moisture_use %||% NA, char_data$bloom_period %||% NA
+        char_data$salinity_tolerance %||% NA, char_data$moisture_use %||% NA, char_data$bloom_period %||% NA,
+        status
       ))
     } else {
-      # Update existing (only non-null values)
-      sets <- c()
-      params <- list()
-      param_idx <- 1
+      # Update existing record
+      sets <- c("fetch_status = $1", "fetch_attempted_at = NOW()")
+      params <- list(status)
+      param_idx <- 2
 
       for (col in c("soil_ph_min", "soil_ph_max", "precip_min_in", "precip_max_in", "temp_min_f",
                     "shade_tolerance", "drought_tolerance", "salinity_tolerance", "moisture_use",
@@ -185,26 +320,24 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
         }
       }
 
-      if (length(sets) > 0) {
-        params[[param_idx]] <- taxon_id
-        sql <- sprintf("UPDATE ref_usda_traits SET %s, updated_at = NOW() WHERE taxon_id = $%d",
-                      paste(sets, collapse = ", "), param_idx)
-        dbExecute(con, sql, params = params)
-      }
+      params[[param_idx]] <- taxon_id
+      sql <- sprintf("UPDATE ref_usda_traits SET %s WHERE taxon_id = $%d",
+                    paste(sets, collapse = ", "), param_idx)
+      dbExecute(con, sql, params = params)
     }
-
-    list(success = TRUE, cached = profile$cached && chars$cached, traits = length(char_data))
+    TRUE
   }, error = function(e) {
-    list(success = FALSE, reason = paste("db_error:", e$message))
+    warning("DB error for taxon ", taxon_id, ": ", e$message)
+    FALSE
   })
 }
 
 # --- Main batch fetcher ---
-#' Fetch USDA data for species missing characteristics
+#' Fetch USDA data for species not yet attempted
 #' @param limit Maximum number of species to fetch (default 100)
 #' @param cache_dir Directory to cache API responses
-#' @param only_missing If TRUE, only fetch species without existing data
-fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", only_missing = TRUE) {
+#' @param retry_errors If TRUE, retry species that previously had API errors
+fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", retry_errors = FALSE) {
   message("=== USDA Reference Data Fetcher ===\n")
 
   # Connect to database
@@ -213,24 +346,30 @@ fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", on
   })
   on.exit(dbDisconnect(con), add = TRUE)
 
-  # Get species to fetch
-  if (only_missing) {
+  # Ensure schema is up to date
+  ensure_schema(con)
+
+  # Get species to fetch - only those NOT in ref_usda_traits yet
+  if (retry_errors) {
+    # Retry species with API errors
+    sql <- "
+      SELECT t.id, t.usda_symbol
+      FROM ref_taxon t
+      JOIN ref_usda_traits r ON r.taxon_id = t.id
+      WHERE t.usda_symbol IS NOT NULL
+        AND t.usda_symbol != ''
+        AND r.fetch_status IN ('api_error', 'profile_failed', 'no_plant_id')
+      LIMIT $1
+    "
+  } else {
+    # Normal mode: only fetch species we haven't attempted at all
     sql <- "
       SELECT t.id, t.usda_symbol
       FROM ref_taxon t
       LEFT JOIN ref_usda_traits r ON r.taxon_id = t.id
       WHERE t.usda_symbol IS NOT NULL
         AND t.usda_symbol != ''
-        AND (r.taxon_id IS NULL
-             OR r.soil_ph_min IS NULL
-             OR r.soil_ph_max IS NULL)
-      LIMIT $1
-    "
-  } else {
-    sql <- "
-      SELECT id, usda_symbol
-      FROM ref_taxon
-      WHERE usda_symbol IS NOT NULL AND usda_symbol != ''
+        AND r.taxon_id IS NULL
       LIMIT $1
     "
   }
@@ -238,14 +377,19 @@ fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", on
   species <- dbGetQuery(con, sql, params = list(limit))
 
   if (nrow(species) == 0) {
-    message("No species to fetch. All species have USDA data or no USDA symbols in database.")
+    message("No species to fetch!")
+    if (!retry_errors) {
+      message("All species with USDA symbols have been attempted.")
+      message("Run usda_stats() to see progress, or use retry_errors=TRUE to retry failures.")
+    }
     return(invisible(NULL))
   }
 
   message(sprintf("Fetching USDA data for %d species...\n", nrow(species)))
 
   # Progress tracking
-  success <- 0
+  success_with_data <- 0
+  success_no_data <- 0
   failed <- 0
   cached <- 0
 
@@ -255,14 +399,18 @@ fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", on
 
     # Progress indicator
     if (i %% 10 == 0 || i == nrow(species)) {
-      message(sprintf("[%d/%d] Processing %s... (success: %d, cached: %d, failed: %d)",
-                     i, nrow(species), symbol, success, cached, failed))
+      message(sprintf("[%d/%d] %s (data: %d, no_data: %d, failed: %d, cached: %d)",
+                     i, nrow(species), symbol, success_with_data, success_no_data, failed, cached))
     }
 
     result <- fetch_single_species(symbol, taxon_id, cache_dir, con)
 
     if (isTRUE(result$success)) {
-      success <- success + 1
+      if (result$status == "success") {
+        success_with_data <- success_with_data + 1
+      } else {
+        success_no_data <- success_no_data + 1
+      }
       if (isTRUE(result$cached)) cached <- cached + 1
     } else {
       failed <- failed + 1
@@ -274,13 +422,54 @@ fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", on
 
   message(sprintf("\n=== Complete ==="))
   message(sprintf("Processed: %d species", nrow(species)))
-  message(sprintf("Success: %d (cached: %d, fresh: %d)", success, cached, success - cached))
-  message(sprintf("Failed: %d", failed))
+  message(sprintf("Success with data: %d", success_with_data))
+  message(sprintf("Success (no USDA data available): %d", success_no_data))
+  message(sprintf("Failed (API errors): %d", failed))
+  message(sprintf("From cache: %d", cached))
+  message("\nRun usda_stats() to see overall progress.")
 
-  invisible(list(processed = nrow(species), success = success, cached = cached, failed = failed))
+  invisible(list(
+    processed = nrow(species),
+    success_with_data = success_with_data,
+    success_no_data = success_no_data,
+    failed = failed,
+    cached = cached
+  ))
 }
 
-# Null coalescing operator
-`%||%` <- function(a, b) if (is.null(a) || (length(a) == 1 && is.na(a))) b else a
+# --- Mark legacy records ---
+#' Update legacy records (those without fetch_status) to have proper status
+mark_legacy_records <- function() {
+  con <- tryCatch(get_db_connection(), error = function(e) {
+    stop("Database connection failed.\n", e$message)
+  })
+  on.exit(dbDisconnect(con), add = TRUE)
 
-message("USDA fetcher loaded. Run: fetch_usda_batch(limit = 100)")
+  ensure_schema(con)
+
+  # Mark records that have data as 'success'
+  n1 <- dbExecute(con, "
+    UPDATE ref_usda_traits
+    SET fetch_status = 'success', fetch_attempted_at = COALESCE(updated_at, NOW())
+    WHERE fetch_status IS NULL
+      AND (soil_ph_min IS NOT NULL OR shade_tolerance IS NOT NULL OR duration IS NOT NULL)
+  ")
+
+  # Mark records with no data as 'no_data'
+  n2 <- dbExecute(con, "
+    UPDATE ref_usda_traits
+    SET fetch_status = 'no_data', fetch_attempted_at = COALESCE(updated_at, NOW())
+    WHERE fetch_status IS NULL
+  ")
+
+
+  message(sprintf("Updated %d legacy records as 'success'", n1))
+  message(sprintf("Updated %d legacy records as 'no_data'", n2))
+
+  invisible(list(success = n1, no_data = n2))
+}
+
+message("USDA fetcher loaded. Available commands:")
+message("  usda_stats()                  - Show fetch progress")
+message("  fetch_usda_batch(limit=100)   - Fetch next batch of species")
+message("  mark_legacy_records()         - Update old records with status")
