@@ -6,3 +6,20 @@
 .httr-oauth
 .DS_Store
 .quarto
+
+# Environment files with secrets (use .renviron.example as template)
+.Renviron
+ShinyPlants/.Renviron
+
+# Claude Code session files
+.claude/
+
+# Archived reference folder (extracted to ShinyPlants/)
+for_claude_EdaphicFlora/
+
+# Large cache files (~67MB, 10K+ JSON files)
+# These are already loaded into the database; keep locally but don't commit
+ShinyPlants/data/cache/
+
+# Windows artifacts
+nul
