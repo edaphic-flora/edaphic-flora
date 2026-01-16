@@ -152,7 +152,10 @@ base_ui <- page_navbar(
                       options = list(maxItems = 20, maxOptions = 100,
                                      placeholder = "Type to search species...")),
        uiOutput("species_count_indicator"),
-       textInput("cultivar", "Cultivar (optional)", ""),
+
+       # Per-species metadata (dynamic based on selected species)
+       uiOutput("per_species_fields"),
+
        helpText(class = "text-muted small",
                 "Tip: Select multiple species if they share the same soil sample."),
 
@@ -235,9 +238,8 @@ base_ui <- page_navbar(
            value = "additional",
            icon = icon("info-circle"),
            dateInput("date", "Sample Date", value = Sys.Date()),
-           textInput("photo_url", "Photo URL (optional)", "",
-                     placeholder = "Link to Google Drive, Dropbox, etc."),
-           textAreaInput("notes", "Notes", "", height = "80px")
+           textAreaInput("notes", "Notes", "", height = "80px",
+                         placeholder = "General notes about this soil sample...")
          )
        ),
 
@@ -467,7 +469,7 @@ base_ui <- page_navbar(
            h5("Can I submit data for plants that died or failed?"),
            p(class = "text-muted mb-4",
              "Yes! Data from unsuccessful plantings is valuable—it helps identify soil conditions that certain species ",
-             "struggle with. Note the outcome in the Notes field for now. (A dedicated outcome field is coming soon.)"),
+             "struggle with. Use the Outcome dropdown (Thriving, Established, Struggling, or Failed/Died) for each species."),
 
            h5("What if I don't have all the soil test values?"),
            p(class = "text-muted mb-4",
@@ -551,6 +553,62 @@ server_inner <- function(input, output, session) {
        icon("seedling"),
        sprintf(" %d species selected - %d record%s will be created",
                n, n, if (n == 1) "" else "s"))
+ })
+
+ # --- Per-species metadata fields ---
+ output$per_species_fields <- renderUI({
+   species_list <- input$species
+   if (is.null(species_list) || length(species_list) == 0) return(NULL)
+
+   # Create a collapsible card for per-species details
+   card(
+     class = "mb-3",
+     card_header(
+       class = "py-2",
+       icon("list"), " Species Details",
+       tags$small(class = "text-muted ms-2", "(per species)")
+     ),
+     card_body(
+       class = "p-2",
+       lapply(seq_along(species_list), function(i) {
+         sp <- species_list[i]
+         sp_id <- gsub("[^a-zA-Z0-9]", "_", sp)  # Safe ID
+
+         div(
+           class = "border rounded p-2 mb-2 bg-light",
+           tags$strong(class = "d-block mb-2 text-truncate", title = sp,
+                       sprintf("%d. %s", i, sp)),
+           layout_column_wrap(
+             width = 1/2,
+             textInput(paste0("cultivar_", sp_id), "Cultivar",
+                       placeholder = "e.g., 'Forest Pansy'"),
+             selectInput(paste0("outcome_", sp_id), "Outcome",
+                         choices = c("" = "", "Thriving" = "Thriving",
+                                     "Established" = "Established",
+                                     "Struggling" = "Struggling",
+                                     "Failed/Died" = "Failed/Died"),
+                         selected = "")
+           ),
+           layout_column_wrap(
+             width = 1/2,
+             selectInput(paste0("sun_", sp_id), "Sun Exposure",
+                         choices = c("" = "", "Full Sun" = "Full Sun",
+                                     "Part Sun" = "Part Sun",
+                                     "Part Shade" = "Part Shade",
+                                     "Full Shade" = "Full Shade"),
+                         selected = ""),
+             selectInput(paste0("hydrology_", sp_id), "Site Hydrology",
+                         choices = c("" = "", "Dry/Xeric" = "Dry",
+                                     "Mesic" = "Mesic",
+                                     "Wet/Hydric" = "Wet"),
+                         selected = "")
+           ),
+           textInput(paste0("inat_", sp_id), "iNaturalist URL",
+                     placeholder = "https://www.inaturalist.org/observations/...")
+         )
+       })
+     )
+   )
  })
 
  # --- Analysis species dropdown ---
@@ -673,14 +731,15 @@ server_inner <- function(input, output, session) {
    if (nrow(dat) == 0) return(NULL)
 
    display <- dat %>%
-     select(id, species, ph, organic_matter, texture_class, date, ecoregion_l4) %>%
-     mutate(date = as.character(date)) %>%
+     select(id, species, outcome, ph, organic_matter, texture_class, date) %>%
+     mutate(date = as.character(date),
+            outcome = ifelse(is.na(outcome), "", outcome)) %>%
      head(20)
 
    datatable(display,
              options = list(pageLength = 10, dom = 'tip', scrollX = TRUE),
              rownames = FALSE,
-             colnames = c("ID", "Species", "pH", "OM %", "Texture", "Date", "Ecoregion"))
+             colnames = c("ID", "Species", "Outcome", "pH", "OM %", "Texture", "Date"))
  })
 
  # --- Texture validation ---
@@ -769,12 +828,23 @@ server_inner <- function(input, output, session) {
      classify_texture(input$sand, input$silt, input$clay, soil_texture_classes)
    } else input$texture_class
 
-   # Create one record per species
+   # Helper to safely get per-species input values
+   get_sp_input <- function(prefix, sp) {
+     sp_id <- gsub("[^a-zA-Z0-9]", "_", sp)
+     val <- input[[paste0(prefix, "_", sp_id)]]
+     if (is.null(val) || !nzchar(trimws(as.character(val)))) NA_character_ else trimws(val)
+   }
+
+   # Create one record per species with per-species metadata
    success_count <- 0
    for (sp in species_list) {
      new_data <- data.frame(
        species = sp,
-       cultivar = input$cultivar,
+       cultivar = get_sp_input("cultivar", sp),
+       outcome = get_sp_input("outcome", sp),
+       sun_exposure = get_sp_input("sun", sp),
+       site_hydrology = get_sp_input("hydrology", sp),
+       inat_url = get_sp_input("inat", sp),
        ph = input$ph,
        organic_matter = input$organic_matter,
        nitrate_ppm = input$nitrate,
@@ -792,7 +862,6 @@ server_inner <- function(input, output, session) {
        ecoregion_l4_code = eco$code,
        location_lat = input$latitude,
        location_long = input$longitude,
-       photo_url = if (nzchar(trimws(input$photo_url))) trimws(input$photo_url) else NA_character_,
        notes = input$notes,
        date = input$date,
        created_by = u$user_uid,
@@ -814,7 +883,6 @@ server_inner <- function(input, output, session) {
 
      # Reset form
      updateSelectizeInput(session, "species", selected = character(0))
-     updateTextInput(session, "cultivar", value = "")
    } else {
      showNotification("Error adding samples. Please try again.", type = "error")
    }
