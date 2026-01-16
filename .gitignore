@@ -13,7 +13,7 @@ app/.Renviron
 
 # Claude Code files (local development only)
 .claude/
-CLAUDE.md
+# CLAUDE.md - now tracked for documentation purposes
 Claude To-do.txt
 
 # Archived reference folder
