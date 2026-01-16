@@ -1031,27 +1031,43 @@ server_inner <- function(input, output, session) {
    if (!ref$has_traits && !ref$has_nwpl) return(NULL)
 
    chip <- function(lbl, val) {
-     if (is.null(val) || is.na(val) || !nzchar(as.character(val))) return(NULL)
+     # Handle NULL, NA, empty, or vector inputs safely
+     if (is.null(val)) return(NULL)
+     if (length(val) == 0) return(NULL)
+     val <- val[1]  # Take first element if vector
+     if (is.na(val) || !nzchar(as.character(val))) return(NULL)
      tags$span(class = "badge bg-light text-dark me-1 mb-1",
                style = "font-size: 0.75rem;",
                sprintf("%s: %s", lbl, val))
+   }
+
+   # Helper to safely extract single value from data frame column
+   safe_val <- function(x) {
+     if (is.null(x) || length(x) == 0) return(NA)
+     x[1]
    }
 
    tagList(
      tags$h6(class = "text-muted mt-2 mb-2", icon("book-open"), " Reference Data"),
      div(class = "d-flex flex-wrap",
          chip("NWPL", ref$nwpl_indicator),
-         if (ref$has_traits) {
-           tr <- ref$traits[1, ]
+         if (isTRUE(ref$has_traits) && !is.null(ref$traits) && nrow(ref$traits) > 0) {
+           tr <- ref$traits[1, , drop = FALSE]
+           ph_min <- safe_val(tr$soil_ph_min)
+           ph_max <- safe_val(tr$soil_ph_max)
+           # Handle both column naming conventions (precip_min_in vs precipitation_min_mm)
+           precip_min <- safe_val(if ("precip_min_in" %in% names(tr)) tr$precip_min_in else tr$precipitation_min_mm)
+           precip_max <- safe_val(if ("precip_max_in" %in% names(tr)) tr$precip_max_in else tr$precipitation_max_mm)
+           precip_unit <- if ("precip_min_in" %in% names(tr)) "in" else "mm"
            list(
-             chip("USDA", tr$usda_symbol),
-             chip("pH", if (!is.na(tr$soil_ph_min) && !is.na(tr$soil_ph_max))
-               sprintf("%.1f-%.1f", tr$soil_ph_min, tr$soil_ph_max) else NA),
-             chip("Shade", tr$shade_tolerance),
-             chip("Drought", tr$drought_tolerance),
-             chip("Salinity", tr$salinity_tolerance),
-             chip("Precip", if (!is.na(tr$precipitation_min_mm) && !is.na(tr$precipitation_max_mm))
-               sprintf("%d-%d mm", tr$precipitation_min_mm, tr$precipitation_max_mm) else NA)
+             chip("USDA", safe_val(tr$usda_symbol)),
+             chip("pH", if (!is.na(ph_min) && !is.na(ph_max))
+               sprintf("%.1f-%.1f", ph_min, ph_max) else NA),
+             chip("Shade", safe_val(tr$shade_tolerance)),
+             chip("Drought", safe_val(tr$drought_tolerance)),
+             chip("Salinity", safe_val(tr$salinity_tolerance)),
+             chip("Precip", if (!is.na(precip_min) && !is.na(precip_max))
+               sprintf("%d-%d %s", as.integer(precip_min), as.integer(precip_max), precip_unit) else NA)
            )
          }
      )
@@ -1092,13 +1108,20 @@ server_inner <- function(input, output, session) {
  output$welcome_stats <- renderUI({
    data_changed()
    stats <- tryCatch({
+     samples_q <- dbGetQuery(pool, "SELECT COUNT(*)::int as n FROM soil_samples")
+     species_q <- dbGetQuery(pool, "SELECT COUNT(DISTINCT species)::int as n FROM soil_samples")
+     users_q <- dbGetQuery(pool, "SELECT COUNT(DISTINCT created_by)::int as n FROM soil_samples")
+     eco_q <- dbGetQuery(pool, "SELECT COUNT(DISTINCT ecoregion_l4)::int as n FROM soil_samples WHERE ecoregion_l4 IS NOT NULL")
      list(
-       samples = dbGetQuery(pool, "SELECT COUNT(*) as n FROM soil_samples")$n[1],
-       species = dbGetQuery(pool, "SELECT COUNT(DISTINCT species) as n FROM soil_samples")$n[1],
-       users = dbGetQuery(pool, "SELECT COUNT(DISTINCT created_by) as n FROM soil_samples")$n[1],
-       ecoregions = dbGetQuery(pool, "SELECT COUNT(DISTINCT ecoregion_l4) as n FROM soil_samples WHERE ecoregion_l4 IS NOT NULL")$n[1]
+       samples = if (nrow(samples_q) > 0) samples_q$n[1] else 0,
+       species = if (nrow(species_q) > 0) species_q$n[1] else 0,
+       users = if (nrow(users_q) > 0) users_q$n[1] else 0,
+       ecoregions = if (nrow(eco_q) > 0) eco_q$n[1] else 0
      )
-   }, error = function(e) list(samples = 0, species = 0, users = 0, ecoregions = 0))
+   }, error = function(e) {
+     message("Welcome stats error: ", e$message)
+     list(samples = 0, species = 0, users = 0, ecoregions = 0)
+   })
 
    stat_box <- function(value, label, icon_name) {
      div(class = "text-center py-3 border-bottom",
@@ -1887,31 +1910,46 @@ server_inner <- function(input, output, session) {
    add_row("USDA Symbol", tr$usda_symbol[1])
    add_row("Scientific Name", tr$scientific_name[1])
 
+   # Basic info (from new table)
+   if ("duration" %in% names(tr)) add_row("Duration", tr$duration[1])
+   if ("growth_habit" %in% names(tr)) add_row("Growth Habit", tr$growth_habit[1])
+   if ("native_status" %in% names(tr)) add_row("Native Status", tr$native_status[1])
+
    # pH range
-   if (!is.na(tr$soil_ph_min[1]) && !is.na(tr$soil_ph_max[1])) {
-     add_row("Soil pH Range", sprintf("%.1f - %.1f", tr$soil_ph_min[1], tr$soil_ph_max[1]))
+   ph_min <- tr$soil_ph_min[1]
+   ph_max <- tr$soil_ph_max[1]
+   if (!is.null(ph_min) && !is.na(ph_min) && !is.null(ph_max) && !is.na(ph_max)) {
+     add_row("Soil pH Range", sprintf("%.1f - %.1f", ph_min, ph_max))
    }
 
    # Tolerances
    add_row("Shade Tolerance", tr$shade_tolerance[1])
    add_row("Drought Tolerance", tr$drought_tolerance[1])
    add_row("Salinity Tolerance", tr$salinity_tolerance[1])
+   if ("moisture_use" %in% names(tr)) add_row("Moisture Use", tr$moisture_use[1])
+   if ("bloom_period" %in% names(tr)) add_row("Bloom Period", tr$bloom_period[1])
 
-   # Soil texture
-   texture <- format_soil_texture(tr$soil_texture_coarse[1], tr$soil_texture_medium[1], tr$soil_texture_fine[1])
-   add_row("Adapted Soil Textures", texture)
-
-   # Climate (convert from metric)
-   if (!is.na(tr$precipitation_min_mm[1]) && !is.na(tr$precipitation_max_mm[1])) {
-     precip_min_in <- round(tr$precipitation_min_mm[1] / 25.4, 1)
-     precip_max_in <- round(tr$precipitation_max_mm[1] / 25.4, 1)
-     add_row("Precipitation Range", sprintf("%.1f - %.1f in (%d - %d mm)",
-             precip_min_in, precip_max_in, tr$precipitation_min_mm[1], tr$precipitation_max_mm[1]))
+   # Soil texture (legacy table only)
+   if (all(c("soil_texture_coarse", "soil_texture_medium", "soil_texture_fine") %in% names(tr))) {
+     texture <- format_soil_texture(tr$soil_texture_coarse[1], tr$soil_texture_medium[1], tr$soil_texture_fine[1])
+     add_row("Adapted Soil Textures", texture)
    }
 
-   if (!is.na(tr$min_temp_c[1])) {
+   # Precipitation - check for both formats
+   if ("precip_min_in" %in% names(tr) && !is.na(tr$precip_min_in[1]) && !is.na(tr$precip_max_in[1])) {
+     add_row("Precipitation Range", sprintf("%.0f - %.0f in", tr$precip_min_in[1], tr$precip_max_in[1]))
+   } else if ("precipitation_min_mm" %in% names(tr) && !is.na(tr$precipitation_min_mm[1])) {
+     precip_min_in <- round(tr$precipitation_min_mm[1] / 25.4, 1)
+     precip_max_in <- round(tr$precipitation_max_mm[1] / 25.4, 1)
+     add_row("Precipitation Range", sprintf("%.1f - %.1f in", precip_min_in, precip_max_in))
+   }
+
+   # Temperature - check for both formats
+   if ("temp_min_f" %in% names(tr) && !is.na(tr$temp_min_f[1])) {
+     add_row("Minimum Temperature", sprintf("%.0f°F", tr$temp_min_f[1]))
+   } else if ("min_temp_c" %in% names(tr) && !is.na(tr$min_temp_c[1])) {
      temp_f <- as.integer(round(tr$min_temp_c[1] * 9 / 5 + 32))
-     add_row("Minimum Temperature", sprintf("%d°F (%d°C)", temp_f, tr$min_temp_c[1]))
+     add_row("Minimum Temperature", sprintf("%d°F", temp_f))
    }
 
    result
