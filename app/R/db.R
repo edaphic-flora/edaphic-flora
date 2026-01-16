@@ -64,6 +64,15 @@ db_migrate <- function() {
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS site_hydrology VARCHAR(50)")
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)")
 
+    # Additional soil parameters (added 2025-01)
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS sulfur_ppm NUMERIC")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS iron_ppm NUMERIC")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS manganese_ppm NUMERIC")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS zinc_ppm NUMERIC")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS boron_ppm NUMERIC")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS copper_ppm NUMERIC")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS cec_meq NUMERIC")
+
     # Indices
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
