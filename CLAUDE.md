@@ -332,3 +332,58 @@ The per-species metadata fields (outcome, sun_exposure, site_hydrology) are now 
 - **Reference Data section**: Cleaned up styling with compact card layout and inline toggle
 - **Welcome page help links**: Added navigation links to Field Guide for Soil Properties, Nutrients, and Plant Performance definitions
 - **Help section**: Added Plant Performance definitions (Outcome, Sun Exposure, Site Hydrology)
+### 2025-01-17: Find Plants, Similar Species & Native Plant Guidance
+
+**New Features:**
+
+1. **Find Plants Page** (new top-level nav)
+   - Users enter soil test values (pH required, plus OM, texture, nutrients optional)
+   - Matches against species with 10+ samples in database
+   - Weighted scoring: pH 35%, OM 20%, texture 15%, nutrients 30%
+   - Shows up to 15 recommended species with match scores, success rates, and optimal conditions
+   - PDF/image upload support to auto-fill form from soil reports
+
+2. **Similar Species Tab** (in Analysis)
+   - Shows species with similar soil profiles to the selected species
+   - Uses weighted similarity scoring (pH 30%, OM 20%, texture 15%, nutrients 35%)
+   - Displays top 10 matches with soil comparisons and success rates
+   - Useful for companion planting and finding alternatives
+
+3. **Species Data Preview Enhancement**
+   - Analysis sidebar now shows sample count with color-coded success rate
+   - Displays pH range, ecoregion count, and average OM at a glance
+
+4. **Download Button**
+   - Added CSV export to Analysis sidebar
+   - Respects current filters, exports key columns
+   - Filename: `edaphic_flora_[species]_[date].csv`
+
+5. **PDF Import on Find Plants**
+   - Same soil report upload feature as Data Entry
+   - Auto-fills pH, OM, texture, and nutrient fields
+   - Supports PDF, RTF, TXT, and images (PNG, JPG, etc.)
+
+**Documentation & Native Species Guidance:**
+
+- **Welcome page**: Added "Prioritize Native Plants" tip with ecosystem benefits
+- **FAQ**: New section "Why should I prioritize native plants?" covering:
+  - Ecosystem support, lower maintenance, soil health, resilience
+  - Warning about invasive species with link to USDA resources
+- **Find Plants caveats**: Prominent "Prioritize Native Plants" callout box with invasive species check link
+- **Similar Species caveats**: Updated to emphasize native plants and invasive species verification
+- **Find Plants empty state**: Updated "Keep in mind" text with native plant guidance
+
+**Bug Fixes:**
+
+- **pH vs OM legend order**: Fixed plotly legend to show Thriving → Established → Struggling → Failed/Died
+  - Data sorted by outcome factor level before plotting
+  - Plotly traces reordered after conversion to ensure correct legend order
+
+**Technical Notes:**
+
+- `calc_species_profile()` - Calculates soil profile stats for a species
+- `calc_similarity()` - Weighted scoring between two species profiles  
+- `calc_user_match()` - Matches user input against species profiles
+- `get_all_species_profiles()` - Reactive that queries species with 10+ samples
+- All recommendation features require minimum 10 samples per species for statistical confidence
+
