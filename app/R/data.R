@@ -61,6 +61,58 @@ get_ecoregion_from_grid <- function(lat, lon, grid, resolution = 0.1) {
 }
 
 # ---------------------------
+# State Grid (for native status lookups)
+# ---------------------------
+
+# Load pre-computed state grid lookup
+load_state_grid <- function() {
+  grid_path <- "data/state_grid.rds"
+  if (file.exists(grid_path)) {
+    message("Loading state grid lookup...")
+    return(readRDS(grid_path))
+  }
+  warning("State grid not found: ", grid_path)
+  NULL
+}
+
+# Grid-based state lookup (for production)
+# Rounds coordinates to nearest grid cell and returns matching state
+get_state_from_grid <- function(lat, lon, grid, resolution = 0.1) {
+  if (is.null(grid) || is.na(lat) || is.na(lon)) {
+    return(NA_character_)
+  }
+
+  # Round to nearest grid cell
+  grid_lat <- round(lat / resolution) * resolution
+  grid_lon <- round(lon / resolution) * resolution
+
+  # Find matching row
+  match_idx <- which(abs(grid$lat - grid_lat) < 0.001 &
+                     abs(grid$lon - grid_lon) < 0.001)
+
+  if (length(match_idx) > 0) {
+    grid$state_code[match_idx[1]]
+  } else {
+    NA_character_
+  }
+}
+
+# Get unique states from a set of coordinates
+get_states_from_coords <- function(lats, lons, grid, resolution = 0.1) {
+  if (is.null(grid) || length(lats) == 0) {
+    return(character(0))
+  }
+
+  states <- mapply(
+    function(lat, lon) get_state_from_grid(lat, lon, grid, resolution),
+    lats, lons,
+    USE.NAMES = FALSE
+  )
+
+  unique(states[!is.na(states)])
+}
+
+# ---------------------------
 # Zipcode Lookup
 # ---------------------------
 

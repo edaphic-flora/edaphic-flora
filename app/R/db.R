@@ -110,6 +110,21 @@ db_migrate <- function() {
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)")
 
+    # State distribution table for native status lookup
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_state_distribution (
+        id SERIAL PRIMARY KEY,
+        taxon_id INTEGER REFERENCES ref_taxon(id) ON DELETE CASCADE,
+        state_code VARCHAR(2) NOT NULL,
+        native_status VARCHAR(20) NOT NULL,
+        source VARCHAR(50) DEFAULT 'USDA',
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        UNIQUE(taxon_id, state_code)
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_state_dist_taxon ON ref_state_distribution(taxon_id)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_state_dist_state ON ref_state_distribution(state_code)")
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
