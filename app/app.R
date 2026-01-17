@@ -759,7 +759,84 @@ delete_modal_ui <- modalDialog(
   p(class = "text-muted", "This action cannot be undone.")
 )
 
-ui <- polished::secure_ui(base_ui)
+# Custom branded sign-in page
+custom_sign_in_ui <- tagList(
+  tags$head(
+    tags$style(HTML("
+      .sign-in-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #f5f5dc 0%, #e8e4d4 100%);
+        padding: 20px;
+      }
+      .sign-in-logo {
+        max-width: 200px;
+        margin-bottom: 20px;
+      }
+      .sign-in-welcome {
+        color: #2c3e50;
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+      .sign-in-tagline {
+        color: #666;
+        font-size: 1rem;
+        margin-bottom: 30px;
+      }
+      .sign-in-box {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        max-width: 400px;
+        width: 100%;
+      }
+      .sign-in-box h1 {
+        color: #27ae60 !important;
+        font-size: 1.75rem;
+      }
+      .sign-in-footer {
+        margin-top: 30px;
+        color: #888;
+        font-size: 0.85rem;
+      }
+      .sign-in-footer a {
+        color: #27ae60;
+        text-decoration: none;
+      }
+      .sign-in-footer a:hover {
+        text-decoration: underline;
+      }
+    "))
+  ),
+  div(class = "sign-in-container",
+    img(src = "logo.svg", class = "sign-in-logo", alt = "Edaphic Flora"),
+    h2(class = "sign-in-welcome", "Welcome to Edaphic Flora"),
+    p(class = "sign-in-tagline", "Record and analyze soil conditions for plant species"),
+    div(class = "sign-in-box",
+      polished::sign_in_ui_default(
+        color = "#27ae60",
+        company_name = "Edaphic Flora",
+        logo_top = NULL,
+        logo_bottom = NULL
+      )
+    ),
+    div(class = "sign-in-footer",
+      a(href = "privacy.html", target = "_blank", "Privacy Policy"),
+      span(" | "),
+      a(href = "terms.html", target = "_blank", "Terms of Service")
+    )
+  )
+)
+
+ui <- polished::secure_ui(
+  base_ui,
+  sign_in_page_ui = custom_sign_in_ui
+)
 
 # ---------------------------
 # Server
