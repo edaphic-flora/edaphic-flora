@@ -260,7 +260,10 @@ edaphic_css <- function() {
       font-weight: 400;
       color: #373D3C;
     }
-    /* Navbar brand text needs lighter flora color */
+    /* Navbar brand text - both white on dark navbar */
+    .navbar .brand-name-edaphic {
+      color: rgba(255,255,255,0.9);
+    }
     .navbar .brand-name-flora {
       color: rgba(255,255,255,0.9);
     }
@@ -278,7 +281,7 @@ edaphic_css <- function() {
     }
     .welcome-brand .brand-name-flora {
       font-weight: 400;
-      color: #373D3C;
+      color: #7A9A86;
     }
   "))
 }

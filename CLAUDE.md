@@ -27,6 +27,23 @@ Rscript -e "shiny::runApp('app/app.R', port=7420, host='127.0.0.1')"
 cd app && Rscript generate_species_db.R
 ```
 
+### Port Management (Important!)
+**Do NOT launch the Shiny app from Claude Code.** Port conflicts are common and difficult to resolve remotely. The user will run the app from RStudio instead.
+
+If port issues occur, use these commands in PowerShell:
+```powershell
+# Check what's using port 7420
+netstat -ano | findstr ":7420"
+
+# Kill by PID (replace 12345 with actual PID)
+taskkill /F /PID 12345
+
+# Or kill all R processes
+Get-Process -Name Rscript, rsession, R -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+TIME_WAIT connections (PID 0) will clear automatically in 1-2 minutes - just use a different port temporarily.
+
 ## Dev/Prod Environment Setup
 
 The app supports separate development and production environments:
