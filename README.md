@@ -1,11 +1,21 @@
-# Edaphic Flora
+<p align="center">
+  <img src="app/www/logo.svg" alt="edaphic flora" width="120">
+</p>
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/toddtesterman)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+<h1 align="center">edaphic flora</h1>
 
-**A community-driven soil database for gardeners, researchers, and plant enthusiasts.**
+<p align="center">
+  <strong>A community-driven soil database for native plant enthusiasts</strong>
+</p>
 
-Edaphic Flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource to help people understand what soil conditions different species actually thrive in—not just what's listed in general references.
+<p align="center">
+  <a href="https://buymeacoffee.com/toddtesterman"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-7A9A86?style=flat&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me A Coffee"></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-7A9A86.svg" alt="License: AGPL v3"></a>
+</p>
+
+---
+
+edaphic flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource to help people understand what soil conditions different species actually thrive in—not just what's listed in general references.
 
 > *"Edaphic" means relating to the soil, especially as it affects living organisms.*
 
@@ -157,9 +167,9 @@ For commercial licensing inquiries, contact: todd@edaphicgardenconsulting.com
 
 ## Support the Project
 
-Edaphic Flora is free and open-source. If you find it useful, consider supporting development:
+edaphic flora is free and open-source. If you find it useful, consider supporting development:
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/toddtesterman)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-7A9A86?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/toddtesterman)
 
 Donations help cover:
 - **Database hosting** (Neon PostgreSQL)
