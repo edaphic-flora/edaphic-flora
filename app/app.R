@@ -28,6 +28,9 @@ library(mapdata)
 library(polished)
 library(plotly)
 library(leaflet)
+# Note: promises/future packages available for future async features if needed
+# library(promises)
+# library(future)
 
 # --- Load modules
 source("R/db.R")
@@ -113,6 +116,7 @@ is_admin_user <- function(user_email) {
 # ---------------------------
 
 base_ui <- page_navbar(
+ id = "main_nav",
  title = span(
    class = "brand-name",
    HTML('<svg width="36" height="28" viewBox="170 0 250 280" style="vertical-align: middle; margin-right: 8px;">
@@ -186,7 +190,10 @@ base_ui <- page_navbar(
              h4(class = "mt-4", "How It Works"),
              tags$ol(
                tags$li(tags$strong("Submit soil data"), " - Enter soil test results along with the species growing in that soil"),
-               tags$li(tags$strong("Include location"), " - Geocode your sample location for ecoregion analysis"),
+               tags$li(tags$strong("Include location"), " - Geocode your sample location for ",
+                       tags$a(href = "https://www.epa.gov/eco-research/level-iii-and-iv-ecoregions-continental-united-states",
+                              target = "_blank", "EPA Level IV ecoregion"),
+                       " analysis"),
                tags$li(tags$strong("Analyze patterns"), " - View pH distributions, nutrient levels, and texture profiles"),
                tags$li(tags$strong("Compare to references"), " - See how your data compares to USDA plant characteristics")
              ),
@@ -195,6 +202,18 @@ base_ui <- page_navbar(
              p("Head to the ", tags$strong("Data Entry"), " tab to submit your first soil sample. ",
                "You can enter data for multiple species that share the same soil conditions."),
              p("Use the ", tags$strong("Analysis"), " tab to explore existing data by species."),
+
+             div(class = "mt-3 p-3 border rounded",
+                 tags$small(class = "text-muted d-block mb-2", icon("question-circle"), " Need help understanding the fields?"),
+                 tags$ul(class = "mb-0 small",
+                   tags$li(actionLink("help_link_soil", "Soil Properties", class = "text-decoration-none"),
+                           " \u2014 pH, organic matter, texture explained"),
+                   tags$li(actionLink("help_link_nutrients", "Nutrient Guide", class = "text-decoration-none"),
+                           " \u2014 Macro and micronutrient reference ranges"),
+                   tags$li(actionLink("help_link_performance", "Plant Performance", class = "text-decoration-none"),
+                           " \u2014 Outcome, sun exposure, and hydrology definitions")
+                 )
+             ),
 
              div(class = "mt-4 p-3 bg-light rounded",
                  tags$small(class = "text-muted",
@@ -210,7 +229,10 @@ base_ui <- page_navbar(
      card(
        card_header(icon("chart-simple"), "Database Stats"),
        card_body(
-         uiOutput("welcome_stats")
+         uiOutput("welcome_stats"),
+         div(class = "text-muted text-center mb-1", style = "font-size: 0.7rem;",
+             icon("map-location-dot"), " Sample Locations"),
+         leafletOutput("welcome_map", height = "280px")
        )
      )
    )
@@ -408,7 +430,44 @@ base_ui <- page_navbar(
        uiOutput("species_summary"),
        uiOutput("reference_badges"),
        hr(),
-       checkboxInput("show_usda_ref", "Show USDA reference overlays", TRUE),
+
+       # --- Filter Controls ---
+       tags$details(
+         open = NA,  # Start collapsed
+         tags$summary(
+           style = "cursor: pointer; font-weight: 500; color: #7A9A86;",
+           icon("filter"), " Filter Data"
+         ),
+         div(
+           class = "mt-2",
+           selectizeInput("filter_outcome", "Outcome",
+                          choices = c("All" = "", "Thriving" = "Thriving",
+                                      "Established" = "Established",
+                                      "Struggling" = "Struggling",
+                                      "Failed/Died" = "Failed/Died"),
+                          selected = "",
+                          options = list(placeholder = "All", plugins = list("clear_button"))),
+           selectizeInput("filter_sun", "Sun Exposure",
+                          choices = c("All" = "", "Full Sun" = "Full Sun",
+                                      "Part Sun" = "Part Sun",
+                                      "Part Shade" = "Part Shade",
+                                      "Full Shade" = "Full Shade"),
+                          selected = "",
+                          options = list(placeholder = "All", plugins = list("clear_button"))),
+           selectizeInput("filter_hydrology", "Site Hydrology",
+                          choices = c("All" = "", "Dry/Xeric" = "Dry",
+                                      "Mesic" = "Mesic",
+                                      "Wet/Hydric" = "Wet"),
+                          selected = "",
+                          options = list(placeholder = "All", plugins = list("clear_button"))),
+           uiOutput("filter_cultivar_ui"),
+           div(class = "d-flex justify-content-between align-items-center mt-2",
+               uiOutput("filter_status"),
+               actionLink("clear_all_filters", "Clear All", icon = icon("times"),
+                          class = "text-muted small")
+           )
+         )
+       ),
        uiOutput("reference_msg")
      ),
 
@@ -450,6 +509,11 @@ base_ui <- page_navbar(
          title = "Map",
          icon = icon("map"),
          uiOutput("map_ui")
+       ),
+       nav_panel(
+         title = "Performance",
+         icon = icon("seedling"),
+         uiOutput("performance_ui")
        ),
        nav_panel(
          title = "Raw Data",
@@ -568,6 +632,34 @@ base_ui <- page_navbar(
            ),
            p("The texture triangle in the Analysis tab shows your samples plotted by their sand/silt/clay percentages."),
 
+           h4(class = "mt-4", "Plant Performance"),
+           p("Track how plants perform in different conditions to identify optimal growing environments:"),
+           tags$dl(class = "row",
+             tags$dt(class = "col-sm-3", "Outcome"),
+             tags$dd(class = "col-sm-9",
+                     tags$ul(class = "mb-0",
+                       tags$li(tags$strong("Thriving"), " — Vigorous growth, healthy appearance, performing above expectations"),
+                       tags$li(tags$strong("Established"), " — Healthy and stable, meeting expectations for the species"),
+                       tags$li(tags$strong("Struggling"), " — Showing stress signs (yellowing, stunting, poor growth) but alive"),
+                       tags$li(tags$strong("Failed/Died"), " — Plant did not survive or was removed due to poor performance")
+                     )),
+             tags$dt(class = "col-sm-3", "Sun Exposure"),
+             tags$dd(class = "col-sm-9",
+                     tags$ul(class = "mb-0",
+                       tags$li(tags$strong("Full Sun"), " — 6+ hours of direct sunlight per day"),
+                       tags$li(tags$strong("Part Sun"), " — 4-6 hours of direct sunlight, usually morning sun"),
+                       tags$li(tags$strong("Part Shade"), " — 2-4 hours of direct sunlight, or filtered light throughout day"),
+                       tags$li(tags$strong("Full Shade"), " — Less than 2 hours of direct sunlight, mostly indirect light")
+                     )),
+             tags$dt(class = "col-sm-3", "Site Hydrology"),
+             tags$dd(class = "col-sm-9",
+                     tags$ul(class = "mb-0",
+                       tags$li(tags$strong("Dry/Xeric"), " — Well-drained soil that dries quickly; rarely wet"),
+                       tags$li(tags$strong("Mesic"), " — Average moisture; soil stays evenly moist but not wet"),
+                       tags$li(tags$strong("Wet/Hydric"), " — Frequently saturated; may have standing water seasonally")
+                     ))
+           ),
+
            h4(class = "mt-4", "Analysis Charts Explained"),
            tags$dl(class = "row",
              tags$dt(class = "col-sm-3", "pH Distribution"),
@@ -575,7 +667,10 @@ base_ui <- page_navbar(
                      "The green shaded area shows the USDA reference pH range when available."),
              tags$dt(class = "col-sm-3", "pH vs Organic Matter"),
              tags$dd(class = "col-sm-9", "Scatter plot exploring the relationship between soil acidity and organic content. ",
-                     "Points are colored by texture class."),
+                     "Points are colored by outcome when available, otherwise by texture class."),
+             tags$dt(class = "col-sm-3", "Performance Tab"),
+             tags$dd(class = "col-sm-9", "Shows outcome distributions and success rates by growing conditions. ",
+                     "The Success Matrix reveals which sun/hydrology combinations yield best results."),
              tags$dt(class = "col-sm-3", "Correlations"),
              tags$dd(class = "col-sm-9", "Heatmap showing statistical correlations between soil parameters. ",
                      "Red = positive correlation, Blue = negative correlation.")
@@ -926,9 +1021,9 @@ server_inner <- function(input, output, session) {
    }
 
    # Show processing notification
-   notif_id <- showNotification("Extracting data from PDF...", type = "message", duration = NULL)
+   notif_id <- showNotification("Extracting data from report...", type = "message", duration = NULL)
 
-   # Perform extraction
+   # Perform extraction (synchronous)
    result <- extract_soil_data_from_pdf(input$pdf_upload$datapath)
 
    removeNotification(notif_id)
@@ -1004,7 +1099,6 @@ server_inner <- function(input, output, session) {
      }
 
      # Handle extraction warnings
-     warning_msg <- NULL
      if (!is.null(data$extraction_warnings) && length(data$extraction_warnings) > 0) {
        warnings_list <- unlist(data$extraction_warnings)
        warning_msg <- paste(warnings_list, collapse = "; ")
@@ -1105,7 +1199,6 @@ server_inner <- function(input, output, session) {
    if (!nzchar(sp)) return(NULL)
 
    ref <- get_reference_summary(sp, pool)
-   if (!ref$has_traits) return(NULL)
 
    chip <- function(lbl, val, href = NULL) {
      # Handle NULL, NA, empty, or vector inputs safely
@@ -1142,29 +1235,36 @@ server_inner <- function(input, output, session) {
      sprintf("https://plants.usda.gov/plant-profile/%s", symbol)
    }
 
-   tagList(
-     tags$h6(class = "text-muted mt-2 mb-2", icon("book-open"), " Reference Data"),
-     div(class = "d-flex flex-wrap",
-         if (isTRUE(ref$has_traits) && !is.null(ref$traits) && nrow(ref$traits) > 0) {
-           tr <- ref$traits[1, , drop = FALSE]
-           symbol <- safe_val(tr$usda_symbol)
-           ph_min <- safe_val(tr$soil_ph_min)
-           ph_max <- safe_val(tr$soil_ph_max)
-           # Handle both column naming conventions (precip_min_in vs precipitation_min_mm)
-           precip_min <- safe_val(if ("precip_min_in" %in% names(tr)) tr$precip_min_in else tr$precipitation_min_mm)
-           precip_max <- safe_val(if ("precip_max_in" %in% names(tr)) tr$precip_max_in else tr$precipitation_max_mm)
-           precip_unit <- if ("precip_min_in" %in% names(tr)) "in" else "mm"
-           list(
-             chip("USDA", symbol, href = usda_url(symbol)),
-             chip("pH", if (!is.na(ph_min) && !is.na(ph_max))
-               sprintf("%.1f-%.1f", ph_min, ph_max) else NA),
-             chip("Shade", safe_val(tr$shade_tolerance)),
-             chip("Drought", safe_val(tr$drought_tolerance)),
-             chip("Salinity", safe_val(tr$salinity_tolerance)),
-             chip("Precip", if (!is.na(precip_min) && !is.na(precip_max))
-               sprintf("%d-%d %s", as.integer(precip_min), as.integer(precip_max), precip_unit) else NA)
-           )
-         }
+   # Show reference section if USDA data exists
+   if (!ref$has_traits) return(NULL)
+
+   # Build reference badges
+   tr <- ref$traits[1, , drop = FALSE]
+   symbol <- safe_val(tr$usda_symbol)
+   ph_min <- safe_val(tr$soil_ph_min)
+   ph_max <- safe_val(tr$soil_ph_max)
+   precip_min <- safe_val(if ("precip_min_in" %in% names(tr)) tr$precip_min_in else tr$precipitation_min_mm)
+   precip_max <- safe_val(if ("precip_max_in" %in% names(tr)) tr$precip_max_in else tr$precipitation_max_mm)
+   precip_unit <- if ("precip_min_in" %in% names(tr)) "in" else "mm"
+
+   div(
+     class = "reference-section mt-2 mb-2 p-2 rounded",
+     style = "background-color: #f8f9fa; border: 1px solid #e9ecef;",
+     # Header with toggle
+     div(class = "d-flex justify-content-between align-items-center mb-2",
+         tags$span(class = "small fw-bold text-muted", icon("book-open"), " USDA Reference"),
+         tags$label(class = "d-flex align-items-center mb-0", style = "cursor: pointer;",
+           tags$input(type = "checkbox", id = "show_usda_ref", checked = "checked",
+                      class = "form-check-input me-1", style = "margin-top: 0;"),
+           tags$span(class = "small text-muted", "Overlay")
+         )
+     ),
+     # Badges row
+     div(class = "d-flex flex-wrap gap-1",
+         chip("USDA", symbol, href = usda_url(symbol)),
+         chip("pH", if (!is.na(ph_min) && !is.na(ph_max)) sprintf("%.1f–%.1f", ph_min, ph_max) else NA),
+         chip("Shade", safe_val(tr$shade_tolerance)),
+         chip("Drought", safe_val(tr$drought_tolerance))
      )
    )
  })
@@ -1219,17 +1319,54 @@ server_inner <- function(input, output, session) {
    })
 
    stat_box <- function(value, label, icon_name) {
-     div(class = "text-center py-3 border-bottom",
-         div(class = "fs-2 fw-bold", style = "color: #7A9A86;", value),
-         div(class = "text-muted small", icon(icon_name), " ", label))
+     div(class = "text-center p-2",
+         div(class = "fs-4 fw-bold", style = "color: #7A9A86;", value),
+         div(class = "text-muted", style = "font-size: 0.7rem;", icon(icon_name), " ", label))
    }
 
-   tagList(
-     stat_box(stats$samples, "Soil Samples", "flask"),
-     stat_box(stats$species, "Species", "seedling"),
-     stat_box(stats$users, "Contributors", "users"),
-     stat_box(stats$ecoregions, "Ecoregions", "map")
+   # 2x2 grid layout for stats
+   div(class = "row g-0 border-bottom pb-2 mb-2",
+     div(class = "col-6 border-end border-bottom", stat_box(stats$samples, "Samples", "flask")),
+     div(class = "col-6 border-bottom", stat_box(stats$species, "Species", "seedling")),
+     div(class = "col-6 border-end", stat_box(stats$users, "Contributors", "users")),
+     div(class = "col-6", stat_box(stats$ecoregions, "Ecoregions", "map"))
    )
+ })
+
+ # --- Welcome page mini map ---
+ output$welcome_map <- renderLeaflet({
+   # Get all sample locations
+   locs <- tryCatch({
+     dbGetQuery(pool, "
+       SELECT location_lat, location_long, ecoregion_l4
+       FROM soil_samples
+       WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
+     ")
+   }, error = function(e) data.frame())
+
+   # Create base map centered on US
+   map <- leaflet() %>%
+     addProviderTiles(providers$CartoDB.Positron) %>%
+     setView(lng = -98.5, lat = 39.8, zoom = 3)
+
+   # Add markers if we have data
+   if (nrow(locs) > 0) {
+     map <- map %>%
+       addCircleMarkers(
+         data = locs,
+         lng = ~location_long,
+         lat = ~location_lat,
+         radius = 4,
+         color = "#7A9A86",
+         fillColor = "#7A9A86",
+         fillOpacity = 0.7,
+         stroke = TRUE,
+         weight = 1,
+         popup = ~ifelse(is.na(ecoregion_l4), "Sample location", ecoregion_l4)
+       )
+   }
+
+   map
  })
 
  # --- Recent entries table ---
@@ -1409,6 +1546,22 @@ server_inner <- function(input, output, session) {
      }
    }
 
+   # Validate coordinates if provided
+   lat <- input$latitude
+   lon <- input$longitude
+   if (!is.null(lat) && !is.na(lat) && lat != 0) {
+     if (lat < -90 || lat > 90) {
+       showNotification("Latitude must be between -90 and 90 degrees", type = "error")
+       return()
+     }
+   }
+   if (!is.null(lon) && !is.na(lon) && lon != 0) {
+     if (lon < -180 || lon > 180) {
+       showNotification("Longitude must be between -180 and 180 degrees", type = "error")
+       return()
+     }
+   }
+
    # Calculate shared values once
    eco <- tryCatch(lookup_ecoregion(input$latitude, input$longitude),
                    error = function(e) list(name = NA, code = NA))
@@ -1469,7 +1622,10 @@ server_inner <- function(input, output, session) {
      )
 
      sample_id <- db_add_sample(new_data)
-     if (!is.null(sample_id)) success_count <- success_count + 1
+     if (!is.null(sample_id)) {
+       success_count <- success_count + 1
+       db_audit_log("create", "soil_samples", sample_id, u$user_uid, sprintf("species: %s", sp))
+     }
    }
 
    if (success_count > 0) {
@@ -1496,7 +1652,12 @@ server_inner <- function(input, output, session) {
 
  output$export_data <- downloadHandler(
    filename = function() paste0("soil_data_export_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv"),
-   content  = function(file) write.csv(db_get_all_samples(), file, row.names = FALSE)
+   content  = function(file) {
+     data <- db_get_all_samples()
+     write.csv(data, file, row.names = FALSE)
+     u <- session$userData$user()
+     db_audit_log("export", "soil_samples", NULL, u$user_uid, sprintf("CSV export: %d records", nrow(data)))
+   }
  )
 
  # --- CSV Import ---
@@ -1517,6 +1678,45 @@ server_inner <- function(input, output, session) {
        return()
      }
 
+     # Type validation for numeric columns
+     numeric_cols <- c("ph", "organic_matter", "texture_sand", "texture_silt", "texture_clay",
+                       "location_lat", "location_long", "nitrate_ppm", "ammonium_ppm",
+                       "phosphorus_ppm", "potassium_ppm", "calcium_ppm", "magnesium_ppm",
+                       "sulfur_ppm", "iron_ppm", "manganese_ppm", "zinc_ppm", "copper_ppm",
+                       "boron_ppm", "cec_meq", "soluble_salts_ppm")
+     warnings <- c()
+     for (col in intersect(numeric_cols, names(imported))) {
+       original <- imported[[col]]
+       imported[[col]] <- suppressWarnings(as.numeric(imported[[col]]))
+       bad_count <- sum(is.na(imported[[col]]) & !is.na(original) & original != "")
+       if (bad_count > 0) {
+         warnings <- c(warnings, sprintf("%s: %d non-numeric values", col, bad_count))
+       }
+     }
+
+     # Validate coordinate bounds
+     if ("location_lat" %in% names(imported)) {
+       bad_lat <- sum(imported$location_lat < -90 | imported$location_lat > 90, na.rm = TRUE)
+       if (bad_lat > 0) warnings <- c(warnings, sprintf("latitude: %d out of range (-90 to 90)", bad_lat))
+     }
+     if ("location_long" %in% names(imported)) {
+       bad_lon <- sum(imported$location_long < -180 | imported$location_long > 180, na.rm = TRUE)
+       if (bad_lon > 0) warnings <- c(warnings, sprintf("longitude: %d out of range (-180 to 180)", bad_lon))
+     }
+
+     # Validate pH range
+     if ("ph" %in% names(imported)) {
+       bad_ph <- sum(imported$ph < 0 | imported$ph > 14, na.rm = TRUE)
+       if (bad_ph > 0) warnings <- c(warnings, sprintf("pH: %d out of range (0 to 14)", bad_ph))
+     }
+
+     if (length(warnings) > 0) {
+       showNotification(
+         paste("Data warnings:", paste(warnings, collapse = "; ")),
+         type = "warning", duration = 10
+       )
+     }
+
      count <- 0
      for (i in seq_len(nrow(imported))) {
        row <- imported[i, ]
@@ -1525,6 +1725,7 @@ server_inner <- function(input, output, session) {
      }
 
      showNotification(sprintf("Imported %d samples successfully!", count), type = "message")
+     db_audit_log("import", "soil_samples", NULL, u$user_uid, sprintf("CSV import: %d records", count))
      data_changed(data_changed() + 1)
    }, error = function(e) {
      showNotification(paste("Import error:", e$message), type = "error")
@@ -1548,6 +1749,96 @@ server_inner <- function(input, output, session) {
  })
 
  # ---------------------------
+ # Filtered Analysis Data
+ # ---------------------------
+
+ # Cultivar filter UI - dynamically populated based on selected species
+ output$filter_cultivar_ui <- renderUI({
+   sp <- input$analysis_species %||% ""
+   if (!nzchar(sp)) return(NULL)
+
+   dat <- db_get_species_data(sp)
+   cultivars <- unique(dat$cultivar[!is.na(dat$cultivar) & nzchar(dat$cultivar)])
+
+   if (length(cultivars) == 0) return(NULL)
+
+   # Sort cultivars alphabetically
+   cultivars <- sort(cultivars)
+   choices <- c("All" = "", setNames(cultivars, cultivars))
+
+   selectizeInput("filter_cultivar", "Cultivar",
+                  choices = choices,
+                  selected = "",
+                  options = list(placeholder = "All", plugins = list("clear_button")))
+ })
+
+ # Clear all filters button
+ observeEvent(input$clear_all_filters, {
+   updateSelectizeInput(session, "filter_outcome", selected = "")
+   updateSelectizeInput(session, "filter_sun", selected = "")
+   updateSelectizeInput(session, "filter_hydrology", selected = "")
+   updateSelectizeInput(session, "filter_cultivar", selected = "")
+ })
+
+ # Help links from welcome page - navigate to Field Guide
+ observeEvent(input$help_link_soil, {
+   nav_select("main_nav", "Field Guide")
+ })
+ observeEvent(input$help_link_nutrients, {
+   nav_select("main_nav", "Field Guide")
+ })
+ observeEvent(input$help_link_performance, {
+   nav_select("main_nav", "Field Guide")
+ })
+
+ # Reactive for filtered species data based on sidebar filters
+ filtered_species_data <- reactive({
+   sp <- input$analysis_species %||% ""
+   if (!nzchar(sp)) return(data.frame())
+
+   dat <- db_get_species_data(sp)
+   if (nrow(dat) == 0) return(dat)
+
+   # Apply outcome filter
+   if (nzchar(input$filter_outcome %||% "")) {
+     dat <- dat[!is.na(dat$outcome) & dat$outcome == input$filter_outcome, , drop = FALSE]
+   }
+
+   # Apply sun exposure filter
+   if (nzchar(input$filter_sun %||% "")) {
+     dat <- dat[!is.na(dat$sun_exposure) & dat$sun_exposure == input$filter_sun, , drop = FALSE]
+   }
+
+   # Apply hydrology filter
+   if (nzchar(input$filter_hydrology %||% "")) {
+     dat <- dat[!is.na(dat$site_hydrology) & dat$site_hydrology == input$filter_hydrology, , drop = FALSE]
+   }
+
+   # Apply cultivar filter
+   if (nzchar(input$filter_cultivar %||% "")) {
+     dat <- dat[!is.na(dat$cultivar) & dat$cultivar == input$filter_cultivar, , drop = FALSE]
+   }
+
+   dat
+ })
+
+ # Filter status display
+ output$filter_status <- renderUI({
+   sp <- input$analysis_species %||% ""
+   if (!nzchar(sp)) return(NULL)
+
+   total <- nrow(db_get_species_data(sp))
+   filtered <- nrow(filtered_species_data())
+
+   if (total == filtered) {
+     span(class = "small text-muted", icon("check"), sprintf(" Showing all %d", total))
+   } else {
+     span(class = "small text-info", icon("filter"),
+          sprintf(" Showing %d of %d", filtered, total))
+   }
+ })
+
+ # ---------------------------
  # Analysis Outputs
  # ---------------------------
 
@@ -1564,45 +1855,214 @@ server_inner <- function(input, output, session) {
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("search", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    if (nrow(dat) == 0) {
-     return(empty_state("database", "No Data", paste("No samples for", input$analysis_species)))
+     return(empty_state("database", "No Data", paste("No samples for", input$analysis_species, "(with current filters)")))
    }
-   tableOutput("summary_stats")
- })
 
- output$summary_stats <- renderTable({
-   req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
-   if (nrow(dat) == 0) return(NULL)
+   # Calculate metrics for cards
+   n_samples <- nrow(dat)
+   n_cultivars <- length(unique(dat$cultivar[!is.na(dat$cultivar) & nzchar(dat$cultivar)]))
 
-   data.frame(
-     Measure = c("Number of Samples", "Average pH", "pH Range",
-                 "Average Organic Matter (%)", "Average Nitrate (ppm)",
-                 "Average Phosphorus (ppm)", "Average Potassium (ppm)"),
-     Value = c(
-       nrow(dat),
-       round(mean(dat$ph, na.rm = TRUE), 2),
-       paste(round(range(dat$ph, na.rm = TRUE), 2), collapse = " - "),
-       round(mean(dat$organic_matter, na.rm = TRUE), 2),
-       round(mean(dat$nitrate_ppm, na.rm = TRUE), 2),
-       round(mean(dat$phosphorus_ppm, na.rm = TRUE), 2),
-       round(mean(dat$potassium_ppm, na.rm = TRUE), 2)
+   # Outcome breakdown
+   outcome_counts <- if ("outcome" %in% names(dat)) table(dat$outcome[!is.na(dat$outcome)]) else NULL
+   has_outcomes <- !is.null(outcome_counts) && length(outcome_counts) > 0
+
+   # Success rate
+   if (has_outcomes) {
+     n_success <- sum(outcome_counts[names(outcome_counts) %in% c("Thriving", "Established")], na.rm = TRUE)
+     n_total_outcome <- sum(outcome_counts)
+     success_rate <- if (n_total_outcome > 0) round(n_success / n_total_outcome * 100) else NA
+   } else {
+     success_rate <- NA
+   }
+
+   tagList(
+     # Key metrics row
+     layout_column_wrap(
+       width = 1/4,
+       card(
+         class = "text-center",
+         card_body(
+           tags$h2(class = "mb-0", n_samples),
+           tags$small(class = "text-muted", "Samples")
+         )
+       ),
+       card(
+         class = "text-center",
+         card_body(
+           tags$h2(class = "mb-0", if (!is.na(success_rate)) paste0(success_rate, "%") else "—"),
+           tags$small(class = "text-muted", "Success Rate")
+         )
+       ),
+       card(
+         class = "text-center",
+         card_body(
+           tags$h2(class = "mb-0", if (n_cultivars > 0) n_cultivars else "—"),
+           tags$small(class = "text-muted", "Cultivars")
+         )
+       ),
+       card(
+         class = "text-center",
+         card_body(
+           tags$h2(class = "mb-0", length(unique(dat$ecoregion_l4[!is.na(dat$ecoregion_l4)]))),
+           tags$small(class = "text-muted", "Ecoregions")
+         )
+       )
+     ),
+
+     # Details row
+     layout_column_wrap(
+       width = 1/2,
+       class = "mt-3",
+       # Soil Chemistry Card
+       card(
+         card_header(icon("flask"), " Soil Chemistry"),
+         card_body(tableOutput("summary_soil_stats"))
+       ),
+       # Performance & Conditions Card
+       card(
+         card_header(icon("seedling"), " Performance & Conditions"),
+         card_body(uiOutput("summary_performance"))
+       )
      )
    )
- }, striped = TRUE, hover = TRUE, width = "100%")
+ })
+
+ output$summary_soil_stats <- renderTable({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   if (nrow(dat) == 0) return(NULL)
+
+   # Only show stats for parameters that have data
+   stats <- list()
+
+   if (sum(!is.na(dat$ph)) > 0) {
+     stats[["pH"]] <- sprintf("%.1f (%.1f – %.1f)",
+                               mean(dat$ph, na.rm = TRUE),
+                               min(dat$ph, na.rm = TRUE),
+                               max(dat$ph, na.rm = TRUE))
+   }
+   if (sum(!is.na(dat$organic_matter)) > 0) {
+     stats[["Organic Matter"]] <- sprintf("%.1f%% (%.1f – %.1f)",
+                                           mean(dat$organic_matter, na.rm = TRUE),
+                                           min(dat$organic_matter, na.rm = TRUE),
+                                           max(dat$organic_matter, na.rm = TRUE))
+   }
+   if (sum(!is.na(dat$texture_class)) > 0) {
+     top_textures <- names(sort(table(dat$texture_class), decreasing = TRUE))[1:min(2, length(unique(dat$texture_class)))]
+     stats[["Texture"]] <- paste(top_textures, collapse = ", ")
+   }
+   if (sum(!is.na(dat$nitrate_ppm)) > 0) {
+     stats[["Nitrate (ppm)"]] <- sprintf("%.0f avg", mean(dat$nitrate_ppm, na.rm = TRUE))
+   }
+   if (sum(!is.na(dat$phosphorus_ppm)) > 0) {
+     stats[["Phosphorus (ppm)"]] <- sprintf("%.0f avg", mean(dat$phosphorus_ppm, na.rm = TRUE))
+   }
+   if (sum(!is.na(dat$potassium_ppm)) > 0) {
+     stats[["Potassium (ppm)"]] <- sprintf("%.0f avg", mean(dat$potassium_ppm, na.rm = TRUE))
+   }
+
+   if (length(stats) == 0) return(data.frame(Parameter = "No data", Value = "—"))
+
+   data.frame(Parameter = names(stats), Value = unlist(stats), stringsAsFactors = FALSE)
+ }, striped = TRUE, hover = TRUE, width = "100%", colnames = FALSE)
+
+ output$summary_performance <- renderUI({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   if (nrow(dat) == 0) return(NULL)
+
+   # Outcome breakdown
+   outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
+   outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                       "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+
+   outcome_html <- if (sum(!is.na(dat$outcome)) > 0) {
+     oc <- table(factor(dat$outcome, levels = outcome_order))
+     oc <- oc[oc > 0]
+     div(
+       tags$strong("Outcomes:"),
+       tags$div(class = "d-flex flex-wrap gap-2 mt-1",
+         lapply(names(oc), function(o) {
+           span(class = "badge", style = paste0("background-color:", outcome_colors[o]),
+                paste(o, "(", oc[o], ")"))
+         })
+       )
+     )
+   } else {
+     tags$p(class = "text-muted small", "No outcome data recorded")
+   }
+
+   # Sun exposure breakdown
+   sun_order <- c("Full Sun", "Part Sun", "Part Shade", "Full Shade")
+   sun_html <- if (sum(!is.na(dat$sun_exposure)) > 0) {
+     sc <- table(factor(dat$sun_exposure, levels = sun_order))
+     sc <- sc[sc > 0]
+     div(class = "mt-3",
+       tags$strong("Sun Exposure:"),
+       tags$div(class = "mt-1",
+         paste(sapply(names(sc), function(s) paste0(s, " (", sc[s], ")")), collapse = " · ")
+       )
+     )
+   } else NULL
+
+   # Hydrology breakdown
+   hydro_order <- c("Dry", "Mesic", "Wet")
+   hydro_html <- if (sum(!is.na(dat$site_hydrology)) > 0) {
+     hc <- table(factor(dat$site_hydrology, levels = hydro_order))
+     hc <- hc[hc > 0]
+     div(class = "mt-3",
+       tags$strong("Site Hydrology:"),
+       tags$div(class = "mt-1",
+         paste(sapply(names(hc), function(h) paste0(h, " (", hc[h], ")")), collapse = " · ")
+       )
+     )
+   } else NULL
+
+   # Cultivar breakdown
+   cultivar_html <- if (sum(!is.na(dat$cultivar) & nzchar(dat$cultivar)) > 0) {
+     cc <- sort(table(dat$cultivar[!is.na(dat$cultivar) & nzchar(dat$cultivar)]), decreasing = TRUE)
+     div(class = "mt-3",
+       tags$strong("Cultivars:"),
+       tags$div(class = "mt-1",
+         paste(sapply(names(cc), function(c) paste0("'", c, "' (", cc[c], ")")), collapse = " · ")
+       )
+     )
+   } else NULL
+
+   # Ecoregion breakdown
+   ecoregion_html <- if (sum(!is.na(dat$ecoregion_l4) & nzchar(dat$ecoregion_l4)) > 0) {
+     ec <- sort(table(dat$ecoregion_l4[!is.na(dat$ecoregion_l4) & nzchar(dat$ecoregion_l4)]), decreasing = TRUE)
+     # Show top 3 if many ecoregions
+     if (length(ec) > 3) {
+       shown <- head(ec, 3)
+       others <- sum(tail(ec, -3))
+       label <- paste(c(sapply(names(shown), function(e) paste0(e, " (", shown[e], ")")),
+                        paste0("+ ", length(ec) - 3, " more")), collapse = " · ")
+     } else {
+       label <- paste(sapply(names(ec), function(e) paste0(e, " (", ec[e], ")")), collapse = " · ")
+     }
+     div(class = "mt-3",
+       tags$strong(icon("map-location-dot"), " Ecoregions:"),
+       tags$div(class = "mt-1 small", label)
+     )
+   } else NULL
+
+   tagList(outcome_html, sun_html, hydro_html, cultivar_html, ecoregion_html)
+ })
 
  # --- pH Distribution (Plotly) ---
  output$ph_plot_ui <- renderUI({
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("chart-bar", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    # Allow reference-only mode if USDA data exists
    if (nrow(dat) == 0) {
      tr <- get_usda_traits_for_name(input$analysis_species, pool)
      if (is.null(tr) || nrow(tr) == 0 || is.na(tr$soil_ph_min) || is.na(tr$soil_ph_max)) {
-       return(empty_state("database", "No Data", "No samples or USDA pH reference available"))
+       return(empty_state("database", "No Data", "No samples (with current filters) or USDA pH reference available"))
      }
    }
    tagList(
@@ -1617,7 +2077,7 @@ server_inner <- function(input, output, session) {
 
  output$ph_plot <- renderPlotly({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    tr <- if (isTRUE(input$show_usda_ref)) get_usda_traits_for_name(input$analysis_species, pool) else NULL
    has_usda_ph <- !is.null(tr) && nrow(tr) > 0 && !is.na(tr$soil_ph_min) && !is.na(tr$soil_ph_max)
 
@@ -1666,12 +2126,12 @@ server_inner <- function(input, output, session) {
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("circle-nodes", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    # Allow reference-only mode if USDA data exists
    if (nrow(dat) == 0) {
      tr <- get_usda_traits_for_name(input$analysis_species, pool)
      if (is.null(tr) || nrow(tr) == 0 || is.na(tr$soil_ph_min) || is.na(tr$soil_ph_max)) {
-       return(empty_state("database", "No Data", "No samples or USDA pH reference available"))
+       return(empty_state("database", "No Data", "No samples (with current filters) or USDA pH reference available"))
      }
    }
    tagList(
@@ -1679,14 +2139,14 @@ server_inner <- function(input, output, session) {
      tags$p(class = "text-muted small mt-2 px-3",
             icon("info-circle"), " ",
             "This scatter plot shows the relationship between soil pH and organic matter content. ",
-            "Points represent individual samples. Higher organic matter generally improves soil structure and water retention. ",
+            "Points are colored by plant outcome (if available). ",
             "The green shaded region shows the USDA reference pH range if available.")
    )
  })
 
  output$ph_om_plot <- renderPlotly({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    tr <- if (isTRUE(input$show_usda_ref)) get_usda_traits_for_name(input$analysis_species, pool) else NULL
    has_usda_ph <- !is.null(tr) && nrow(tr) > 0 && !is.na(tr$soil_ph_min) && !is.na(tr$soil_ph_max)
 
@@ -1709,6 +2169,9 @@ server_inner <- function(input, output, session) {
 
    cor_val <- cor(dat$ph, dat$organic_matter, use = "complete.obs")
 
+   # Determine if we have outcome data for coloring
+   has_outcome <- sum(!is.na(dat$outcome)) > 0
+
    p <- ggplot(dat, aes(x = ph, y = organic_matter))
 
    # Add USDA overlay if available (before points so it's behind)
@@ -1719,15 +2182,34 @@ server_inner <- function(input, output, session) {
 
    p <- p +
      geom_smooth(method = "lm", se = TRUE, color = edaphic_colors$dark,
-                 fill = edaphic_colors$light, alpha = 0.3, linetype = "dashed") +
-     geom_point(aes(color = texture_class,
-                    text = paste0("pH: ", ph, "\nOM: ", organic_matter, "%\nTexture: ", texture_class)),
-                size = 3, alpha = 0.7) +
-     scale_color_edaphic() +
+                 fill = edaphic_colors$light, alpha = 0.3, linetype = "dashed")
+
+   # Color by outcome if available, otherwise by texture
+   if (has_outcome) {
+     outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
+     outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                         "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+     dat$outcome <- factor(dat$outcome, levels = outcome_order)
+     p <- p +
+       geom_point(aes(color = outcome,
+                      text = paste0("pH: ", ph, "\nOM: ", organic_matter, "%\nOutcome: ", outcome)),
+                  size = 3, alpha = 0.8) +
+       scale_color_manual(values = outcome_colors, breaks = outcome_order, na.value = "#95a5a6") +
+       labs(color = "Outcome")
+   } else {
+     p <- p +
+       geom_point(aes(color = texture_class,
+                      text = paste0("pH: ", ph, "\nOM: ", organic_matter, "%\nTexture: ", texture_class)),
+                  size = 3, alpha = 0.7) +
+       scale_color_edaphic() +
+       labs(color = "Texture")
+   }
+
+   p <- p +
      labs(title = paste("pH vs Organic Matter -", input$analysis_species),
           subtitle = paste("r =", round(cor_val, 3),
                            if (has_usda_ph) paste("| USDA pH:", tr$soil_ph_min[1], "-", tr$soil_ph_max[1]) else ""),
-          x = "Soil pH", y = "Organic Matter (%)", color = "Texture") +
+          x = "Soil pH", y = "Organic Matter (%)") +
      theme_edaphic()
 
    ggplotly(p, tooltip = "text") %>%
@@ -1739,9 +2221,9 @@ server_inner <- function(input, output, session) {
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("leaf", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    if (nrow(dat) == 0) {
-     return(empty_state("database", "No Data", "No samples available"))
+     return(empty_state("database", "No Data", "No samples match current filters"))
    }
    tagList(
      plotlyOutput("nutrient_plot", height = "500px"),
@@ -1755,7 +2237,7 @@ server_inner <- function(input, output, session) {
 
  output$nutrient_plot <- renderPlotly({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    if (nrow(dat) == 0) return(NULL)
 
    nutrient_cols <- c("nitrate_ppm", "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
@@ -1807,7 +2289,7 @@ server_inner <- function(input, output, session) {
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("project-diagram", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    if (nrow(dat) < 3) {
      return(empty_state("database", "Insufficient Data", "Need at least 3 samples for correlations"))
    }
@@ -1823,7 +2305,7 @@ server_inner <- function(input, output, session) {
 
  output$heatmap_plot <- renderPlotly({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    if (nrow(dat) < 3) return(NULL)
 
    numeric_cols <- c("ph", "organic_matter", "cec_meq", "soluble_salts_ppm",
@@ -1868,10 +2350,10 @@ server_inner <- function(input, output, session) {
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("mountain", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    dat <- dat[!is.na(dat$texture_sand) & !is.na(dat$texture_silt) & !is.na(dat$texture_clay), ]
    if (nrow(dat) == 0) {
-     return(empty_state("database", "No Texture Data", "No samples with texture data"))
+     return(empty_state("database", "No Texture Data", "No samples with texture data matching filters"))
    }
    tagList(
      plotOutput("texture_plot", height = "550px"),
@@ -1885,17 +2367,39 @@ server_inner <- function(input, output, session) {
 
  output$texture_plot <- renderPlot({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    dat <- dat[!is.na(dat$texture_sand) & !is.na(dat$texture_silt) & !is.na(dat$texture_clay), ]
    if (nrow(dat) == 0) return(NULL)
 
+   # Check if we have outcome data to color by
+   has_outcome <- "outcome" %in% names(dat) && sum(!is.na(dat$outcome)) >= 2
+
    p <- ggtern(dat, aes(x = texture_sand, y = texture_silt, z = texture_clay)) +
-     geom_point(aes(color = texture_class), size = 4, alpha = 0.7) +
      theme_bw() + theme_showarrows() +
-     labs(title = paste("Soil Texture -", input$analysis_species),
-          subtitle = paste(nrow(dat), "samples")) +
-     xlab("Sand (%)") + ylab("Silt (%)") + zlab("Clay (%)") +
-     scale_color_edaphic() +
+     xlab("Sand (%)") + ylab("Silt (%)") + zlab("Clay (%)")
+
+   # Color by outcome if available, otherwise by texture class
+   if (has_outcome) {
+     outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
+     outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                         "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+     dat$outcome <- factor(dat$outcome, levels = outcome_order)
+     p <- p +
+       geom_point(aes(color = outcome), size = 4, alpha = 0.8) +
+       scale_color_manual(values = outcome_colors, breaks = outcome_order, na.value = "#95a5a6") +
+       labs(title = paste("Soil Texture -", input$analysis_species),
+            subtitle = paste(nrow(dat), "samples (colored by outcome)"),
+            color = "Outcome")
+   } else {
+     p <- p +
+       geom_point(aes(color = texture_class), size = 4, alpha = 0.7) +
+       scale_color_edaphic() +
+       labs(title = paste("Soil Texture -", input$analysis_species),
+            subtitle = paste(nrow(dat), "samples"),
+            color = "Texture")
+   }
+
+   p <- p +
      theme(
        tern.panel.background = element_rect(fill = "#f8f9fa"),
        tern.panel.grid.major = element_line(color = "#dee2e6"),
@@ -1915,10 +2419,10 @@ server_inner <- function(input, output, session) {
    if (is.null(input$analysis_species) || input$analysis_species == "") {
      return(empty_state("map", "No Species Selected", "Choose a species from the sidebar"))
    }
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    dat <- dat[!is.na(dat$location_lat) & !is.na(dat$location_long), ]
    if (nrow(dat) == 0) {
-     return(empty_state("map-marker-alt", "No Location Data", "No samples with coordinates"))
+     return(empty_state("map-marker-alt", "No Location Data", "No samples with coordinates matching filters"))
    }
    tagList(
      leafletOutput("map_plot", height = "550px"),
@@ -1931,34 +2435,455 @@ server_inner <- function(input, output, session) {
 
  output$map_plot <- renderLeaflet({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()
    dat <- dat[!is.na(dat$location_lat) & !is.na(dat$location_long), ]
    if (nrow(dat) == 0) return(NULL)
+
+   # Color markers by outcome if available
+   outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                       "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+   has_outcome <- sum(!is.na(dat$outcome)) > 0
 
    dat$popup <- paste0(
      "<strong>", dat$species, "</strong><br>",
      "<b>pH:</b> ", dat$ph, "<br>",
      "<b>OM:</b> ", dat$organic_matter, "%<br>",
      "<b>Texture:</b> ", dat$texture_class, "<br>",
+     ifelse(!is.na(dat$outcome), paste0("<b>Outcome:</b> ", dat$outcome, "<br>"), ""),
+     ifelse(!is.na(dat$sun_exposure), paste0("<b>Sun:</b> ", dat$sun_exposure, "<br>"), ""),
+     ifelse(!is.na(dat$site_hydrology), paste0("<b>Hydrology:</b> ", dat$site_hydrology, "<br>"), ""),
      "<b>Date:</b> ", dat$date,
      ifelse(!is.na(dat$ecoregion_l4), paste0("<br><b>Ecoregion:</b> ", dat$ecoregion_l4), "")
    )
+
+   # Assign colors based on outcome
+   if (has_outcome) {
+     dat$marker_color <- sapply(dat$outcome, function(o) {
+       if (is.na(o)) edaphic_colors$muted else outcome_colors[o]
+     })
+   } else {
+     dat$marker_color <- edaphic_colors$accent
+   }
 
    leaflet(dat) %>%
      addProviderTiles(providers$CartoDB.Positron) %>%
      addCircleMarkers(
        lng = ~location_long, lat = ~location_lat,
        radius = 8, color = edaphic_colors$primary,
-       fillColor = edaphic_colors$accent, fillOpacity = 0.7,
+       fillColor = ~marker_color, fillOpacity = 0.7,
        stroke = TRUE, weight = 2, popup = ~popup
      ) %>%
      setView(lng = mean(dat$location_long), lat = mean(dat$location_lat), zoom = 5)
  })
 
+ # --- Plant Performance ---
+ output$performance_ui <- renderUI({
+   if (is.null(input$analysis_species) || input$analysis_species == "") {
+     return(empty_state("seedling", "No Species Selected", "Choose a species from the sidebar"))
+   }
+   dat <- filtered_species_data()
+   if (nrow(dat) == 0) {
+     return(empty_state("seedling", "No Data", "No samples match current filters"))
+   }
+
+   # Check if we have any outcome data
+   has_outcome <- sum(!is.na(dat$outcome)) > 0
+   has_sun <- sum(!is.na(dat$sun_exposure)) > 0
+   has_hydro <- sum(!is.na(dat$site_hydrology)) > 0
+
+   if (!has_outcome && !has_sun && !has_hydro) {
+     return(div(
+       class = "p-4 text-center",
+       icon("info-circle", class = "fa-2x text-muted mb-3"),
+       tags$h5("No Performance Data Yet"),
+       tags$p(class = "text-muted",
+              "This tab shows plant outcome, sun exposure, and hydrology data. ",
+              "Add this information when entering new samples to see performance analysis.")
+     ))
+   }
+
+   tagList(
+     layout_column_wrap(
+       width = 1/2,
+       card(
+         card_header("Outcome Distribution"),
+         card_body(plotlyOutput("performance_outcome_plot", height = "300px"))
+       ),
+       card(
+         card_header(icon("lightbulb"), " Key Insights"),
+         card_body(uiOutput("performance_insights"))
+       )
+     ),
+     layout_column_wrap(
+       width = 1/2,
+       card(
+         card_header("Sun Exposure"),
+         card_body(plotlyOutput("performance_sun_plot", height = "250px"))
+       ),
+       card(
+         card_header("Site Hydrology"),
+         card_body(plotlyOutput("performance_hydro_plot", height = "250px"))
+       )
+     ),
+     # Success Factors section - selectable soil parameters by outcome
+     if (has_outcome) {
+       tagList(
+         tags$h5(class = "mt-4 mb-3", icon("search"), " Success Factors"),
+         tags$p(class = "text-muted small mb-3",
+                "Compare soil conditions between thriving and struggling/failed plants to identify optimal ranges."),
+         layout_column_wrap(
+           width = 1/2,
+           card(
+             card_header(
+               class = "d-flex justify-content-between align-items-center",
+               span(icon("chart-bar"), " Parameter by Outcome"),
+               selectInput("success_factor_param", NULL,
+                           choices = c("pH" = "ph",
+                                       "Organic Matter (%)" = "organic_matter",
+                                       "Clay Content (%)" = "texture_clay",
+                                       "Sand Content (%)" = "texture_sand",
+                                       "Nitrate (ppm)" = "nitrate_ppm",
+                                       "Phosphorus (ppm)" = "phosphorus_ppm",
+                                       "Potassium (ppm)" = "potassium_ppm",
+                                       "Calcium (ppm)" = "calcium_ppm"),
+                           selected = "ph",
+                           width = "180px")
+             ),
+             card_body(plotlyOutput("success_factor_plot", height = "320px"))
+           ),
+           # Condition matrix heatmap
+           if (has_sun && has_hydro) {
+             card(
+               card_header(icon("th"), " Success Matrix: Sun × Hydrology"),
+               card_body(
+                 plotlyOutput("success_matrix_plot", height = "320px"),
+                 tags$p(class = "text-muted small mt-2",
+                        "Success rate (% Thriving + Established) by condition. Darker green = higher success.")
+               )
+             )
+           } else {
+             card(
+               card_header(icon("info-circle"), " More Data Needed"),
+               card_body(
+                 class = "text-center text-muted",
+                 tags$p("Record sun exposure and hydrology data to see the Success Matrix visualization.")
+               )
+             )
+           }
+         )
+       )
+     }
+   )
+ })
+
+ # Outcome distribution bar chart
+ output$performance_outcome_plot <- renderPlotly({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   dat <- dat[!is.na(dat$outcome), ]
+   if (nrow(dat) == 0) return(NULL)
+
+   outcome_counts <- as.data.frame(table(dat$outcome))
+   names(outcome_counts) <- c("Outcome", "Count")
+
+   # Order outcomes logically
+   outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
+   outcome_counts$Outcome <- factor(outcome_counts$Outcome, levels = outcome_order)
+   outcome_counts <- outcome_counts[order(outcome_counts$Outcome), ]
+
+   # Colors: green for thriving, yellow for established, orange for struggling, red for failed
+   outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                       "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+
+   p <- ggplot(outcome_counts, aes(x = Outcome, y = Count, fill = Outcome)) +
+     geom_bar(stat = "identity") +
+     scale_fill_manual(values = outcome_colors, breaks = outcome_order) +
+     labs(x = "", y = "Number of Plants") +
+     theme_minimal() +
+     theme(legend.position = "none",
+           axis.text.x = element_text(angle = 45, hjust = 1))
+
+   ggplotly(p, tooltip = c("x", "y")) %>%
+     layout(margin = list(b = 80))
+ })
+
+ # Key insights based on outcome data
+ output$performance_insights <- renderUI({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   dat <- dat[!is.na(dat$outcome), ]
+   if (nrow(dat) < 3) {
+     return(div(class = "text-muted", "Need more outcome data to generate insights."))
+   }
+
+   insights <- list()
+   outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                       "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+
+   # Calculate success
+   dat$success <- dat$outcome %in% c("Thriving", "Established")
+   overall_success <- round(mean(dat$success) * 100)
+
+   # Best sun exposure
+   if (sum(!is.na(dat$sun_exposure)) >= 3) {
+     sun_rates <- aggregate(success ~ sun_exposure, data = dat[!is.na(dat$sun_exposure), ],
+                            FUN = function(x) c(rate = mean(x) * 100, n = length(x)))
+     sun_rates <- do.call(data.frame, sun_rates)
+     names(sun_rates) <- c("sun_exposure", "rate", "n")
+     sun_rates <- sun_rates[sun_rates$n >= 2, ]  # Need at least 2 samples
+     if (nrow(sun_rates) > 0) {
+       best_sun <- sun_rates[which.max(sun_rates$rate), ]
+       if (best_sun$rate >= 50) {
+         insights$sun <- div(class = "mb-2",
+           icon("sun", class = "text-warning me-2"),
+           tags$strong("Best sun: "), best_sun$sun_exposure,
+           tags$span(class = "text-success ms-1", sprintf("(%d%% success)", round(best_sun$rate)))
+         )
+       }
+     }
+   }
+
+   # Best hydrology
+   if (sum(!is.na(dat$site_hydrology)) >= 3) {
+     hydro_rates <- aggregate(success ~ site_hydrology, data = dat[!is.na(dat$site_hydrology), ],
+                              FUN = function(x) c(rate = mean(x) * 100, n = length(x)))
+     hydro_rates <- do.call(data.frame, hydro_rates)
+     names(hydro_rates) <- c("site_hydrology", "rate", "n")
+     hydro_rates <- hydro_rates[hydro_rates$n >= 2, ]
+     if (nrow(hydro_rates) > 0) {
+       best_hydro <- hydro_rates[which.max(hydro_rates$rate), ]
+       if (best_hydro$rate >= 50) {
+         insights$hydro <- div(class = "mb-2",
+           icon("droplet", class = "text-info me-2"),
+           tags$strong("Best hydrology: "), best_hydro$site_hydrology,
+           tags$span(class = "text-success ms-1", sprintf("(%d%% success)", round(best_hydro$rate)))
+         )
+       }
+     }
+   }
+
+   # pH comparison between success and failure
+   if (sum(!is.na(dat$ph)) >= 4) {
+     success_ph <- dat$ph[dat$success & !is.na(dat$ph)]
+     fail_ph <- dat$ph[!dat$success & !is.na(dat$ph)]
+     if (length(success_ph) >= 2 && length(fail_ph) >= 2) {
+       success_ph_range <- sprintf("%.1f–%.1f", min(success_ph), max(success_ph))
+       fail_ph_range <- sprintf("%.1f–%.1f", min(fail_ph), max(fail_ph))
+       insights$ph <- div(class = "mb-2",
+         icon("flask", class = "text-secondary me-2"),
+         tags$strong("pH patterns: "),
+         tags$span(class = "text-success", sprintf("Success: %s", success_ph_range)),
+         " vs ",
+         tags$span(class = "text-danger", sprintf("Fail: %s", fail_ph_range))
+       )
+     }
+   }
+
+   # Worst conditions (if clear pattern)
+   if (sum(!is.na(dat$sun_exposure)) >= 3 || sum(!is.na(dat$site_hydrology)) >= 3) {
+     avoid_items <- c()
+     if (exists("sun_rates") && nrow(sun_rates) > 0) {
+       worst_sun <- sun_rates[which.min(sun_rates$rate), ]
+       if (worst_sun$rate < 40 && worst_sun$n >= 2) {
+         avoid_items <- c(avoid_items, worst_sun$sun_exposure)
+       }
+     }
+     if (exists("hydro_rates") && nrow(hydro_rates) > 0) {
+       worst_hydro <- hydro_rates[which.min(hydro_rates$rate), ]
+       if (worst_hydro$rate < 40 && worst_hydro$n >= 2) {
+         avoid_items <- c(avoid_items, worst_hydro$site_hydrology)
+       }
+     }
+     if (length(avoid_items) > 0) {
+       insights$avoid <- div(class = "mb-2",
+         icon("triangle-exclamation", class = "text-warning me-2"),
+         tags$strong("Avoid: "),
+         tags$span(class = "text-danger", paste(avoid_items, collapse = ", "))
+       )
+     }
+   }
+
+   # Build output
+   if (length(insights) == 0) {
+     return(div(
+       class = "text-center py-3",
+       div(class = "display-6 mb-2", paste0(overall_success, "%")),
+       div(class = "text-muted small", "Overall success rate"),
+       tags$hr(),
+       div(class = "text-muted small", "Add more samples with varied conditions to see specific insights.")
+     ))
+   }
+
+   tagList(
+     div(class = "d-flex align-items-center mb-3",
+         div(class = "display-6 me-3", style = paste0("color: ", if(overall_success >= 60) "#27ae60" else if(overall_success >= 40) "#f39c12" else "#e74c3c"),
+             paste0(overall_success, "%")),
+         div(tags$small(class = "text-muted", "overall success"))
+     ),
+     tags$hr(class = "my-2"),
+     do.call(tagList, insights)
+   )
+ })
+
+ # Sun exposure distribution
+ output$performance_sun_plot <- renderPlotly({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   dat <- dat[!is.na(dat$sun_exposure), ]
+   if (nrow(dat) == 0) return(NULL)
+
+   sun_counts <- as.data.frame(table(dat$sun_exposure))
+   names(sun_counts) <- c("Sun", "Count")
+
+   # Order logically
+   sun_order <- c("Full Sun", "Part Sun", "Part Shade", "Full Shade")
+   sun_counts$Sun <- factor(sun_counts$Sun, levels = sun_order)
+
+   p <- ggplot(sun_counts, aes(x = Sun, y = Count, fill = Sun)) +
+     geom_bar(stat = "identity") +
+     scale_fill_manual(values = c("Full Sun" = "#f1c40f", "Part Sun" = "#f5d76e",
+                                  "Part Shade" = "#95a5a6", "Full Shade" = "#7f8c8d")) +
+     labs(x = "", y = "Count") +
+     theme_minimal() +
+     theme(legend.position = "none",
+           axis.text.x = element_text(angle = 45, hjust = 1))
+
+   ggplotly(p, tooltip = c("x", "y")) %>%
+     layout(margin = list(b = 60))
+ })
+
+ # Hydrology distribution
+ output$performance_hydro_plot <- renderPlotly({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   dat <- dat[!is.na(dat$site_hydrology), ]
+   if (nrow(dat) == 0) return(NULL)
+
+   hydro_counts <- as.data.frame(table(dat$site_hydrology))
+   names(hydro_counts) <- c("Hydrology", "Count")
+
+   # Order logically
+   hydro_order <- c("Dry", "Mesic", "Wet")
+   hydro_counts$Hydrology <- factor(hydro_counts$Hydrology, levels = hydro_order)
+
+   p <- ggplot(hydro_counts, aes(x = Hydrology, y = Count, fill = Hydrology)) +
+     geom_bar(stat = "identity") +
+     scale_fill_manual(values = c("Dry" = "#e67e22", "Mesic" = "#27ae60", "Wet" = "#3498db")) +
+     labs(x = "", y = "Count") +
+     theme_minimal() +
+     theme(legend.position = "none")
+
+   ggplotly(p, tooltip = c("x", "y"))
+ })
+
+ # --- Success Factors: Parameter distributions by outcome ---
+
+ # Helper to create outcome boxplot
+ create_outcome_boxplot <- function(dat, param, param_label, unit = "") {
+   dat <- dat[!is.na(dat$outcome) & !is.na(dat[[param]]), ]
+   if (nrow(dat) < 3) return(NULL)
+
+   outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
+   dat$outcome <- factor(dat$outcome, levels = outcome_order)
+   outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
+                       "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+
+   # Rename param column to 'value' to avoid scoping issues
+   dat$value <- dat[[param]]
+
+   p <- ggplot(dat, aes(x = outcome, y = value, fill = outcome)) +
+     geom_boxplot(alpha = 0.8, outlier.shape = 21) +
+     geom_jitter(width = 0.15, alpha = 0.5, size = 2) +
+     scale_fill_manual(values = outcome_colors, breaks = outcome_order) +
+     labs(x = "", y = paste0(param_label, if (nzchar(unit)) paste0(" (", unit, ")") else "")) +
+     theme_minimal() +
+     theme(legend.position = "none",
+           axis.text.x = element_text(angle = 45, hjust = 1))
+
+   ggplotly(p, tooltip = c("y")) %>%
+     layout(margin = list(b = 80))
+ }
+
+ # Dynamic Success Factor plot based on dropdown selection
+ output$success_factor_plot <- renderPlotly({
+   req(input$analysis_species, input$analysis_species != "")
+   req(input$success_factor_param)
+   dat <- filtered_species_data()
+
+   # Parameter labels and units
+   param_info <- list(
+     ph = list(label = "pH", unit = ""),
+     organic_matter = list(label = "Organic Matter", unit = "%"),
+     texture_clay = list(label = "Clay Content", unit = "%"),
+     texture_sand = list(label = "Sand Content", unit = "%"),
+     nitrate_ppm = list(label = "Nitrate", unit = "ppm"),
+     phosphorus_ppm = list(label = "Phosphorus", unit = "ppm"),
+     potassium_ppm = list(label = "Potassium", unit = "ppm"),
+     calcium_ppm = list(label = "Calcium", unit = "ppm")
+   )
+
+   param <- input$success_factor_param
+   info <- param_info[[param]]
+   if (is.null(info)) info <- list(label = param, unit = "")
+
+   create_outcome_boxplot(dat, param, info$label, info$unit)
+ })
+
+ # Success Matrix: Sun × Hydrology heatmap
+ output$success_matrix_plot <- renderPlotly({
+   req(input$analysis_species, input$analysis_species != "")
+   dat <- filtered_species_data()
+   dat <- dat[!is.na(dat$outcome) & !is.na(dat$sun_exposure) & !is.na(dat$site_hydrology), ]
+   if (nrow(dat) < 3) return(NULL)
+
+   # Calculate success rate for each sun × hydrology combination
+   dat$success <- dat$outcome %in% c("Thriving", "Established")
+
+   # Create all possible combinations
+   sun_levels <- c("Full Sun", "Part Sun", "Part Shade", "Full Shade")
+   hydro_levels <- c("Dry", "Mesic", "Wet")
+
+   matrix_data <- expand.grid(sun_exposure = sun_levels, site_hydrology = hydro_levels,
+                              stringsAsFactors = FALSE)
+
+   # Calculate success rate for each combination
+   matrix_data$success_rate <- sapply(1:nrow(matrix_data), function(i) {
+     subset_dat <- dat[dat$sun_exposure == matrix_data$sun_exposure[i] &
+                         dat$site_hydrology == matrix_data$site_hydrology[i], ]
+     if (nrow(subset_dat) == 0) return(NA)
+     round(mean(subset_dat$success) * 100, 0)
+   })
+
+   matrix_data$n <- sapply(1:nrow(matrix_data), function(i) {
+     nrow(dat[dat$sun_exposure == matrix_data$sun_exposure[i] &
+                dat$site_hydrology == matrix_data$site_hydrology[i], ])
+   })
+
+   matrix_data$label <- ifelse(is.na(matrix_data$success_rate), "",
+                               paste0(matrix_data$success_rate, "%\n(n=", matrix_data$n, ")"))
+
+   # Order factors
+   matrix_data$sun_exposure <- factor(matrix_data$sun_exposure, levels = sun_levels)
+   matrix_data$site_hydrology <- factor(matrix_data$site_hydrology, levels = hydro_levels)
+
+   p <- ggplot(matrix_data, aes(x = site_hydrology, y = sun_exposure, fill = success_rate)) +
+     geom_tile(color = "white", size = 1) +
+     geom_text(aes(label = label), color = "white", fontface = "bold", size = 3.5) +
+     scale_fill_gradient(low = "#e74c3c", high = "#27ae60", na.value = "#cccccc",
+                         limits = c(0, 100), name = "Success %") +
+     labs(x = "Site Hydrology", y = "Sun Exposure") +
+     theme_minimal() +
+     theme(panel.grid = element_blank(),
+           axis.text = element_text(size = 10))
+
+   ggplotly(p, tooltip = c("fill")) %>%
+     config(displayModeBar = FALSE)
+ })
+
  # --- Raw Data ---
  output$raw_data <- renderDT({
    req(input$analysis_species, input$analysis_species != "")
-   dat <- db_get_species_data(input$analysis_species)
+   dat <- filtered_species_data()  # Use filtered data
    if (nrow(dat) == 0) return(NULL)
    datatable(dat, options = list(scrollX = TRUE, pageLength = 15))
  })
@@ -2140,6 +3065,7 @@ server_inner <- function(input, output, session) {
    success <- db_update_sample(entry_id, update_data, u$user_uid, is_admin = is_admin())
 
    if (success) {
+     db_audit_log("update", "soil_samples", entry_id, u$user_uid, "entry updated")
      removeModal()
      showNotification("Entry updated successfully!", type = "message")
      data_changed(data_changed() + 1)
@@ -2192,6 +3118,7 @@ server_inner <- function(input, output, session) {
    success <- db_delete_sample(entry_id, u$user_uid, is_admin = is_admin())
 
    if (success) {
+     db_audit_log("delete", "soil_samples", entry_id, u$user_uid, "entry deleted")
      removeModal()
      showNotification("Entry deleted.", type = "message")
      data_changed(data_changed() + 1)
@@ -2280,7 +3207,10 @@ server_inner <- function(input, output, session) {
    filename = function() paste0("admin_export_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv"),
    content = function(file) {
      if (is_admin()) {
-       write.csv(db_get_all_samples(), file, row.names = FALSE)
+       data <- db_get_all_samples()
+       write.csv(data, file, row.names = FALSE)
+       u <- session$userData$user()
+       db_audit_log("admin_export", "soil_samples", NULL, u$user_uid, sprintf("Admin export: %d records", nrow(data)))
      }
    }
  )

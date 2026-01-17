@@ -2,6 +2,42 @@
 # Queries ref_taxon and ref_usda_characteristics tables
 
 # ---------------------------
+# In-Memory Cache
+# ---------------------------
+
+# Cache environments for USDA lookups (reduce database queries)
+.usda_cache <- new.env(parent = emptyenv())
+.usda_cache$taxon <- new.env(parent = emptyenv())
+.usda_cache$characteristics <- new.env(parent = emptyenv())
+.usda_cache$nwpl <- new.env(parent = emptyenv())
+.usda_cache$hits <- 0L
+.usda_cache$misses <- 0L
+
+#' Clear all USDA caches
+clear_usda_cache <- function() {
+  .usda_cache$taxon <- new.env(parent = emptyenv())
+  .usda_cache$characteristics <- new.env(parent = emptyenv())
+  .usda_cache$nwpl <- new.env(parent = emptyenv())
+  .usda_cache$hits <- 0L
+  .usda_cache$misses <- 0L
+  invisible(TRUE)
+}
+
+#' Get cache stats
+usda_cache_stats <- function() {
+  list(
+    taxon_entries = length(ls(.usda_cache$taxon)),
+    characteristics_entries = length(ls(.usda_cache$characteristics)),
+    nwpl_entries = length(ls(.usda_cache$nwpl)),
+    hits = .usda_cache$hits,
+    misses = .usda_cache$misses,
+    hit_rate = if (.usda_cache$hits + .usda_cache$misses > 0)
+      round(.usda_cache$hits / (.usda_cache$hits + .usda_cache$misses) * 100, 1)
+    else 0
+  )
+}
+
+# ---------------------------
 # Helper Functions
 # ---------------------------
 
@@ -30,7 +66,7 @@ canonical_gs <- function(name) {
 # USDA Taxon Resolution
 # ---------------------------
 
-#' Resolve a species name to ref_taxon record
+#' Resolve a species name to ref_taxon record (with caching)
 #' Uses synonym-aware lookup: tries direct match on scientific_name or usda_symbol
 #' @param gs_name Species name (genus species format or USDA symbol)
 #' @param pool Database connection pool
@@ -39,7 +75,15 @@ resolve_taxon_id <- function(gs_name, pool) {
  gs <- canonical_gs(gs_name)
  if (!nzchar(gs)) return(NULL)
 
- tryCatch({
+ # Check cache first
+ cache_key <- tolower(gs)
+ if (exists(cache_key, envir = .usda_cache$taxon, inherits = FALSE)) {
+   .usda_cache$hits <- .usda_cache$hits + 1L
+   return(get(cache_key, envir = .usda_cache$taxon))
+ }
+ .usda_cache$misses <- .usda_cache$misses + 1L
+
+ result <- tryCatch({
    # 1) Try exact match on usda_symbol
    q1 <- DBI::dbGetQuery(pool, "
      SELECT id AS taxon_id, scientific_name, usda_symbol
@@ -73,21 +117,39 @@ resolve_taxon_id <- function(gs_name, pool) {
    message("resolve_taxon_id error: ", e$message)
    NULL
  })
+
+ # Cache the result (even NULL results to avoid repeated lookups)
+ assign(cache_key, result, envir = .usda_cache$taxon)
+ result
 }
 
 # ---------------------------
 # USDA Characteristics Lookup
 # ---------------------------
 
-#' Get USDA characteristics for a species name
+#' Get USDA characteristics for a species name (with caching)
 #' @param gs_name Species name
 #' @param pool Database connection pool
 #' @return Data frame with characteristics or NULL
 get_usda_characteristics_for_name <- function(gs_name, pool) {
- row <- resolve_taxon_id(gs_name, pool)
- if (is.null(row)) return(NULL)
+ gs <- canonical_gs(gs_name)
+ if (!nzchar(gs)) return(NULL)
 
- tryCatch({
+ # Check cache first
+ cache_key <- tolower(gs)
+ if (exists(cache_key, envir = .usda_cache$characteristics, inherits = FALSE)) {
+   .usda_cache$hits <- .usda_cache$hits + 1L
+   return(get(cache_key, envir = .usda_cache$characteristics))
+ }
+ .usda_cache$misses <- .usda_cache$misses + 1L
+
+ row <- resolve_taxon_id(gs_name, pool)
+ if (is.null(row)) {
+   assign(cache_key, NULL, envir = .usda_cache$characteristics)
+   return(NULL)
+ }
+
+ result <- tryCatch({
    # Try ref_usda_traits first (new table from fetch_usda_data.R)
    result <- DBI::dbGetQuery(pool, "
      SELECT
@@ -141,6 +203,10 @@ get_usda_characteristics_for_name <- function(gs_name, pool) {
    message("get_usda_characteristics_for_name error: ", e$message)
    NULL
  })
+
+ # Cache the result
+ assign(cache_key, result, envir = .usda_cache$characteristics)
+ result
 }
 
 #' Alias for backwards compatibility
@@ -152,15 +218,29 @@ get_usda_traits_for_name <- function(gs_name, pool) {
 # NWPL Wetland Indicator Lookup
 # ---------------------------
 
-#' Get NWPL national wetland indicator for a species
+#' Get NWPL national wetland indicator for a species (with caching)
 #' @param gs_name Species name
 #' @param pool Database connection pool
 #' @return Character string with indicator or NA
 get_nwpl_national_for_name <- function(gs_name, pool) {
- row <- resolve_taxon_id(gs_name, pool)
- if (is.null(row)) return(NA_character_)
+ gs <- canonical_gs(gs_name)
+ if (!nzchar(gs)) return(NA_character_)
 
- tryCatch({
+ # Check cache first
+ cache_key <- tolower(gs)
+ if (exists(cache_key, envir = .usda_cache$nwpl, inherits = FALSE)) {
+   .usda_cache$hits <- .usda_cache$hits + 1L
+   return(get(cache_key, envir = .usda_cache$nwpl))
+ }
+ .usda_cache$misses <- .usda_cache$misses + 1L
+
+ row <- resolve_taxon_id(gs_name, pool)
+ if (is.null(row)) {
+   assign(cache_key, NA_character_, envir = .usda_cache$nwpl)
+   return(NA_character_)
+ }
+
+ result <- tryCatch({
    # Try national indicator first
    res <- DBI::dbGetQuery(pool, "
      SELECT indicator
@@ -187,6 +267,10 @@ get_nwpl_national_for_name <- function(gs_name, pool) {
 
    NA_character_
  }, error = function(e) NA_character_)
+
+ # Cache the result
+ assign(cache_key, result, envir = .usda_cache$nwpl)
+ result
 }
 
 #' Lookup NWPL indicator by WCVP name (alternate)

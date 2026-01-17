@@ -383,7 +383,8 @@ record_attempt <- function(con, taxon_id, symbol, char_data, status) {
 #' @param limit Maximum number of species to fetch (default 100)
 #' @param cache_dir Directory to cache API responses
 #' @param retry_errors If TRUE, retry species that previously had API errors
-fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", retry_errors = FALSE) {
+#' @param delay Seconds to wait between API calls (default 0.5, use 2.5-3 for overnight runs)
+fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", retry_errors = FALSE, delay = 0.5) {
   message("=== USDA Reference Data Fetcher ===\n")
 
   # Connect to database
@@ -431,7 +432,9 @@ fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", re
     return(invisible(NULL))
   }
 
-  message(sprintf("Fetching USDA data for %d species...\n", nrow(species)))
+  message(sprintf("Fetching USDA data for %d species...", nrow(species)))
+  est_hours <- round((nrow(species) * (delay + 0.5)) / 3600, 1)
+  message(sprintf("Estimated time: %.1f hours (with %.1fs delay between calls)\n", est_hours, delay))
 
   # Progress tracking
   success_with_data <- 0
@@ -463,7 +466,7 @@ fetch_usda_batch <- function(limit = 100, cache_dir = "data/cache/usda_char", re
     }
 
     # Rate limiting between API calls (skip if we used cache)
-    if (!isTRUE(result$cached)) Sys.sleep(0.5)
+    if (!isTRUE(result$cached)) Sys.sleep(delay)
   }
 
   message(sprintf("\n=== Complete ==="))
