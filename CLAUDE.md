@@ -23,6 +23,9 @@ Rscript -e "renv::restore()"
 # Run the main application (port 7420)
 Rscript -e "shiny::runApp('app/app.R', port=7420, host='127.0.0.1')"
 
+# Run automated tests
+cd tests/testthat && Rscript -e "testthat::test_dir('.', reporter = 'summary')"
+
 # Regenerate filtered species database (if wcvp_names.csv is updated)
 cd app && Rscript generate_species_db.R
 ```
@@ -77,35 +80,50 @@ Neon allows creating database branches (like git branches):
 
 ```
 app/
-├── app.R                 # Main Shiny app (UI + server, ~830 lines)
+├── app.R                 # Main Shiny app (UI + server, ~3150 lines)
 ├── R/
 │   ├── db.R              # Database connection, migration, query functions
 │   ├── data.R            # Reference data loading (species, ecoregions, textures)
 │   ├── helpers.R         # Ecoregion lookup, texture classification functions
 │   ├── usda.R            # USDA reference data queries
-│   └── theme.R           # Custom color palette, ggplot theme, bslib theme, CSS
+│   ├── theme.R           # Custom color palette, ggplot theme, bslib theme, CSS
+│   ├── pdf_extract.R     # AI-powered soil report extraction (Claude API)
+│   ├── mod_analysis.R    # Analysis tab Shiny module (template)
+│   └── mod_data_entry.R  # Data entry tab Shiny module (template)
 ├── species_accepted.csv  # Pre-filtered species database (360K accepted species)
 ├── generate_species_db.R # Script to regenerate species_accepted.csv
+├── fetch_usda_data.R     # Batch USDA data fetcher script
 ├── sql/                  # Database schema and migrations
 └── www/                  # Static assets
 ```
 
 ### Module Responsibilities
 
-- **R/db.R**: PostgreSQL connection pool, schema migration (`db_migrate()`), CRUD operations
+- **R/db.R**: PostgreSQL connection pool, schema migration (`db_migrate()`), CRUD operations, audit logging
 - **R/data.R**: Loads `species_accepted.csv`, ecoregion shapefiles, soil texture classification table
 - **R/helpers.R**: `get_ecoregion()` for coordinate-to-ecoregion lookup, `classify_texture()` for soil texture
 - **R/theme.R**: `edaphic_colors` palette, `theme_edaphic()` for ggplot, `edaphic_bs_theme()` for bslib, `edaphic_css()` for custom styles
+- **R/pdf_extract.R**: Claude API integration for extracting soil data from PDFs, images, RTF files
+- **R/mod_analysis.R**: Shiny module template for analysis tab (not yet integrated into app.R)
+- **R/mod_data_entry.R**: Shiny module template for data entry tab (not yet integrated into app.R)
+
+### Modularization Status (TODO)
+
+The `mod_analysis.R` and `mod_data_entry.R` files contain Shiny module templates that can be used to refactor app.R. Full integration requires:
+1. Replace inline UI/server code in app.R with module calls
+2. Pass dependencies (species_db, colors, theme functions) as module parameters
+3. Thorough testing of all reactive flows
 
 ### UI Structure
 
 The app uses `page_navbar` with these main sections:
-1. **Welcome**: Landing page with app overview and stats
+1. **Welcome**: Landing page with app overview, stats, and help links
 2. **Data Entry**: Sidebar form with accordion sections + recent entries table (users can edit/delete their own entries)
-3. **Analysis**: Species selector sidebar + tabbed visualizations (8 tabs)
+3. **Analysis**: Species selector sidebar with filters (Outcome, Sun, Hydrology, Cultivar) + tabbed visualizations:
+   - Summary, pH Distribution, Organic Matter, Texture, Nutrients, Correlations, Map, Performance (new), USDA Traits
 4. **Data Management**: Import/export functionality
 5. **Admin**: Admin-only data management (requires ADMIN_EMAILS config)
-6. **Help Menu**: Field Guide and FAQ
+6. **Help Menu**: Field Guide (with Soil Properties, Nutrients, Plant Performance definitions) and FAQ
 
 ### Visualization Stack
 
@@ -247,7 +265,15 @@ Currently only ~335 species have detailed characteristics. Implement continuous 
 4. Cache the JSON response in `data/cache/usda_char/` for reproducibility
 5. Consider rate limiting and background job queue (e.g., using `callr` or external worker)
 
-This would seamlessly grow the reference database as users explore new species.
+### Analysis Tab Enhancements (Completed 2025-01-17)
+The per-species metadata fields (outcome, sun_exposure, site_hydrology) are now fully visualized:
+1. **Outcome distribution** - Stacked bar chart on Performance tab
+2. **Sun exposure breakdown** - Stacked bar chart on Performance tab
+3. **Hydrology analysis** - Stacked bar chart on Performance tab
+4. **Cross-tab filters** - Filter sidebar with Outcome, Sun Exposure, Hydrology, and Cultivar dropdowns (with clear buttons)
+5. **Success factors** - Selectable box plots comparing soil parameters by outcome (pH, OM, clay, nutrients, etc.)
+6. **Key insights** - Auto-generated insights panel showing overall success rate, best conditions, and conditions to avoid
+7. **Summary page** - Metric cards with sample count, success rate, cultivar count, and location count + detail sections
 
 ## Session Notes
 
@@ -291,3 +317,18 @@ This would seamlessly grow the reference database as users explore new species.
   - Color-matched text: "edaphic" in sage, "flora" in charcoal
   - Removed logo image from welcome page, using styled text instead
 - **Help page enhancements**: Added external resource links (USDA, Cornell, EPA, Kew, iNaturalist)
+
+### 2025-01-17: Performance Analysis & UI Improvements
+- **Test data**: Created `scripts/insert_test_data.R` to insert 25 samples for Acer rubrum and Agastache foeniculum with varied outcomes
+- **Performance tab**: New tab with stacked bar charts for Outcome, Sun Exposure, and Hydrology distributions
+- **Success Factors**: Selectable box plot comparing soil parameters by outcome (8 options: pH, OM, clay, N, P, K, Ca, Mg)
+- **Key Insights panel**: Auto-generated insights showing overall success rate, best sun/hydrology conditions, pH patterns, and conditions to avoid
+- **Filter enhancements**:
+  - Changed dropdowns to selectizeInput with clear_button plugin (X buttons)
+  - Added "Clear All" link to reset filters
+  - Added dynamic Cultivar filter that populates based on selected species
+  - Ordered outcome legends: Thriving → Established → Struggling → Failed/Died
+- **Summary page redesign**: 4 metric cards (Samples, Success Rate, Cultivars, Locations) + Soil Chemistry and Performance detail cards
+- **Reference Data section**: Cleaned up styling with compact card layout and inline toggle
+- **Welcome page help links**: Added navigation links to Field Guide for Soil Properties, Nutrients, and Plant Performance definitions
+- **Help section**: Added Plant Performance definitions (Outcome, Sun Exposure, Site Hydrology)

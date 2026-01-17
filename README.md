@@ -32,7 +32,20 @@ edaphic flora is an open-source R Shiny application for recording and analyzing 
 
 ## Screenshots
 
-*Coming soon*
+<p align="center">
+  <img src="app/www/screenshot_welcome.png" alt="Welcome page" width="80%">
+  <br><em>Welcome page with database statistics</em>
+</p>
+
+<p align="center">
+  <img src="app/www/screenshot_data_entry.png" alt="Data entry form" width="80%">
+  <br><em>Multi-species soil data entry form</em>
+</p>
+
+<p align="center">
+  <img src="app/www/screenshot_analysis.png" alt="Analysis dashboard" width="80%">
+  <br><em>Interactive analysis with USDA reference data</em>
+</p>
 
 ## Technology Stack
 
