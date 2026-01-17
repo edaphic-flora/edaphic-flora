@@ -10,6 +10,7 @@
 .usda_cache$taxon <- new.env(parent = emptyenv())
 .usda_cache$characteristics <- new.env(parent = emptyenv())
 .usda_cache$nwpl <- new.env(parent = emptyenv())
+.usda_cache$native_status <- new.env(parent = emptyenv())
 .usda_cache$hits <- 0L
 .usda_cache$misses <- 0L
 
@@ -18,6 +19,7 @@ clear_usda_cache <- function() {
   .usda_cache$taxon <- new.env(parent = emptyenv())
   .usda_cache$characteristics <- new.env(parent = emptyenv())
   .usda_cache$nwpl <- new.env(parent = emptyenv())
+  .usda_cache$native_status <- new.env(parent = emptyenv())
   .usda_cache$hits <- 0L
   .usda_cache$misses <- 0L
   invisible(TRUE)
@@ -29,6 +31,7 @@ usda_cache_stats <- function() {
     taxon_entries = length(ls(.usda_cache$taxon)),
     characteristics_entries = length(ls(.usda_cache$characteristics)),
     nwpl_entries = length(ls(.usda_cache$nwpl)),
+    native_status_entries = length(ls(.usda_cache$native_status)),
     hits = .usda_cache$hits,
     misses = .usda_cache$misses,
     hit_rate = if (.usda_cache$hits + .usda_cache$misses > 0)
@@ -334,4 +337,105 @@ mm_to_in <- function(mm) {
 c_to_f <- function(c) {
  if (is.na(c)) return(NA_integer_)
  as.integer(round(c * 9 / 5 + 32))
+}
+
+# ---------------------------
+# Native Status Lookup
+# ---------------------------
+
+#' Get native status for a species in a specific state (with caching)
+#' @param gs_name Species name (genus species format)
+#' @param state_code Two-letter US state abbreviation
+#' @param pool Database connection pool
+#' @return Character: "Native", "Introduced", "Both", or NA if unknown
+get_native_status_for_state <- function(gs_name, state_code, pool) {
+  gs <- canonical_gs(gs_name)
+  if (!nzchar(gs) || is.na(state_code) || !nzchar(state_code)) return(NA_character_)
+
+  # Check cache first
+  cache_key <- paste0(tolower(gs), "_", toupper(state_code))
+  if (exists(cache_key, envir = .usda_cache$native_status, inherits = FALSE)) {
+    .usda_cache$hits <- .usda_cache$hits + 1L
+    return(get(cache_key, envir = .usda_cache$native_status))
+  }
+  .usda_cache$misses <- .usda_cache$misses + 1L
+
+  result <- tryCatch({
+    # First resolve taxon_id
+    taxon <- resolve_taxon_id(gs_name, pool)
+    if (is.null(taxon)) return(NA_character_)
+
+    # Query native status for this state
+    res <- DBI::dbGetQuery(pool, "
+      SELECT native_status
+      FROM ref_state_distribution
+      WHERE taxon_id = $1 AND state_code = $2
+      LIMIT 1;",
+      params = list(taxon$taxon_id, toupper(state_code)))
+
+    if (nrow(res) > 0 && !is.na(res$native_status[1])) {
+      res$native_status[1]
+    } else {
+      NA_character_
+    }
+  }, error = function(e) {
+    message("get_native_status_for_state error: ", e$message)
+    NA_character_
+  })
+
+  # Cache the result
+  assign(cache_key, result, envir = .usda_cache$native_status)
+  result
+}
+
+#' Get native status summary for a species across multiple states
+#' @param gs_name Species name (genus species format)
+#' @param state_codes Vector of two-letter US state abbreviations
+#' @param pool Database connection pool
+#' @return List with: native_states, introduced_states, both_states, unknown_states, summary
+get_native_status_summary <- function(gs_name, state_codes, pool) {
+  if (length(state_codes) == 0) {
+    return(list(
+      native_states = character(0),
+      introduced_states = character(0),
+      both_states = character(0),
+      unknown_states = character(0),
+      summary = "unknown"
+    ))
+  }
+
+  # Look up status for each state
+  statuses <- sapply(state_codes, function(st) {
+    get_native_status_for_state(gs_name, st, pool)
+  }, USE.NAMES = TRUE)
+
+  native_states <- names(statuses[statuses == "Native" & !is.na(statuses)])
+  introduced_states <- names(statuses[statuses == "Introduced" & !is.na(statuses)])
+  both_states <- names(statuses[statuses == "Both" & !is.na(statuses)])
+  unknown_states <- names(statuses[is.na(statuses)])
+
+  # Determine overall summary
+  has_native <- length(native_states) > 0 || length(both_states) > 0
+  has_introduced <- length(introduced_states) > 0 || length(both_states) > 0
+  all_unknown <- length(unknown_states) == length(state_codes)
+
+  summary <- if (all_unknown) {
+    "unknown"
+  } else if (has_native && has_introduced) {
+    "mixed"
+  } else if (has_native) {
+    "native"
+  } else if (has_introduced) {
+    "introduced"
+  } else {
+    "unknown"
+  }
+
+  list(
+    native_states = native_states,
+    introduced_states = introduced_states,
+    both_states = both_states,
+    unknown_states = unknown_states,
+    summary = summary
+  )
 }

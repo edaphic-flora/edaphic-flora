@@ -81,6 +81,17 @@ lookup_ecoregion <- function(lat, lon) {
   }
 }
 
+# State grid for native status lookups (dev only - data not granular enough yet)
+state_grid <- NULL
+if (!is_prod) {
+  state_grid <- tryCatch({
+    load_state_grid()
+  }, error = function(e) {
+    message("Warning: Could not load state grid: ", e$message)
+    NULL
+  })
+}
+
 # --- Auth config
 firebase_cfg <- list(
  apiKey     = Sys.getenv("FIREBASE_API_KEY"),
@@ -447,6 +458,7 @@ base_ui <- page_navbar(
        hr(),
        uiOutput("species_summary"),
        uiOutput("reference_badges"),
+       uiOutput("native_status_badge"),
        hr(),
 
        # --- Filter Controls ---
@@ -1502,6 +1514,95 @@ output$find_pdf_extract_status <- renderUI({
          chip("Shade", safe_val(tr$shade_tolerance)),
          chip("Drought", safe_val(tr$drought_tolerance))
      )
+   )
+ })
+
+ # --- Native status badge (dev only - data not granular enough yet) ---
+ output$native_status_badge <- renderUI({
+   # Only show in dev mode - regional data (L48/AK/HI) not state-specific yet
+   if (is_prod || is.null(state_grid)) return(NULL)
+
+   sp <- input$analysis_species %||% ""
+   if (!nzchar(sp)) return(NULL)
+
+   # Get sample locations for this species
+   dat <- db_get_species_data(sp)
+   if (nrow(dat) == 0) return(NULL)
+
+   # Extract states from sample coordinates
+   valid_coords <- dat %>%
+     filter(!is.na(location_lat) & !is.na(location_long))
+
+   if (nrow(valid_coords) == 0) return(NULL)
+
+   # Look up states from coordinates
+   user_states <- get_states_from_coords(
+     valid_coords$location_lat,
+     valid_coords$location_long,
+     state_grid
+   )
+
+   if (length(user_states) == 0) {
+     # No state data available (outside US or grid not loaded)
+     return(NULL)
+   }
+
+   # Get native status summary
+   status <- get_native_status_summary(sp, user_states, pool)
+
+   # Build badge based on summary
+   badge_class <- switch(status$summary,
+     "native" = "bg-success",
+     "introduced" = "bg-warning text-dark",
+     "mixed" = "bg-info text-dark",
+     "bg-secondary"  # unknown
+   )
+
+   badge_icon <- switch(status$summary,
+     "native" = icon("check-circle"),
+     "introduced" = icon("exclamation-triangle"),
+     "mixed" = icon("info-circle"),
+     icon("question-circle")
+   )
+
+   badge_text <- switch(status$summary,
+     "native" = "Native to your area",
+     "introduced" = "Introduced in your area",
+     "mixed" = "Mixed native status",
+     "Native status unknown"
+   )
+
+   # Build detail text for mixed status
+   detail_text <- NULL
+   if (status$summary == "mixed" && (length(status$native_states) > 0 || length(status$introduced_states) > 0)) {
+     parts <- c()
+     if (length(status$native_states) > 0) {
+       parts <- c(parts, paste0("Native: ", paste(status$native_states, collapse = ", ")))
+     }
+     if (length(status$introduced_states) > 0) {
+       parts <- c(parts, paste0("Introduced: ", paste(status$introduced_states, collapse = ", ")))
+     }
+     detail_text <- paste(parts, collapse = " | ")
+   }
+
+   div(
+     class = "native-status-section mt-2 p-2 rounded",
+     style = switch(status$summary,
+       "native" = "background-color: #f0fdf4; border: 1px solid #86efac;",
+       "introduced" = "background-color: #fefce8; border: 1px solid #fde047;",
+       "mixed" = "background-color: #ecfeff; border: 1px solid #67e8f9;",
+       "background-color: #f3f4f6; border: 1px solid #d1d5db;"
+     ),
+     div(
+       class = "d-flex align-items-center gap-2",
+       tags$span(
+         class = paste("badge", badge_class),
+         badge_icon, " ", badge_text
+       )
+     ),
+     if (!is.null(detail_text)) {
+       div(class = "small text-muted mt-1", detail_text)
+     }
    )
  })
 
