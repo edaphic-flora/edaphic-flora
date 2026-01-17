@@ -382,8 +382,71 @@ The per-species metadata fields (outcome, sun_exposure, site_hydrology) are now 
 **Technical Notes:**
 
 - `calc_species_profile()` - Calculates soil profile stats for a species
-- `calc_similarity()` - Weighted scoring between two species profiles  
+- `calc_similarity()` - Weighted scoring between two species profiles
 - `calc_user_match()` - Matches user input against species profiles
 - `get_all_species_profiles()` - Reactive that queries species with 10+ samples
 - All recommendation features require minimum 10 samples per species for statistical confidence
+
+### 2025-01-17: Native Status Toggle Feature (DEV ONLY)
+
+**New Feature: Native Status Badge in Analysis Sidebar**
+
+**Status: DEV ONLY** - Currently disabled in production. The USDA data is regional (L48/AK/HI) rather than state-specific, making it not granular enough to be useful yet. Will re-enable when state-level or county-level data is available.
+
+Shows whether a selected species is native or introduced in the user's area, based on the lat/long coordinates from submitted soil samples.
+
+**Implementation:**
+
+1. **Database Schema** (`R/db.R`):
+   - New table `ref_state_distribution` with columns: taxon_id, state_code, native_status, source
+   - Indexes on taxon_id and state_code for fast lookups
+
+2. **State Grid Generator** (`generate_state_grid.R`):
+   - Pre-computes lat/long to US state mapping using `tigris` package
+   - Creates `data/state_grid.rds` (~500KB) for production use
+   - Run: `cd app && Rscript generate_state_grid.R`
+
+3. **Data Loading Functions** (`R/data.R`):
+   - `load_state_grid()` - Loads pre-computed state grid
+   - `get_state_from_grid(lat, lon, grid)` - Single coordinate lookup
+   - `get_states_from_coords(lats, lons, grid)` - Batch lookup
+
+4. **Native Status Lookup** (`R/usda.R`):
+   - `get_native_status_for_state(gs_name, state_code, pool)` - Single state lookup with caching
+   - `get_native_status_summary(gs_name, state_codes, pool)` - Multi-state summary
+   - Cache environment `.usda_cache$native_status` for performance
+
+5. **ETL Script** (`R/etl/usda_state_dist_etl.R`):
+   - Loads USDA state distribution data into `ref_state_distribution`
+   - Supports wide format (state columns) or long format (State, Native Status columns)
+   - Run: `source("R/etl/usda_state_dist_etl.R"); usda_state_dist_etl_run()`
+
+6. **UI Badge** (`app.R`):
+   - Shows in Analysis sidebar below USDA Reference section
+   - Color-coded: green (native), yellow (introduced), blue (mixed), gray (unknown)
+   - Mixed status shows state breakdown (e.g., "Native: PA, NY | Introduced: CA")
+
+**Badge Display:**
+
+- **Native**: Green badge with checkmark - "Native to your area"
+- **Introduced**: Yellow badge with warning - "Introduced in your area"
+- **Mixed**: Blue badge with info icon - "Mixed native status" + state breakdown
+- **Unknown**: Gray badge with question mark - "Native status unknown"
+
+**Files Created/Modified:**
+
+| File | Action |
+|------|--------|
+| `app/R/db.R` | Added ref_state_distribution migration |
+| `app/R/data.R` | Added state grid loading functions |
+| `app/R/usda.R` | Added native status lookup with caching |
+| `app/generate_state_grid.R` | Created - state grid generator |
+| `app/R/etl/usda_state_dist_etl.R` | Created - USDA distribution ETL |
+| `app/app.R` | Added UI output and reactive badge |
+
+**Setup Required:**
+
+1. Generate state grid: `cd app && Rscript generate_state_grid.R`
+2. Download USDA state distribution data (PLANTS checklist)
+3. Run ETL: `source("R/etl/usda_state_dist_etl.R"); usda_state_dist_etl_run("data/raw/usda/state_dist.csv")`
 
