@@ -90,7 +90,7 @@ polished::polished_config(
  api_key   = Sys.getenv("POLISHED_API_KEY"),
  firebase_config   = firebase_cfg,
  sign_in_providers = c("google", "email"),
- is_invite_required = FALSE,
+ is_invite_required = TRUE,
  is_email_verification_required = FALSE
 )
 
