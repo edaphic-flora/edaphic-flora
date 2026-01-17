@@ -4,6 +4,9 @@ library(DBI)
 library(RPostgres)
 library(pool)
 
+# Null-coalescing operator
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+
 # ---------------------------
 # Database Connection
 # ---------------------------
@@ -92,6 +95,21 @@ db_migrate <- function() {
     ")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_pdf_extractions_user ON pdf_extractions(user_id)")
 
+    # Audit log table for tracking changes
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id SERIAL PRIMARY KEY,
+        action VARCHAR(50) NOT NULL,
+        table_name VARCHAR(100),
+        record_id INTEGER,
+        user_id TEXT,
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)")
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
@@ -106,20 +124,27 @@ db_migrate <- function() {
 # Query Functions
 # ---------------------------
 
-db_get_all_samples <- function() {
+db_get_all_samples <- function(limit = NULL) {
   tryCatch({
-    dbGetQuery(pool, "SELECT * FROM soil_samples ORDER BY created_at DESC")
+    sql <- "SELECT * FROM soil_samples ORDER BY created_at DESC"
+    if (!is.null(limit) && is.numeric(limit) && limit > 0) {
+      sql <- paste(sql, "LIMIT", as.integer(limit))
+    }
+    dbGetQuery(pool, sql)
   }, error = function(e) {
     message("Error fetching samples: ", e$message)
     data.frame()
   })
 }
 
-db_get_species_data <- function(species) {
+db_get_species_data <- function(species, limit = NULL) {
   if (is.null(species) || !nzchar(trimws(species))) return(data.frame())
   tryCatch({
-    dbGetQuery(pool, "SELECT * FROM soil_samples WHERE species = $1 ORDER BY created_at DESC",
-               params = list(species))
+    sql <- "SELECT * FROM soil_samples WHERE species = $1 ORDER BY created_at DESC"
+    if (!is.null(limit) && is.numeric(limit) && limit > 0) {
+      sql <- paste(sql, "LIMIT", as.integer(limit))
+    }
+    dbGetQuery(pool, sql, params = list(species))
   }, error = function(e) {
     message("Error fetching species data: ", e$message)
     data.frame()
@@ -270,4 +295,43 @@ db_can_extract <- function(user_id, daily_limit = 5) {
 db_get_remaining_extractions <- function(user_id, daily_limit = 5) {
   count <- db_get_extraction_count_today(user_id)
   max(0, daily_limit - count)
+}
+
+# ---------------------------
+# Audit Logging
+# ---------------------------
+
+#' Log an action to the audit trail
+#' @param action Action type (e.g., "create", "update", "delete", "login", "export")
+#' @param table_name Table affected (e.g., "soil_samples")
+#' @param record_id ID of the affected record
+#' @param user_id User who performed the action
+#' @param details Additional details (JSON or text)
+db_audit_log <- function(action, table_name = NULL, record_id = NULL, user_id = NULL, details = NULL) {
+  tryCatch({
+    dbExecute(pool,
+      "INSERT INTO audit_log (action, table_name, record_id, user_id, details) VALUES ($1, $2, $3, $4, $5)",
+      params = list(action, table_name, record_id, user_id, details))
+    # Also log to console for server logs
+    message(sprintf("[AUDIT] %s | %s | record:%s | user:%s | %s",
+                    action, table_name %||% "-", record_id %||% "-",
+                    substr(user_id %||% "-", 1, 8), details %||% ""))
+    TRUE
+  }, error = function(e) {
+    message("Audit log error: ", e$message)
+    FALSE
+  })
+}
+
+#' Get recent audit log entries
+#' @param limit Number of entries to return
+db_get_audit_log <- function(limit = 100) {
+  tryCatch({
+    dbGetQuery(pool,
+      "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT $1",
+      params = list(limit))
+  }, error = function(e) {
+    message("Error fetching audit log: ", e$message)
+    data.frame()
+  })
 }

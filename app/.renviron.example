@@ -1,24 +1,53 @@
-# --- Postgres (Neon)
-POSTGRES_HOST=ep-xxxxx.neon.tech
+# ===========================================
+# edaphic flora - Environment Configuration
+# ===========================================
+# Copy this file to .Renviron and fill in your values
+# cp .Renviron.example .Renviron
+
+# -------------------------------------------
+# Database (PostgreSQL/Neon)
+# -------------------------------------------
+# Get these from your Neon dashboard: https://console.neon.tech
+POSTGRES_HOST=your-project.us-east-2.aws.neon.tech
 POSTGRES_PORT=5432
 POSTGRES_DB=neondb
-POSTGRES_USER=shiny_app
-POSTGRES_PASSWORD=change_me
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_password
 POSTGRES_SSLMODE=require
 
-# --- S3 (uploads)
-S3_BUCKET=shinyplantsbucket
-AWS_DEFAULT_REGION=us-east-2
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
+# -------------------------------------------
+# Authentication (Polished + Firebase)
+# -------------------------------------------
+# Polished: https://polished.tech - create app, get API key
+POLISHED_APP_NAME=your_app_name
+POLISHED_API_KEY=your_polished_api_key
 
-# --- Polished + Firebase
-POLISHED_APP_NAME=edaphic-flora
-POLISHED_API_KEY=your-polished-api-key
-FIREBASE_API_KEY=your-firebase-web-api-key
-FIREBASE_AUTH_DOMAIN=edaphic-flora.firebaseapp.com
-FIREBASE_PROJECT_ID=edaphic-flora
+# Firebase: https://console.firebase.google.com
+# Project Settings > General > Your apps > Web app config
+FIREBASE_API_KEY=your_firebase_api_key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_PROJECT_ID=your-project-id
 
-# --- App guards
-MAX_FILE_SIZE_MB=20
-MAX_FILES_PER_USER_PER_DAY=200
+# -------------------------------------------
+# Admin Configuration
+# -------------------------------------------
+# Comma-separated list of email addresses with admin access
+# Admins can edit/delete any user's entries
+ADMIN_EMAILS=admin@example.com,owner@example.com
+
+# -------------------------------------------
+# AI Features (Optional)
+# -------------------------------------------
+# For PDF/image soil report extraction
+# Get key from: https://console.anthropic.com
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Daily extraction limit per user (default: 5)
+PDF_EXTRACT_DAILY_LIMIT=5
+
+# -------------------------------------------
+# Environment Mode
+# -------------------------------------------
+# Set to "dev" for development (shows DEV badge, uses full ecoregion shapefile)
+# Set to "prod" or omit for production (uses lightweight grid lookup)
+ENV=dev
