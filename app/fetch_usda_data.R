@@ -215,6 +215,32 @@ parse_characteristics <- function(char_data) {
   result
 }
 
+# --- Helper to safely extract scalar value from potentially nested data ---
+safe_scalar <- function(x, collapse = ", ") {
+  if (is.null(x)) return(NA_character_)
+  if (is.list(x)) {
+    x <- unlist(x, use.names = FALSE)
+  }
+  if (length(x) == 0) return(NA_character_)
+  if (length(x) > 1) {
+    # Multiple values - collapse to string
+    x <- x[!is.na(x) & nzchar(as.character(x))]
+    if (length(x) == 0) return(NA_character_)
+    return(paste(unique(x), collapse = collapse))
+  }
+  if (is.na(x) || !nzchar(as.character(x))) return(NA_character_)
+  as.character(x)
+}
+
+safe_numeric <- function(x) {
+  if (is.null(x)) return(NA_real_)
+  if (is.list(x)) x <- unlist(x, use.names = FALSE)
+  if (length(x) == 0) return(NA_real_)
+  x <- x[1]
+  if (is.na(x)) return(NA_real_)
+  as.numeric(x)
+}
+
 # --- Fetch data for a single species ---
 fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
   # 1. Fetch profile to get plant ID
@@ -230,33 +256,31 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
     return(list(success = FALSE, reason = "profile_failed", cached = profile$cached))
   }
 
-  # Extract plant ID from profile
-  plant_id <- profile$data$Id[1]
-  if (is.null(plant_id) || is.na(plant_id)) {
+  # Extract plant ID from profile (handle potential list/array)
+  plant_id <- safe_numeric(profile$data$Id)
+  if (is.na(plant_id)) {
     record_attempt(con, taxon_id, symbol, list(), "no_plant_id")
     return(list(success = FALSE, reason = "no_plant_id", cached = profile$cached))
   }
 
-  # Extract basic info from profile
-  duration <- profile$data$Duration[1]
-  growth_habit <- if (!is.null(profile$data$GrowthHabits)) {
-    paste(profile$data$GrowthHabits, collapse = ", ")
-  } else NA
-  native_status <- profile$data$NativeStatus[1]
+  # Extract basic info from profile - safely handle arrays/lists
+  duration <- safe_scalar(profile$data$Duration)
+  growth_habit <- safe_scalar(profile$data$GrowthHabits)
+  native_status <- safe_scalar(profile$data$NativeStatus)
 
   # 2. Fetch characteristics
   if (!isTRUE(profile$cached)) Sys.sleep(0.3)  # Rate limiting only for fresh requests
 
-  char_cache <- file.path(cache_dir, paste0("char_", plant_id, ".json"))
+  char_cache <- file.path(cache_dir, paste0("char_", as.integer(plant_id), ".json"))
   chars <- fetch_usda_json(
-    sprintf("https://plantsservices.sc.egov.usda.gov/api/PlantCharacteristics/%s", plant_id),
+    sprintf("https://plantsservices.sc.egov.usda.gov/api/PlantCharacteristics/%s", as.integer(plant_id)),
     char_cache
   )
 
   # Parse characteristics
   char_data <- parse_characteristics(chars$data)
 
-  # Add profile data
+  # Add profile data (already safe scalars)
   char_data$duration <- duration
   char_data$growth_habit <- growth_habit
   char_data$native_status <- native_status
@@ -278,14 +302,26 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
 
 # --- Record fetch attempt in database ---
 record_attempt <- function(con, taxon_id, symbol, char_data, status) {
+  # Helper to ensure value is scalar for DB insertion
+  to_db <- function(x, numeric = FALSE) {
+    if (is.null(x)) return(NA)
+    if (is.list(x)) x <- unlist(x, use.names = FALSE)
+    if (length(x) == 0) return(NA)
+    if (length(x) > 1) x <- paste(x[!is.na(x)], collapse = ", ")
+    x <- x[1]
+    if (is.na(x)) return(NA)
+    if (numeric) return(as.numeric(x))
+    as.character(x)
+  }
+
   tryCatch({
     # Check if record exists
     existing <- dbGetQuery(con,
       "SELECT taxon_id FROM ref_usda_traits WHERE taxon_id = $1",
-      params = list(taxon_id))
+      params = list(as.integer(taxon_id)))
 
     if (nrow(existing) == 0) {
-      # Insert new record with status
+      # Insert new record with status - ensure all values are scalar
       dbExecute(con, "
         INSERT INTO ref_usda_traits (
           taxon_id, usda_symbol, duration, growth_habit, native_status,
@@ -295,32 +331,42 @@ record_attempt <- function(con, taxon_id, symbol, char_data, status) {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
       ", params = list(
-        taxon_id, symbol,
-        char_data$duration %||% NA, char_data$growth_habit %||% NA, char_data$native_status %||% NA,
-        char_data$soil_ph_min %||% NA, char_data$soil_ph_max %||% NA,
-        char_data$precip_min_in %||% NA, char_data$precip_max_in %||% NA, char_data$temp_min_f %||% NA,
-        char_data$shade_tolerance %||% NA, char_data$drought_tolerance %||% NA,
-        char_data$salinity_tolerance %||% NA, char_data$moisture_use %||% NA, char_data$bloom_period %||% NA,
-        status
+        as.integer(taxon_id),
+        to_db(symbol),
+        to_db(char_data$duration),
+        to_db(char_data$growth_habit),
+        to_db(char_data$native_status),
+        to_db(char_data$soil_ph_min, numeric = TRUE),
+        to_db(char_data$soil_ph_max, numeric = TRUE),
+        to_db(char_data$precip_min_in, numeric = TRUE),
+        to_db(char_data$precip_max_in, numeric = TRUE),
+        to_db(char_data$temp_min_f, numeric = TRUE),
+        to_db(char_data$shade_tolerance),
+        to_db(char_data$drought_tolerance),
+        to_db(char_data$salinity_tolerance),
+        to_db(char_data$moisture_use),
+        to_db(char_data$bloom_period),
+        to_db(status)
       ))
     } else {
       # Update existing record
       sets <- c("fetch_status = $1", "fetch_attempted_at = NOW()")
-      params <- list(status)
+      params <- list(to_db(status))
       param_idx <- 2
 
       for (col in c("soil_ph_min", "soil_ph_max", "precip_min_in", "precip_max_in", "temp_min_f",
                     "shade_tolerance", "drought_tolerance", "salinity_tolerance", "moisture_use",
                     "bloom_period", "duration", "growth_habit", "native_status")) {
         val <- char_data[[col]]
-        if (!is.null(val) && !is.na(val)) {
+        db_val <- to_db(val, numeric = col %in% c("soil_ph_min", "soil_ph_max", "precip_min_in", "precip_max_in", "temp_min_f"))
+        if (!is.na(db_val)) {
           sets <- c(sets, sprintf("%s = $%d", col, param_idx))
-          params[[param_idx]] <- val
+          params[[param_idx]] <- db_val
           param_idx <- param_idx + 1
         }
       }
 
-      params[[param_idx]] <- taxon_id
+      params[[param_idx]] <- as.integer(taxon_id)
       sql <- sprintf("UPDATE ref_usda_traits SET %s WHERE taxon_id = $%d",
                     paste(sets, collapse = ", "), param_idx)
       dbExecute(con, sql, params = params)
@@ -469,7 +515,149 @@ mark_legacy_records <- function() {
   invisible(list(success = n1, no_data = n2))
 }
 
+# --- Diagnose data issues ---
+#' Check for mismatches between ref_taxon and ref_usda_traits
+usda_diagnose <- function(cache_dir = "data/cache/usda_char") {
+  con <- tryCatch(get_db_connection(), error = function(e) {
+    stop("Database connection failed.\n", e$message)
+  })
+  on.exit(dbDisconnect(con), add = TRUE)
+
+  message("\n=== USDA Data Diagnosis ===\n")
+
+  # Check taxon_id alignment
+  alignment <- dbGetQuery(con, "
+    SELECT
+      (SELECT COUNT(*) FROM ref_usda_traits) AS traits_total,
+      (SELECT COUNT(*) FROM ref_usda_traits r
+       JOIN ref_taxon t ON t.id = r.taxon_id) AS traits_matched,
+      (SELECT COUNT(*) FROM ref_usda_traits r
+       LEFT JOIN ref_taxon t ON t.id = r.taxon_id
+       WHERE t.id IS NULL) AS traits_orphaned
+  ")
+
+  message(sprintf("ref_usda_traits records:      %d", as.integer(alignment$traits_total)))
+  message(sprintf("  - Matched to ref_taxon:     %d", as.integer(alignment$traits_matched)))
+  message(sprintf("  - Orphaned (no match):      %d", as.integer(alignment$traits_orphaned)))
+
+  # Check cache files
+  profile_files <- list.files(cache_dir, pattern = "^profile_.*\\.json$", full.names = FALSE)
+  char_files <- list.files(cache_dir, pattern = "^char_.*\\.json$", full.names = FALSE)
+
+  # Extract symbols from profile filenames
+  cached_symbols <- gsub("^profile_|\\.json$", "", profile_files)
+
+  message("\nCache files:")
+  message(sprintf("  - Profile files:            %d", as.integer(length(profile_files))))
+  message(sprintf("  - Characteristic files:     %d", as.integer(length(char_files))))
+
+  # Check how many cached symbols exist in ref_taxon
+  if (length(cached_symbols) > 0) {
+    # Sample check - take first 1000
+    sample_symbols <- head(cached_symbols, 1000)
+    in_taxon <- dbGetQuery(con,
+      sprintf("SELECT COUNT(*) as n FROM ref_taxon WHERE usda_symbol IN (%s)",
+              paste(sprintf("'%s'", sample_symbols), collapse = ",")))
+
+    message(sprintf("  - Cached symbols in ref_taxon: %d/%d (sampled)",
+                    as.integer(in_taxon$n), as.integer(length(sample_symbols))))
+  }
+
+  # Check what the query actually returns
+  next_batch <- dbGetQuery(con, "
+    SELECT t.id, t.usda_symbol
+    FROM ref_taxon t
+    LEFT JOIN ref_usda_traits r ON r.taxon_id = t.id
+    WHERE t.usda_symbol IS NOT NULL
+      AND t.usda_symbol != ''
+      AND r.taxon_id IS NULL
+    LIMIT 10
+  ")
+
+  message("\nNext 10 species to fetch:")
+  for (i in seq_len(nrow(next_batch))) {
+    sym <- next_batch$usda_symbol[i]
+    has_cache <- file.exists(file.path(cache_dir, paste0("profile_", sym, ".json")))
+    message(sprintf("  %s (id=%d) - cache: %s", sym, as.integer(next_batch$id[i]), if(has_cache) "YES" else "no"))
+  }
+
+  invisible(list(
+    alignment = alignment,
+    cached_symbols = length(cached_symbols)
+  ))
+}
+
+# --- Sync cache to database ---
+#' Process existing cache files and ensure they have database records
+#' This fixes the issue where cache exists but no database record
+sync_cache_to_db <- function(cache_dir = "data/cache/usda_char", limit = 500) {
+  con <- tryCatch(get_db_connection(), error = function(e) {
+    stop("Database connection failed.\n", e$message)
+  })
+  on.exit(dbDisconnect(con), add = TRUE)
+
+  ensure_schema(con)
+
+  message("=== Syncing Cache to Database ===\n")
+
+  # Get species that have cache files but no database record
+  # First, find which symbols are in ref_taxon but not in ref_usda_traits
+  missing <- dbGetQuery(con, "
+    SELECT t.id, t.usda_symbol
+    FROM ref_taxon t
+    LEFT JOIN ref_usda_traits r ON r.taxon_id = t.id
+    WHERE t.usda_symbol IS NOT NULL
+      AND t.usda_symbol != ''
+      AND r.taxon_id IS NULL
+  ")
+
+  if (nrow(missing) == 0) {
+    message("All species already have database records!")
+    return(invisible(NULL))
+  }
+
+  # Filter to those with cache files
+  missing$has_cache <- sapply(missing$usda_symbol, function(sym) {
+    file.exists(file.path(cache_dir, paste0("profile_", sym, ".json")))
+  })
+
+  to_sync <- missing[missing$has_cache, ]
+  to_sync <- head(to_sync, limit)
+
+  if (nrow(to_sync) == 0) {
+    message("No cached species need syncing.")
+    message(sprintf("(%d species need fetching from API)", as.integer(nrow(missing))))
+    return(invisible(NULL))
+  }
+
+  message(sprintf("Found %d species with cache but no DB record", as.integer(sum(missing$has_cache))))
+  message(sprintf("Processing %d of them...\n", as.integer(nrow(to_sync))))
+
+  synced <- 0
+  for (i in seq_len(nrow(to_sync))) {
+    symbol <- to_sync$usda_symbol[i]
+    taxon_id <- to_sync$id[i]
+
+    if (i %% 50 == 0 || i == nrow(to_sync)) {
+      message(sprintf("[%d/%d] Syncing %s...", as.integer(i), as.integer(nrow(to_sync)), symbol))
+    }
+
+    # Process cached data (this won't hit the API since cache exists)
+    result <- fetch_single_species(symbol, taxon_id, cache_dir, con)
+    if (isTRUE(result$success)) synced <- synced + 1
+  }
+
+  message("\n=== Sync Complete ===")
+  message(sprintf("Synced: %d species", as.integer(synced)))
+  message(sprintf("Remaining without cache: %d (will need API fetch)",
+                  as.integer(nrow(missing) - sum(missing$has_cache))))
+
+  invisible(list(synced = synced, remaining = nrow(missing) - sum(missing$has_cache)))
+}
+
 message("USDA fetcher loaded. Available commands:")
 message("  usda_stats()                  - Show fetch progress")
-message("  fetch_usda_batch(limit=100)   - Fetch next batch of species")
+message("  usda_diagnose()               - Check for data issues")
+message("  sync_cache_to_db(limit=500)   - Sync cached files to database")
+message("  fetch_usda_batch(limit=100)   - Fetch next batch from API")
 message("  mark_legacy_records()         - Update old records with status")
