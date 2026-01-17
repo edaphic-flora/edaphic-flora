@@ -178,8 +178,8 @@ base_ui <- page_navbar(
        ),
        card_body(
          div(class = "px-md-5",
-             h4("What is Edaphic Flora?"),
-             p("Edaphic Flora helps gardeners, horticulturists, and researchers understand the relationship ",
+             h4("What is edaphic flora?"),
+             p("edaphic flora helps gardeners, horticulturists, and researchers understand the relationship ",
                "between soil conditions and plant success. By collecting real-world soil data from locations ",
                "where specific plants grow, we build a reference database that can guide planting decisions."),
 
@@ -814,13 +814,13 @@ custom_sign_in_ui <- tagList(
     "))
   ),
   div(class = "sign-in-container",
-    img(src = "logo.svg", class = "sign-in-logo", alt = "Edaphic Flora"),
-    h2(class = "sign-in-welcome", "Welcome to Edaphic Flora"),
+    img(src = "logo.svg", class = "sign-in-logo", alt = "edaphic flora"),
+    h2(class = "sign-in-welcome", "Welcome to edaphic flora"),
     p(class = "sign-in-tagline", "Record and analyze soil conditions for plant species"),
     div(class = "sign-in-box",
       polished::sign_in_ui_default(
         color = "#27ae60",
-        company_name = "Edaphic Flora",
+        company_name = "edaphic flora",
         logo_top = NULL,
         logo_bottom = NULL
       )
