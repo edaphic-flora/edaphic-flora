@@ -1105,17 +1105,29 @@ server_inner <- function(input, output, session) {
    if (!nzchar(sp)) return(NULL)
 
    ref <- get_reference_summary(sp, pool)
-   if (!ref$has_traits && !ref$has_nwpl) return(NULL)
+   if (!ref$has_traits) return(NULL)
 
-   chip <- function(lbl, val) {
+   chip <- function(lbl, val, href = NULL) {
      # Handle NULL, NA, empty, or vector inputs safely
      if (is.null(val)) return(NULL)
      if (length(val) == 0) return(NULL)
      val <- val[1]  # Take first element if vector
      if (is.na(val) || !nzchar(as.character(val))) return(NULL)
-     tags$span(class = "badge bg-light text-dark me-1 mb-1",
-               style = "font-size: 0.75rem;",
-               sprintf("%s: %s", lbl, val))
+     badge <- tags$span(class = "badge bg-light text-dark me-1 mb-1",
+                        style = "font-size: 0.75rem;",
+                        sprintf("%s: %s", lbl, val))
+     # Wrap in link if href provided - add external link icon to indicate clickable
+     if (!is.null(href) && nzchar(href)) {
+       tags$a(href = href, target = "_blank",
+              style = "text-decoration: none;",
+              title = paste("View on", lbl, "website"),
+              tags$span(class = "badge bg-light text-dark me-1 mb-1",
+                        style = "font-size: 0.75rem; cursor: pointer; border: 1px solid #27ae60;",
+                        sprintf("%s: %s ", lbl, val),
+                        icon("external-link-alt", class = "fa-xs", style = "color: #27ae60;")))
+     } else {
+       badge
+     }
    }
 
    # Helper to safely extract single value from data frame column
@@ -1124,12 +1136,18 @@ server_inner <- function(input, output, session) {
      x[1]
    }
 
+   # Build USDA PLANTS URL from symbol
+   usda_url <- function(symbol) {
+     if (is.na(symbol) || !nzchar(symbol)) return(NULL)
+     sprintf("https://plants.usda.gov/plant-profile/%s", symbol)
+   }
+
    tagList(
      tags$h6(class = "text-muted mt-2 mb-2", icon("book-open"), " Reference Data"),
      div(class = "d-flex flex-wrap",
-         chip("NWPL", ref$nwpl_indicator),
          if (isTRUE(ref$has_traits) && !is.null(ref$traits) && nrow(ref$traits) > 0) {
            tr <- ref$traits[1, , drop = FALSE]
+           symbol <- safe_val(tr$usda_symbol)
            ph_min <- safe_val(tr$soil_ph_min)
            ph_max <- safe_val(tr$soil_ph_max)
            # Handle both column naming conventions (precip_min_in vs precipitation_min_mm)
@@ -1137,7 +1155,7 @@ server_inner <- function(input, output, session) {
            precip_max <- safe_val(if ("precip_max_in" %in% names(tr)) tr$precip_max_in else tr$precipitation_max_mm)
            precip_unit <- if ("precip_min_in" %in% names(tr)) "in" else "mm"
            list(
-             chip("USDA", safe_val(tr$usda_symbol)),
+             chip("USDA", symbol, href = usda_url(symbol)),
              chip("pH", if (!is.na(ph_min) && !is.na(ph_max))
                sprintf("%.1f-%.1f", ph_min, ph_max) else NA),
              chip("Shade", safe_val(tr$shade_tolerance)),

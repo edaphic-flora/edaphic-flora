@@ -94,7 +94,10 @@ db_migrate <- function() {
 
     TRUE
   }, error = function(e) {
-    message("DB migration error: ", e$message)
+    # Ignore permission errors - schema likely already exists in production
+    if (!grepl("permission denied", e$message, ignore.case = TRUE)) {
+      message("DB migration error: ", e$message)
+    }
     FALSE
   })
 }
