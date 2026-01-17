@@ -28,6 +28,7 @@ test_soil_reports/
 # Large cache files (~67MB, 10K+ JSON files)
 # These are already loaded into the database; keep locally but don't commit
 app/data/cache/
+data/cache/
 
 # Generated data files (run generate_*.R scripts locally to create)
 app/data/ecoregion_grid.*
