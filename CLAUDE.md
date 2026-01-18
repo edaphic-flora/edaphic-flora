@@ -80,7 +80,7 @@ Neon allows creating database branches (like git branches):
 
 ```
 app/
-├── app.R                 # Main Shiny app (UI + server, ~3150 lines)
+├── app.R                 # Main Shiny app (UI + server, ~4100 lines)
 ├── R/
 │   ├── db.R              # Database connection, migration, query functions
 │   ├── data.R            # Reference data loading (species, ecoregions, textures)
@@ -109,10 +109,17 @@ app/
 
 ### Modularization Status (TODO)
 
-The `mod_analysis.R` and `mod_data_entry.R` files contain Shiny module templates that can be used to refactor app.R. Full integration requires:
-1. Replace inline UI/server code in app.R with module calls
-2. Pass dependencies (species_db, colors, theme functions) as module parameters
-3. Thorough testing of all reactive flows
+A detailed modularization plan exists at `app/docs/MODULARIZATION_PLAN.md`. The plan identifies 7 modules to extract from app.R:
+
+1. **mod_help.R** - Static help pages (lowest risk)
+2. **mod_welcome.R** - Landing page with stats and map
+3. **mod_admin.R** - Admin-only data management
+4. **mod_data_management.R** - Import/export functionality
+5. **mod_find_plants.R** - Species recommendation engine
+6. **mod_data_entry.R** - Soil sample data collection
+7. **mod_analysis.R** - Species data visualization (largest, most complex)
+
+The existing `mod_analysis.R` and `mod_data_entry.R` templates need updating to match the current app.R structure. See the plan document for dependencies, testing checkpoints, and implementation order.
 
 ### UI Structure
 
@@ -449,4 +456,20 @@ Shows whether a selected species is native or introduced in the user's area, bas
 1. Generate state grid: `cd app && Rscript generate_state_grid.R`
 2. Download USDA state distribution data (PLANTS checklist)
 3. Run ETL: `source("R/etl/usda_state_dist_etl.R"); usda_state_dist_etl_run("data/raw/usda/state_dist.csv")`
+
+### 2025-01-17: Code Cleanup & Modularization Planning
+
+**Modularization Plan:**
+- Created comprehensive plan at `app/docs/MODULARIZATION_PLAN.md`
+- Identifies 7 modules with dependencies, line counts, and testing checkpoints
+- Recommended implementation order from lowest to highest risk
+- Estimated ~15 hours total work
+
+**Code Cleanup:**
+- Removed unused `pdf_extract_config` alias from `R/pdf_extract.R`
+- Removed commented-out async imports from `app.R` (lines 31-33)
+- Added named constants to replace magic numbers:
+  - `TEXTURE_TOLERANCE` (0.1) in `R/helpers.R`
+  - `GRID_RESOLUTION` (0.1) and `GRID_MATCH_TOLERANCE` (0.001) in `R/data.R`
+- Updated functions to use new constants
 

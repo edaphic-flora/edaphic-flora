@@ -3,6 +3,13 @@
 library(sf)
 
 # ---------------------------
+# Constants
+# ---------------------------
+
+# Tolerance for texture classification (allows for small rounding errors)
+TEXTURE_TOLERANCE <- 0.1
+
+# ---------------------------
 # Ecoregion Lookup
 # ---------------------------
 
@@ -44,16 +51,16 @@ get_texture_percentages <- function(texture_class, soil_texture_classes) {
 }
 
 classify_texture <- function(sand, silt, clay, soil_texture_classes) {
-  if (abs((sand + silt + clay) - 100) > 0.1) {
+  if (abs((sand + silt + clay) - 100) > TEXTURE_TOLERANCE) {
     return("Error: Percentages must sum to 100%")
   }
   for (i in seq_len(nrow(soil_texture_classes))) {
-    if (clay >= (soil_texture_classes$Clay_Min[i] - 0.1) &&
-        clay <= (soil_texture_classes$Clay_Max[i] + 0.1) &&
-        silt >= (soil_texture_classes$Silt_Min[i] - 0.1) &&
-        silt <= (soil_texture_classes$Silt_Max[i] + 0.1) &&
-        sand >= (soil_texture_classes$Sand_Min[i] - 0.1) &&
-        sand <= (soil_texture_classes$Sand_Max[i] + 0.1)) {
+    if (clay >= (soil_texture_classes$Clay_Min[i] - TEXTURE_TOLERANCE) &&
+        clay <= (soil_texture_classes$Clay_Max[i] + TEXTURE_TOLERANCE) &&
+        silt >= (soil_texture_classes$Silt_Min[i] - TEXTURE_TOLERANCE) &&
+        silt <= (soil_texture_classes$Silt_Max[i] + TEXTURE_TOLERANCE) &&
+        sand >= (soil_texture_classes$Sand_Min[i] - TEXTURE_TOLERANCE) &&
+        sand <= (soil_texture_classes$Sand_Max[i] + TEXTURE_TOLERANCE)) {
       return(as.character(soil_texture_classes$Texture[i]))
     }
   }

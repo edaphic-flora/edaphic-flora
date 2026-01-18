@@ -356,5 +356,3 @@ is_pdf_extraction_available <- function() {
   nzchar(extract_config$api_key)
 }
 
-# For backward compatibility
-pdf_extract_config <- extract_config
