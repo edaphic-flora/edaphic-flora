@@ -850,9 +850,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       if (nrow(dat) == 0) {
         if (!has_usda_ph) return(NULL)
+        # Empty state - show USDA range with text label
         p <- ggplot() +
-          annotate("rect", xmin = tr$soil_ph_min[1], xmax = tr$soil_ph_max[1],
-                   ymin = -Inf, ymax = Inf, alpha = 0.15, fill = edaphic_colors$accent) +
           annotate("text", x = (tr$soil_ph_min[1] + tr$soil_ph_max[1]) / 2, y = 0.5,
                    label = sprintf("USDA pH: %.1f - %.1f", tr$soil_ph_min[1], tr$soil_ph_max[1]),
                    color = edaphic_colors$dark, size = 4) +
@@ -862,7 +861,25 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                x = "Soil pH", y = "") +
           theme_edaphic() +
           theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-        return(ggplotly(p) %>% config(displayModeBar = TRUE, displaylogo = FALSE))
+
+        pl <- ggplotly(p) %>% config(displayModeBar = TRUE, displaylogo = FALSE)
+        # Add USDA range as filled polygon trace
+        ph_min <- as.numeric(tr$soil_ph_min[1])
+        ph_max <- as.numeric(tr$soil_ph_max[1])
+        pl <- pl %>% add_trace(
+          x = c(ph_min, ph_max, ph_max, ph_min, ph_min),
+          y = c(0, 0, 1, 1, 0),
+          type = "scatter",
+          mode = "lines",
+          fill = "toself",
+          fillcolor = "rgba(122, 154, 134, 0.3)",
+          line = list(width = 0),
+          name = "USDA pH Range",
+          hoverinfo = "text",
+          text = sprintf("USDA Reference: pH %.1f - %.1f", ph_min, ph_max),
+          showlegend = FALSE
+        )
+        return(pl)
       }
 
       p <- ggplot(dat, aes(x = ph)) +
@@ -870,19 +887,42 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         geom_vline(xintercept = mean(dat$ph, na.rm = TRUE),
                    color = edaphic_colors$danger, linetype = "dashed", linewidth = 1)
 
-      if (has_usda_ph) {
-        p <- p + annotate("rect", xmin = tr$soil_ph_min[1], xmax = tr$soil_ph_max[1],
-                          ymin = -Inf, ymax = Inf, alpha = 0.12, fill = edaphic_colors$accent)
-      }
-
       p <- p + labs(title = paste("pH Distribution -", input$analysis_species),
                     subtitle = paste("n =", nrow(dat), "| Mean =", round(mean(dat$ph, na.rm = TRUE), 2),
                                      if (has_usda_ph) paste("| USDA:", tr$soil_ph_min[1], "-", tr$soil_ph_max[1]) else ""),
                     x = "Soil pH", y = "Count") +
         theme_edaphic()
 
-      ggplotly(p, tooltip = c("x", "y")) %>%
+      # Convert to plotly
+      pl <- ggplotly(p, tooltip = c("x", "y")) %>%
         config(displayModeBar = TRUE, displaylogo = FALSE)
+
+      # Add USDA range as a filled polygon trace (shapes don't render reliably with ggplotly)
+      if (has_usda_ph) {
+        ph_min <- as.numeric(tr$soil_ph_min[1])
+        ph_max <- as.numeric(tr$soil_ph_max[1])
+        message(sprintf("Adding USDA overlay: pH %.1f - %.1f", ph_min, ph_max))
+
+        # Get y-axis range from histogram to create full-height rectangle
+        hist_data <- hist(dat$ph, breaks = 15, plot = FALSE)
+        y_max <- max(hist_data$counts) * 1.05
+
+        pl <- pl %>% add_trace(
+          x = c(ph_min, ph_max, ph_max, ph_min, ph_min),
+          y = c(0, 0, y_max, y_max, 0),
+          type = "scatter",
+          mode = "lines",
+          fill = "toself",
+          fillcolor = "rgba(122, 154, 134, 0.25)",
+          line = list(width = 0),
+          name = "USDA pH Range",
+          hoverinfo = "text",
+          text = sprintf("USDA Reference: pH %.1f - %.1f", ph_min, ph_max),
+          showlegend = FALSE
+        )
+      }
+
+      pl
     })
 
     # ---------------------------
@@ -920,8 +960,6 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (nrow(dat) == 0) {
         if (!has_usda_ph) return(NULL)
         p <- ggplot() +
-          annotate("rect", xmin = tr$soil_ph_min[1], xmax = tr$soil_ph_max[1],
-                   ymin = -Inf, ymax = Inf, alpha = 0.15, fill = edaphic_colors$accent) +
           annotate("text", x = (tr$soil_ph_min[1] + tr$soil_ph_max[1]) / 2, y = 50,
                    label = sprintf("USDA pH: %.1f - %.1f", tr$soil_ph_min[1], tr$soil_ph_max[1]),
                    color = edaphic_colors$dark, size = 4) +
@@ -930,20 +968,30 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                subtitle = "No sample data - showing USDA pH reference range",
                x = "Soil pH", y = "Organic Matter (%)") +
           theme_edaphic()
-        return(ggplotly(p) %>% config(displayModeBar = TRUE, displaylogo = FALSE))
+
+        pl <- ggplotly(p) %>% config(displayModeBar = TRUE, displaylogo = FALSE)
+        ph_min <- as.numeric(tr$soil_ph_min[1])
+        ph_max <- as.numeric(tr$soil_ph_max[1])
+        pl <- pl %>% add_trace(
+          x = c(ph_min, ph_max, ph_max, ph_min, ph_min),
+          y = c(0, 0, 100, 100, 0),
+          type = "scatter",
+          mode = "lines",
+          fill = "toself",
+          fillcolor = "rgba(122, 154, 134, 0.3)",
+          line = list(width = 0),
+          name = "USDA pH Range",
+          hoverinfo = "text",
+          text = sprintf("USDA Reference: pH %.1f - %.1f", ph_min, ph_max),
+          showlegend = FALSE
+        )
+        return(pl)
       }
 
       cor_val <- cor(dat$ph, dat$organic_matter, use = "complete.obs")
       has_outcome <- sum(!is.na(dat$outcome)) > 0
 
-      p <- ggplot(dat, aes(x = ph, y = organic_matter))
-
-      if (has_usda_ph) {
-        p <- p + annotate("rect", xmin = tr$soil_ph_min[1], xmax = tr$soil_ph_max[1],
-                          ymin = -Inf, ymax = Inf, alpha = 0.12, fill = edaphic_colors$accent)
-      }
-
-      p <- p +
+      p <- ggplot(dat, aes(x = ph, y = organic_matter)) +
         geom_smooth(method = "lm", se = TRUE, color = edaphic_colors$dark,
                     fill = edaphic_colors$light, alpha = 0.3, linetype = "dashed")
 
@@ -990,6 +1038,29 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
        if (length(new_order) == length(plt$x$data)) {
          plt$x$data <- plt$x$data[new_order]
        }
+     }
+
+     # Add USDA pH range as filled polygon trace (shapes don't render reliably with ggplotly)
+     if (has_usda_ph) {
+       ph_min <- as.numeric(tr$soil_ph_min[1])
+       ph_max <- as.numeric(tr$soil_ph_max[1])
+
+       # Get y-axis range from data
+       y_max <- max(dat$organic_matter, na.rm = TRUE) * 1.1
+
+       plt <- plt %>% add_trace(
+         x = c(ph_min, ph_max, ph_max, ph_min, ph_min),
+         y = c(0, 0, y_max, y_max, 0),
+         type = "scatter",
+         mode = "lines",
+         fill = "toself",
+         fillcolor = "rgba(122, 154, 134, 0.2)",
+         line = list(width = 0),
+         name = "USDA pH Range",
+         hoverinfo = "text",
+         text = sprintf("USDA Reference: pH %.1f - %.1f", ph_min, ph_max),
+         showlegend = FALSE
+       )
      }
 
      plt
