@@ -40,6 +40,7 @@ source("R/mod_help.R")
 source("R/mod_welcome.R")
 source("R/mod_admin.R")
 source("R/mod_data_management.R")
+source("R/mod_find_plants.R")
 
 # --- Initialize
 db_migrate()
@@ -475,89 +476,8 @@ base_ui <- page_navbar(
    )
  ),
 
- # ========== FIND PLANTS TAB ==========
- nav_panel(
-   title = "Find Plants",
-   icon = icon("magnifying-glass-location"),
-   layout_sidebar(
-     sidebar = sidebar(
-       title = "Your Soil Profile",
-       width = 320,
-       bg = "#f8f9fa",
-
-       p(class = "small text-muted mb-3",
-         "Enter your soil test values to find species that thrive in similar conditions."),
-
-      # Soil Report Upload Section (conditional on API key availability)
-      if (is_pdf_extraction_available()) {
-        div(
-          class = "mb-3 p-3 border rounded bg-light",
-          div(class = "d-flex align-items-center mb-2",
-              icon("file-lines", class = "text-success me-2"),
-              strong("Upload Soil Report"),
-              span(class = "badge bg-info ms-2", "Beta")),
-          fileInput("find_pdf_upload", NULL,
-                    accept = c("application/pdf", ".pdf", ".rtf", ".txt",
-                               "image/png", "image/jpeg", "image/gif", "image/webp",
-                               ".png", ".jpg", ".jpeg", ".gif", ".webp"),
-                    buttonLabel = "Choose File",
-                    placeholder = "No file selected"),
-          uiOutput("find_pdf_extract_status"),
-          helpText(class = "text-muted small",
-                   "Upload a soil report to auto-fill the form. ",
-                   "Supports PDF, RTF, TXT, and images.")
-        )
-      },
-
-       # pH input
-       numericInput("find_ph", "pH", value = NA, min = 3, max = 10, step = 0.1),
-
-       # Organic matter input
-       numericInput("find_om", "Organic Matter (%)", value = NA, min = 0, max = 50, step = 0.5),
-
-       # Texture input
-       selectInput("find_texture", "Soil Texture",
-                   choices = c("Any" = "",
-                               "Sand", "Loamy Sand", "Sandy Loam", "Loam",
-                               "Silt Loam", "Silt", "Sandy Clay Loam",
-                               "Clay Loam", "Silty Clay Loam", "Sandy Clay",
-                               "Silty Clay", "Clay"),
-                   selected = ""),
-
-       hr(),
-
-       # Optional nutrient inputs (collapsible)
-       tags$details(
-         open = NA,
-         tags$summary(
-           style = "cursor: pointer; font-weight: 500; color: #7A9A86;",
-           icon("flask"), " Nutrient Values (Optional)"
-         ),
-         div(class = "mt-2",
-           numericInput("find_nitrate", "Nitrate (ppm)", value = NA, min = 0, step = 1),
-           numericInput("find_phosphorus", "Phosphorus (ppm)", value = NA, min = 0, step = 1),
-           numericInput("find_potassium", "Potassium (ppm)", value = NA, min = 0, step = 1),
-           numericInput("find_calcium", "Calcium (ppm)", value = NA, min = 0, step = 10),
-           numericInput("find_magnesium", "Magnesium (ppm)", value = NA, min = 0, step = 10)
-         )
-       ),
-
-       hr(),
-
-       actionButton("find_plants_btn", "Find Matching Plants",
-                    class = "btn-success w-100", icon = icon("search")),
-
-       hr(),
-       div(class = "small text-muted",
-         icon("lightbulb"), " Tip: At minimum, enter pH for best results. ",
-         "More values = more accurate matches."
-       )
-     ),
-
-     # Main content area
-     uiOutput("find_plants_results")
-   )
- ),
+# ========== FIND PLANTS TAB ==========
+findPlantsUI("find_plants"),
 
  # ========== DATA MANAGEMENT TAB ==========
  dataManagementUI("data_mgmt"),
@@ -752,6 +672,16 @@ server_inner <- function(input, output, session) {
  adminServer("admin", pool, is_admin, current_user, data_changed)
  dataManagementServer("data_mgmt", pool, current_user, data_changed, soil_data_template)
 
+ # --- Find Plants module ---
+ # Note: pdf_extract_limit is defined in PDF Extraction section below
+ find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
+                                      as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "5")))
+
+ # Handle FAQ link from Find Plants module
+ observeEvent(find_plants_faq(), {
+   nav_select("main_nav", "FAQ")
+ }, ignoreInit = TRUE)
+
  # --- Species dropdown population ---
  observe({
    updateSelectizeInput(session, "species",
@@ -907,75 +837,6 @@ server_inner <- function(input, output, session) {
    }
  })
 
-# --- Find Plants PDF Upload Handler ---
-observeEvent(input$find_pdf_upload, {
-  req(input$find_pdf_upload)
-  u <- current_user()
-
-  if (is.null(u)) {
-    showNotification("Please sign in to use PDF extraction.", type = "error")
-    return()
-  }
-
-  # Check rate limit (admin bypass)
-  if (!is_admin() && !db_can_extract(u$user_uid, pdf_extract_limit)) {
-    showNotification("Daily extraction limit reached. Try again tomorrow.", type = "warning")
-    return()
-  }
-
-  # Show processing notification
-  notif_id <- showNotification("Extracting data from report...", type = "message", duration = NULL)
-
-  # Perform extraction (synchronous)
-  result <- extract_soil_data_from_pdf(input$find_pdf_upload$datapath)
-
-  removeNotification(notif_id)
-
-  if (result$success) {
-    # Log the extraction
-    db_log_extraction(u$user_uid, input$find_pdf_upload$name, result$tokens_used)
-
-    # Populate Find Plants form fields
-    data <- result$data
-
-    # Core soil properties
-    if (!is.null(data$ph)) updateNumericInput(session, "find_ph", value = data$ph)
-    if (!is.null(data$organic_matter)) updateNumericInput(session, "find_om", value = data$organic_matter)
-
-    # Texture - map to texture class
-    if (!is.null(data$texture_class) && nzchar(data$texture_class)) {
-      updateSelectInput(session, "find_texture", selected = data$texture_class)
-    }
-
-    # Nutrients
-    if (!is.null(data$nitrate_ppm)) updateNumericInput(session, "find_nitrate", value = data$nitrate_ppm)
-    if (!is.null(data$phosphorus_ppm)) updateNumericInput(session, "find_phosphorus", value = data$phosphorus_ppm)
-    if (!is.null(data$potassium_ppm)) updateNumericInput(session, "find_potassium", value = data$potassium_ppm)
-    if (!is.null(data$calcium_ppm)) updateNumericInput(session, "find_calcium", value = data$calcium_ppm)
-    if (!is.null(data$magnesium_ppm)) updateNumericInput(session, "find_magnesium", value = data$magnesium_ppm)
-
-    # Handle extraction warnings
-    if (!is.null(data$extraction_warnings) && length(data$extraction_warnings) > 0) {
-      warnings_list <- unlist(data$extraction_warnings)
-      warning_msg <- paste(warnings_list, collapse = "; ")
-      showNotification(
-        paste("Extraction warnings:", warning_msg),
-        type = "warning",
-        duration = 10
-      )
-    }
-
-    showNotification("Data extracted! Click 'Find Matching Plants' to see recommendations.", type = "message", duration = 5)
-
-  } else {
-    showNotification(paste("Extraction failed:", result$error), type = "error", duration = 8)
-  }
-})
-
-# Status output for Find Plants PDF extraction
-output$find_pdf_extract_status <- renderUI({
-  NULL  # Placeholder for future status messages
-})
 
  # --- Per-species metadata fields ---
  output$per_species_fields <- renderUI({
@@ -1123,7 +984,7 @@ output$find_pdf_extract_status <- renderUI({
      # Badges row
      div(class = "d-flex flex-wrap gap-1",
          chip("USDA", symbol, href = usda_url(symbol)),
-         chip("pH", if (!is.na(ph_min) && !is.na(ph_max)) sprintf("%.1f–%.1f", ph_min, ph_max) else NA),
+         chip("pH", if (!is.na(ph_min) && !is.na(ph_max)) sprintf("%.1fâ€“%.1f", ph_min, ph_max) else NA),
          chip("Shade", safe_val(tr$shade_tolerance)),
          chip("Drought", safe_val(tr$drought_tolerance))
      )
@@ -1547,8 +1408,8 @@ output$find_pdf_extract_status <- renderUI({
 
    # pH range
    ph_range <- if (sum(!is.na(dat$ph)) > 0) {
-     sprintf("%.1f – %.1f", min(dat$ph, na.rm = TRUE), max(dat$ph, na.rm = TRUE))
-   } else "—"
+     sprintf("%.1f â€“ %.1f", min(dat$ph, na.rm = TRUE), max(dat$ph, na.rm = TRUE))
+   } else "â€”"
 
    # Build compact preview
    div(class = "small",
@@ -1715,96 +1576,6 @@ output$find_pdf_extract_status <- renderUI({
  # Similar Species Matching
  # ---------------------------
 
- # Calculate soil profile for a species (returns list of ranges)
- calc_species_profile <- function(dat) {
-   if (nrow(dat) == 0) return(NULL)
-
-   profile <- list(
-     n_samples = nrow(dat),
-     ph_mean = mean(dat$ph, na.rm = TRUE),
-     ph_min = min(dat$ph, na.rm = TRUE),
-     ph_max = max(dat$ph, na.rm = TRUE),
-     om_mean = mean(dat$organic_matter, na.rm = TRUE),
-     om_min = min(dat$organic_matter, na.rm = TRUE),
-     om_max = max(dat$organic_matter, na.rm = TRUE)
-   )
-
-   # Texture - most common class
-   if (sum(!is.na(dat$texture_class)) > 0) {
-     profile$texture_class <- names(sort(table(dat$texture_class), decreasing = TRUE))[1]
-   }
-
-   # Nutrients - means
-   if (sum(!is.na(dat$nitrate_ppm)) > 0) profile$nitrate_mean <- mean(dat$nitrate_ppm, na.rm = TRUE)
-   if (sum(!is.na(dat$phosphorus_ppm)) > 0) profile$phosphorus_mean <- mean(dat$phosphorus_ppm, na.rm = TRUE)
-   if (sum(!is.na(dat$potassium_ppm)) > 0) profile$potassium_mean <- mean(dat$potassium_ppm, na.rm = TRUE)
-   if (sum(!is.na(dat$calcium_ppm)) > 0) profile$calcium_mean <- mean(dat$calcium_ppm, na.rm = TRUE)
-   if (sum(!is.na(dat$magnesium_ppm)) > 0) profile$magnesium_mean <- mean(dat$magnesium_ppm, na.rm = TRUE)
-
-   # Success rate
-   if ("outcome" %in% names(dat) && sum(!is.na(dat$outcome)) > 0) {
-     outcomes <- dat$outcome[!is.na(dat$outcome)]
-     profile$success_rate <- sum(outcomes %in% c("Thriving", "Established")) / length(outcomes) * 100
-   }
-
-   # Best conditions
-   if (sum(!is.na(dat$sun_exposure)) > 0) {
-     profile$best_sun <- names(sort(table(dat$sun_exposure), decreasing = TRUE))[1]
-   }
-   if (sum(!is.na(dat$site_hydrology)) > 0) {
-     profile$best_hydrology <- names(sort(table(dat$site_hydrology), decreasing = TRUE))[1]
-   }
-
-   profile
- }
-
- # Calculate similarity score between two profiles (0-100)
- calc_similarity <- function(profile1, profile2) {
-   if (is.null(profile1) || is.null(profile2)) return(0)
-
-   scores <- c()
-   weights <- c()
-
-   # pH similarity (weight: 30) - check range overlap
-   if (!is.na(profile1$ph_mean) && !is.na(profile2$ph_mean)) {
-     ph_diff <- abs(profile1$ph_mean - profile2$ph_mean)
-     ph_score <- max(0, 100 - ph_diff * 25)  # -25 points per pH unit difference
-     scores <- c(scores, ph_score)
-     weights <- c(weights, 30)
-   }
-
-   # OM similarity (weight: 20)
-   if (!is.na(profile1$om_mean) && !is.na(profile2$om_mean)) {
-     om_diff <- abs(profile1$om_mean - profile2$om_mean)
-     om_score <- max(0, 100 - om_diff * 10)  # -10 points per % difference
-     scores <- c(scores, om_score)
-     weights <- c(weights, 20)
-   }
-
-   # Texture similarity (weight: 15)
-   if (!is.null(profile1$texture_class) && !is.null(profile2$texture_class)) {
-     texture_score <- if (profile1$texture_class == profile2$texture_class) 100 else 50
-     scores <- c(scores, texture_score)
-     weights <- c(weights, 15)
-   }
-
-   # Nutrient similarities (weight: 5 each, total 25)
-   nutrient_params <- c("nitrate_mean", "phosphorus_mean", "potassium_mean", "calcium_mean", "magnesium_mean")
-   for (param in nutrient_params) {
-     if (!is.null(profile1[[param]]) && !is.null(profile2[[param]])) {
-       # Normalize by using ratio (within 2x = similar)
-       ratio <- profile1[[param]] / max(profile2[[param]], 0.1)
-       if (ratio > 1) ratio <- 1 / ratio
-       nutrient_score <- ratio * 100
-       scores <- c(scores, nutrient_score)
-       weights <- c(weights, 5)
-     }
-   }
-
-   # Calculate weighted average
-   if (length(scores) == 0) return(0)
-   sum(scores * weights) / sum(weights)
- }
 
  # Get all species profiles (cached for performance)
  get_all_species_profiles <- reactive({
@@ -1908,9 +1679,9 @@ output$find_pdf_extract_status <- renderUI({
                  tags$strong(sp),
                  div(class = "small text-muted",
                    paste(profile$n_samples, "samples"),
-                   if (!is.null(profile$success_rate)) paste0(" · ", round(profile$success_rate), "% success"),
-                   if (!is.null(profile$best_sun)) paste0(" · ", profile$best_sun),
-                   if (!is.null(profile$best_hydrology)) paste0(" · ", profile$best_hydrology)
+                   if (!is.null(profile$success_rate)) paste0(" Â· ", round(profile$success_rate), "% success"),
+                   if (!is.null(profile$best_sun)) paste0(" Â· ", profile$best_sun),
+                   if (!is.null(profile$best_hydrology)) paste0(" Â· ", profile$best_hydrology)
                  )
                ),
                div(class = "text-end",
@@ -1918,7 +1689,7 @@ output$find_pdf_extract_status <- renderUI({
                            paste0(score, "% match")),
                  div(class = "small text-muted mt-1",
                    if (!is.na(profile$ph_mean)) sprintf("pH %.1f", profile$ph_mean) else "",
-                   if (!is.na(profile$om_mean)) sprintf(" · %.1f%% OM", profile$om_mean) else ""
+                   if (!is.na(profile$om_mean)) sprintf(" Â· %.1f%% OM", profile$om_mean) else ""
                  )
                )
              )
@@ -1943,295 +1714,6 @@ output$find_pdf_extract_status <- renderUI({
        )
      }
    )
- })
-
- # ---------------------------
- # Find Plants Recommendation Engine
- # ---------------------------
-
- # Reactive to store find plants results
- find_plants_results <- reactiveVal(NULL)
-
- # Calculate match score between user input and species profile
- calc_user_match <- function(user_profile, species_profile) {
-   if (is.null(species_profile)) return(0)
-
-   scores <- c()
-   weights <- c()
-
-   # pH match (weight: 35)
-   if (!is.na(user_profile$ph) && !is.na(species_profile$ph_mean)) {
-     # Check if user pH is within species range (or close to mean)
-     ph_in_range <- user_profile$ph >= (species_profile$ph_min - 0.5) &&
-                    user_profile$ph <= (species_profile$ph_max + 0.5)
-     if (ph_in_range) {
-       ph_diff <- abs(user_profile$ph - species_profile$ph_mean)
-       ph_score <- max(0, 100 - ph_diff * 20)
-     } else {
-       ph_score <- 30  # Penalty for being outside range
-     }
-     scores <- c(scores, ph_score)
-     weights <- c(weights, 35)
-   }
-
-   # OM match (weight: 20)
-   if (!is.na(user_profile$om) && !is.na(species_profile$om_mean)) {
-     om_diff <- abs(user_profile$om - species_profile$om_mean)
-     om_score <- max(0, 100 - om_diff * 8)
-     scores <- c(scores, om_score)
-     weights <- c(weights, 20)
-   }
-
-   # Texture match (weight: 15)
-   if (!is.null(user_profile$texture) && nzchar(user_profile$texture) &&
-       !is.null(species_profile$texture_class)) {
-     texture_score <- if (user_profile$texture == species_profile$texture_class) 100 else 50
-     scores <- c(scores, texture_score)
-     weights <- c(weights, 15)
-   }
-
-   # Nutrient matches (weight: 6 each, total 30)
-   nutrient_map <- list(
-     nitrate = "nitrate_mean",
-     phosphorus = "phosphorus_mean",
-     potassium = "potassium_mean",
-     calcium = "calcium_mean",
-     magnesium = "magnesium_mean"
-   )
-
-   for (user_param in names(nutrient_map)) {
-     species_param <- nutrient_map[[user_param]]
-     if (!is.na(user_profile[[user_param]]) && !is.null(species_profile[[species_param]])) {
-       ratio <- user_profile[[user_param]] / max(species_profile[[species_param]], 0.1)
-       if (ratio > 1) ratio <- 1 / ratio
-       nutrient_score <- ratio * 100
-       scores <- c(scores, nutrient_score)
-       weights <- c(weights, 6)
-     }
-   }
-
-   if (length(scores) == 0) return(0)
-   sum(scores * weights) / sum(weights)
- }
-
- # Handle Find Plants button click
- observeEvent(input$find_plants_btn, {
-   # Build user profile from inputs
-   user_profile <- list(
-     ph = input$find_ph,
-     om = input$find_om,
-     texture = input$find_texture,
-     nitrate = input$find_nitrate,
-     phosphorus = input$find_phosphorus,
-     potassium = input$find_potassium,
-     calcium = input$find_calcium,
-     magnesium = input$find_magnesium
-   )
-
-   # Check if at least pH is provided
-   if (is.na(user_profile$ph)) {
-     find_plants_results(list(error = "Please enter at least a pH value to find matching plants."))
-     return()
-   }
-
-   # Get all species profiles
-   all_profiles <- get_all_species_profiles()
-
-   if (length(all_profiles) == 0) {
-     find_plants_results(list(error = "No species have enough data (10+ samples) for recommendations yet."))
-     return()
-   }
-
-   # Calculate match scores for all species
-   matches <- lapply(names(all_profiles), function(sp) {
-     profile <- all_profiles[[sp]]
-     score <- calc_user_match(user_profile, profile)
-     list(
-       species = sp,
-       score = score,
-       profile = profile
-     )
-   })
-
-   # Sort by score descending
-   matches <- matches[order(sapply(matches, function(x) -x$score))]
-
-   # Take top 15
-   matches <- head(matches, 15)
-
-   find_plants_results(list(
-     user_profile = user_profile,
-     matches = matches
-   ))
- })
-
- # Render Find Plants results
- output$find_plants_results <- renderUI({
-   results <- find_plants_results()
-
-   if (is.null(results)) {
-     return(
-       div(class = "text-center py-5",
-         tags$i(class = "fa fa-seedling fa-3x text-muted mb-3"),
-         h4("Find Plants for Your Soil"),
-         p(class = "text-muted",
-           "Enter your soil test values in the sidebar and click ",
-           tags$strong("Find Matching Plants"), " to discover species that thrive in similar conditions."
-         ),
-         div(class = "mt-4 p-3 bg-light rounded text-start", style = "max-width: 550px; margin: 0 auto;",
-           tags$small(class = "text-muted",
-             tags$strong("How it works:"), tags$br(),
-             "We compare your soil profile against real-world data from successful plantings. ",
-             "Species are ranked by how closely their optimal conditions match your soil, ",
-             "with success rates and growing conditions shown for each recommendation."
-           ),
-           tags$hr(class = "my-2"),
-           tags$small(class = "text-muted",
-             tags$strong("Keep in mind:"), tags$br(),
-            "Recommendations are based on soil chemistry only. ",
-            tags$strong("Prioritize native plants"), " and verify species are not invasive in your area. ",
-            "Also check climate compatibility and other site factors before planting. ",
-             "See the FAQ for details on limitations."
-           )
-         )
-       )
-     )
-   }
-
-   if (!is.null(results$error)) {
-     return(
-       div(class = "alert alert-warning",
-         icon("exclamation-triangle"), " ", results$error
-       )
-     )
-   }
-
-   user_profile <- results$user_profile
-   matches <- results$matches
-
-   tagList(
-     # User's soil profile summary
-     card(
-       class = "mb-3",
-       card_header(class = "py-2 bg-success text-white",
-         icon("flask"), " Your Soil Profile"
-       ),
-       card_body(
-         class = "py-2",
-         div(class = "d-flex flex-wrap gap-3",
-           if (!is.na(user_profile$ph)) span("pH: ", tags$strong(user_profile$ph)),
-           if (!is.na(user_profile$om)) span("OM: ", tags$strong(paste0(user_profile$om, "%"))),
-           if (nzchar(user_profile$texture %||% "")) span("Texture: ", tags$strong(user_profile$texture)),
-           if (!is.na(user_profile$nitrate)) span("N: ", tags$strong(paste0(user_profile$nitrate, " ppm"))),
-           if (!is.na(user_profile$phosphorus)) span("P: ", tags$strong(paste0(user_profile$phosphorus, " ppm"))),
-           if (!is.na(user_profile$potassium)) span("K: ", tags$strong(paste0(user_profile$potassium, " ppm")))
-         )
-       )
-     ),
-
-     # Results header
-     div(class = "d-flex justify-content-between align-items-center mb-3",
-       h5(class = "mb-0", icon("leaf"), " Recommended Species"),
-       span(class = "text-muted small", length(matches), " matches found")
-     ),
-
-     # Results list
-     if (length(matches) == 0) {
-       div(class = "alert alert-info",
-         "No species found matching your soil profile. Try adjusting your values or entering fewer parameters."
-       )
-     } else {
-       div(class = "recommendations-list",
-         lapply(matches, function(m) {
-           score <- round(m$score)
-           profile <- m$profile
-
-           # Score color
-           score_color <- if (score >= 80) "#27ae60" else if (score >= 60) "#7A9A86" else if (score >= 40) "#f39c12" else "#95a5a6"
-
-           # Success rate color
-           success_color <- if (!is.null(profile$success_rate)) {
-             if (profile$success_rate >= 70) "text-success" else if (profile$success_rate >= 50) "text-warning" else "text-danger"
-           } else "text-muted"
-
-           card(
-             class = "mb-2",
-             card_body(
-               class = "py-3 px-3",
-               div(class = "d-flex justify-content-between align-items-start",
-                 div(style = "flex: 1;",
-                   div(class = "d-flex align-items-center gap-2 mb-1",
-                     tags$strong(class = "fs-5", m$species),
-                     tags$span(class = "badge", style = paste0("background-color:", score_color),
-                               paste0(score, "% match"))
-                   ),
-                   div(class = "small text-muted mb-2",
-                     paste(profile$n_samples, "samples"),
-                     if (!is.null(profile$success_rate)) {
-                       span(class = success_color, paste0(" · ", round(profile$success_rate), "% success rate"))
-                     }
-                   ),
-                   # Optimal conditions
-                   if (!is.null(profile$best_sun) || !is.null(profile$best_hydrology)) {
-                     div(class = "small",
-                       tags$strong("Best conditions: "),
-                       if (!is.null(profile$best_sun)) span(class = "badge bg-light text-dark me-1", profile$best_sun),
-                       if (!is.null(profile$best_hydrology)) span(class = "badge bg-light text-dark", profile$best_hydrology)
-                     )
-                   }
-                 ),
-                 # Soil comparison
-                 div(class = "text-end small text-muted", style = "min-width: 120px;",
-                   if (!is.na(profile$ph_mean)) div(sprintf("pH: %.1f (%.1f–%.1f)", profile$ph_mean, profile$ph_min, profile$ph_max)),
-                   if (!is.na(profile$om_mean)) div(sprintf("OM: %.1f%%", profile$om_mean)),
-                   if (!is.null(profile$texture_class)) div(profile$texture_class)
-                 )
-               )
-             )
-           )
-         })
-       )
-     },
-
-     # Footer note
-     div(class = "mt-3 small text-muted",
-       icon("info-circle"), " Recommendations based on user-submitted data from successful plantings. ",
-       "Match scores consider pH (35%), organic matter (20%), texture (15%), and nutrients (30%). ",
-       "Only species with 10+ samples are shown."
-     ),
-
-     # Important caveats
-     div(class = "mt-3 p-3 border rounded",
-       div(class = "small",
-         tags$strong(icon("exclamation-triangle"), " Important Limitations"),
-         p(class = "text-muted mt-2 mb-2",
-           "These recommendations are based on soil chemistry only. Before planting, also consider:"),
-         tags$ul(class = "text-muted mb-2",
-           tags$li(tags$strong("Climate compatibility"), " \u2014 Check hardiness zones for your location"),
-           tags$li(tags$strong("Site conditions"), " \u2014 Drainage, light exposure, and microclimate matter beyond soil chemistry"),
-           tags$li(tags$strong("Water needs"), " \u2014 Rainfall patterns and irrigation availability")
-         ),
-        # Native species callout
-        div(class = "mt-2 p-2 bg-light rounded border-start border-success border-3",
-          tags$strong(icon("leaf", class = "text-success"), " Prioritize Native Plants"),
-          p(class = "text-muted mb-1 mt-1",
-            "Native plants support local ecosystems, require less maintenance, and are adapted to your climate. ",
-            "Before planting any species, verify it is not invasive in your region."),
-          tags$a(href = "https://www.invasivespeciesinfo.gov/", target = "_blank", class = "small",
-                 "Check invasive species lists ", icon("external-link-alt"))
-        ),
-         p(class = "text-muted mb-0",
-           "Use these recommendations as a starting point for research, not as planting guarantees. ",
-           "See the ", actionLink("find_plants_faq_link", "FAQ"), " for more details on how matching works."
-         )
-       )
-     )
-   )
- })
-
- # Link from Find Plants to FAQ
- observeEvent(input$find_plants_faq_link, {
-   nav_select("main_nav", "FAQ")
  })
 
  # --- Summary ---
@@ -2275,14 +1757,14 @@ output$find_pdf_extract_status <- renderUI({
        card(
          class = "text-center",
          card_body(
-           tags$h2(class = "mb-0", if (!is.na(success_rate)) paste0(success_rate, "%") else "—"),
+           tags$h2(class = "mb-0", if (!is.na(success_rate)) paste0(success_rate, "%") else "â€”"),
            tags$small(class = "text-muted", "Success Rate")
          )
        ),
        card(
          class = "text-center",
          card_body(
-           tags$h2(class = "mb-0", if (n_cultivars > 0) n_cultivars else "—"),
+           tags$h2(class = "mb-0", if (n_cultivars > 0) n_cultivars else "â€”"),
            tags$small(class = "text-muted", "Cultivars")
          )
        ),
@@ -2322,13 +1804,13 @@ output$find_pdf_extract_status <- renderUI({
    stats <- list()
 
    if (sum(!is.na(dat$ph)) > 0) {
-     stats[["pH"]] <- sprintf("%.1f (%.1f – %.1f)",
+     stats[["pH"]] <- sprintf("%.1f (%.1f â€“ %.1f)",
                                mean(dat$ph, na.rm = TRUE),
                                min(dat$ph, na.rm = TRUE),
                                max(dat$ph, na.rm = TRUE))
    }
    if (sum(!is.na(dat$organic_matter)) > 0) {
-     stats[["Organic Matter"]] <- sprintf("%.1f%% (%.1f – %.1f)",
+     stats[["Organic Matter"]] <- sprintf("%.1f%% (%.1f â€“ %.1f)",
                                            mean(dat$organic_matter, na.rm = TRUE),
                                            min(dat$organic_matter, na.rm = TRUE),
                                            max(dat$organic_matter, na.rm = TRUE))
@@ -2347,7 +1829,7 @@ output$find_pdf_extract_status <- renderUI({
      stats[["Potassium (ppm)"]] <- sprintf("%.0f avg", mean(dat$potassium_ppm, na.rm = TRUE))
    }
 
-   if (length(stats) == 0) return(data.frame(Parameter = "No data", Value = "—"))
+   if (length(stats) == 0) return(data.frame(Parameter = "No data", Value = "â€”"))
 
    data.frame(Parameter = names(stats), Value = unlist(stats), stringsAsFactors = FALSE)
  }, striped = TRUE, hover = TRUE, width = "100%", colnames = FALSE)
@@ -2386,7 +1868,7 @@ output$find_pdf_extract_status <- renderUI({
      div(class = "mt-3",
        tags$strong("Sun Exposure:"),
        tags$div(class = "mt-1",
-         paste(sapply(names(sc), function(s) paste0(s, " (", sc[s], ")")), collapse = " · ")
+         paste(sapply(names(sc), function(s) paste0(s, " (", sc[s], ")")), collapse = " Â· ")
        )
      )
    } else NULL
@@ -2399,7 +1881,7 @@ output$find_pdf_extract_status <- renderUI({
      div(class = "mt-3",
        tags$strong("Site Hydrology:"),
        tags$div(class = "mt-1",
-         paste(sapply(names(hc), function(h) paste0(h, " (", hc[h], ")")), collapse = " · ")
+         paste(sapply(names(hc), function(h) paste0(h, " (", hc[h], ")")), collapse = " Â· ")
        )
      )
    } else NULL
@@ -2410,7 +1892,7 @@ output$find_pdf_extract_status <- renderUI({
      div(class = "mt-3",
        tags$strong("Cultivars:"),
        tags$div(class = "mt-1",
-         paste(sapply(names(cc), function(c) paste0("'", c, "' (", cc[c], ")")), collapse = " · ")
+         paste(sapply(names(cc), function(c) paste0("'", c, "' (", cc[c], ")")), collapse = " Â· ")
        )
      )
    } else NULL
@@ -2423,9 +1905,9 @@ output$find_pdf_extract_status <- renderUI({
        shown <- head(ec, 3)
        others <- sum(tail(ec, -3))
        label <- paste(c(sapply(names(shown), function(e) paste0(e, " (", shown[e], ")")),
-                        paste0("+ ", length(ec) - 3, " more")), collapse = " · ")
+                        paste0("+ ", length(ec) - 3, " more")), collapse = " Â· ")
      } else {
-       label <- paste(sapply(names(ec), function(e) paste0(e, " (", ec[e], ")")), collapse = " · ")
+       label <- paste(sapply(names(ec), function(e) paste0(e, " (", ec[e], ")")), collapse = " Â· ")
      }
      div(class = "mt-3",
        tags$strong(icon("map-location-dot"), " Ecoregions:"),
@@ -2958,7 +2440,7 @@ output$find_pdf_extract_status <- renderUI({
            # Condition matrix heatmap
            if (has_sun && has_hydro) {
              card(
-               card_header(icon("th"), " Success Matrix: Sun × Hydrology"),
+               card_header(icon("th"), " Success Matrix: Sun Ã— Hydrology"),
                card_body(
                  plotlyOutput("success_matrix_plot", height = "320px"),
                  tags$p(class = "text-muted small mt-2",
@@ -3071,8 +2553,8 @@ output$find_pdf_extract_status <- renderUI({
      success_ph <- dat$ph[dat$success & !is.na(dat$ph)]
      fail_ph <- dat$ph[!dat$success & !is.na(dat$ph)]
      if (length(success_ph) >= 2 && length(fail_ph) >= 2) {
-       success_ph_range <- sprintf("%.1f–%.1f", min(success_ph), max(success_ph))
-       fail_ph_range <- sprintf("%.1f–%.1f", min(fail_ph), max(fail_ph))
+       success_ph_range <- sprintf("%.1fâ€“%.1f", min(success_ph), max(success_ph))
+       fail_ph_range <- sprintf("%.1fâ€“%.1f", min(fail_ph), max(fail_ph))
        insights$ph <- div(class = "mb-2",
          icon("flask", class = "text-secondary me-2"),
          tags$strong("pH patterns: "),
@@ -3233,14 +2715,14 @@ output$find_pdf_extract_status <- renderUI({
    create_outcome_boxplot(dat, param, info$label, info$unit)
  })
 
- # Success Matrix: Sun × Hydrology heatmap
+ # Success Matrix: Sun Ã— Hydrology heatmap
  output$success_matrix_plot <- renderPlotly({
    req(input$analysis_species, input$analysis_species != "")
    dat <- filtered_species_data()
    dat <- dat[!is.na(dat$outcome) & !is.na(dat$sun_exposure) & !is.na(dat$site_hydrology), ]
    if (nrow(dat) < 3) return(NULL)
 
-   # Calculate success rate for each sun × hydrology combination
+   # Calculate success rate for each sun Ã— hydrology combination
    dat$success <- dat$outcome %in% c("Thriving", "Established")
 
    # Create all possible combinations
@@ -3370,10 +2852,10 @@ output$find_pdf_extract_status <- renderUI({
 
    # Temperature - check for both formats
    if ("temp_min_f" %in% names(tr) && !is.na(tr$temp_min_f[1])) {
-     add_row("Minimum Temperature", sprintf("%.0f°F", tr$temp_min_f[1]))
+     add_row("Minimum Temperature", sprintf("%.0fÂ°F", tr$temp_min_f[1]))
    } else if ("min_temp_c" %in% names(tr) && !is.na(tr$min_temp_c[1])) {
      temp_f <- as.integer(round(tr$min_temp_c[1] * 9 / 5 + 32))
-     add_row("Minimum Temperature", sprintf("%d°F", temp_f))
+     add_row("Minimum Temperature", sprintf("%dÂ°F", temp_f))
    }
 
    result
