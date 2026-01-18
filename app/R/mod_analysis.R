@@ -361,6 +361,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           span(class = "fw-bold", style = "color: #7A9A86;", paste(n_samples, "samples")),
           if (!is.na(success_rate)) {
             span(class = if (success_rate >= 70) "text-success" else if (success_rate >= 50) "text-warning" else "text-danger",
+                 title = "Success rate: % of samples with Thriving or Established outcomes",
+                 style = "cursor: help; border-bottom: 1px dotted currentColor;",
                  paste0(success_rate, "% success"))
           }
         ),
@@ -579,13 +581,18 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                     tags$strong(sp),
                     div(class = "small text-muted",
                       paste(profile$n_samples, "samples"),
-                      if (!is.null(profile$success_rate)) paste0(" - ", round(profile$success_rate), "% success"),
+                      if (!is.null(profile$success_rate)) {
+                        span(title = "Success rate: % of samples with Thriving or Established outcomes",
+                             style = "cursor: help; border-bottom: 1px dotted currentColor;",
+                             paste0(" - ", round(profile$success_rate), "% success"))
+                      },
                       if (!is.null(profile$best_sun)) paste0(" - ", profile$best_sun),
                       if (!is.null(profile$best_hydrology)) paste0(" - ", profile$best_hydrology)
                     )
                   ),
                   div(class = "text-end",
                     tags$span(class = "badge fs-6", style = paste0("background-color:", score_color),
+                              title = "Soil similarity: weighted comparison of pH, OM, texture, and nutrients",
                               paste0(score, "% match")),
                     div(class = "small text-muted mt-1",
                       if (!is.na(profile$ph_mean)) sprintf("pH %.1f", profile$ph_mean) else "",
@@ -657,7 +664,10 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
             class = "text-center",
             card_body(
               tags$h2(class = "mb-0", if (!is.na(success_rate)) paste0(success_rate, "%") else "-"),
-              tags$small(class = "text-muted", "Success Rate")
+              tags$small(class = "text-muted",
+                         title = "% of samples rated Thriving or Established",
+                         style = "cursor: help; border-bottom: 1px dotted currentColor;",
+                         "Success Rate")
             )
           ),
           card(
@@ -1462,7 +1472,9 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         insights <- c(insights, list(div(
           class = "mb-2",
           icon("chart-pie", class = "text-success me-2"),
-          sprintf("Overall success rate: %d%%", success_rate),
+          span(title = "Success rate = (Thriving + Established) / Total samples with outcomes",
+               style = "cursor: help; border-bottom: 1px dotted currentColor;",
+               sprintf("Overall success rate: %d%%", success_rate)),
           span(class = "text-muted small", sprintf(" (%d of %d)", n_success, length(outcomes)))
         )))
       }
@@ -1575,7 +1587,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         param
       )
 
-      p <- ggplot(dat, aes(x = outcome, y = .data[[param]], fill = outcome)) +
+      p <- ggplot(dat, aes_string(x = "outcome", y = param, fill = "outcome")) +
         geom_boxplot(alpha = 0.8) +
         scale_fill_manual(values = outcome_colors) +
         labs(x = NULL, y = param_label) +
