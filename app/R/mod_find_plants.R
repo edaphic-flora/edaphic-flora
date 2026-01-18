@@ -2,6 +2,26 @@
 # Plant recommendation engine based on soil profile matching
 
 # ---------------------------
+# Constants
+# ---------------------------
+
+# Maximum number of species to recommend
+MAX_RECOMMENDATIONS <- 15
+
+# pH tolerance for range matching (± this value outside species range still counts)
+PH_RANGE_TOLERANCE <- 0.5
+
+# Score multipliers for calculating match scores
+PH_SCORE_MULTIPLIER <- 20     # Higher = more sensitive to pH differences
+OM_SCORE_MULTIPLIER <- 8      # Higher = more sensitive to OM differences
+
+# Penalty score for pH outside species range
+PH_OUT_OF_RANGE_PENALTY <- 30
+
+# Minimum samples required for species to appear in recommendations
+MIN_SAMPLES_FOR_RECOMMENDATIONS <- 10
+
+# ---------------------------
 # Helper Functions
 # ---------------------------
 
@@ -18,13 +38,13 @@ calc_user_match <- function(user_profile, species_profile) {
   # pH match (weight: 35)
   if (!is.na(user_profile$ph) && !is.na(species_profile$ph_mean)) {
     # Check if user pH is within species range (or close to mean)
-    ph_in_range <- user_profile$ph >= (species_profile$ph_min - 0.5) &&
-                   user_profile$ph <= (species_profile$ph_max + 0.5)
+    ph_in_range <- user_profile$ph >= (species_profile$ph_min - PH_RANGE_TOLERANCE) &&
+                   user_profile$ph <= (species_profile$ph_max + PH_RANGE_TOLERANCE)
     if (ph_in_range) {
       ph_diff <- abs(user_profile$ph - species_profile$ph_mean)
-      ph_score <- max(0, 100 - ph_diff * 20)
+      ph_score <- max(0, 100 - ph_diff * PH_SCORE_MULTIPLIER)
     } else {
-      ph_score <- 30  # Penalty for being outside range
+      ph_score <- PH_OUT_OF_RANGE_PENALTY  # Penalty for being outside range
     }
     scores <- c(scores, ph_score)
     weights <- c(weights, 35)
@@ -33,7 +53,7 @@ calc_user_match <- function(user_profile, species_profile) {
   # OM match (weight: 20)
   if (!is.na(user_profile$om) && !is.na(species_profile$om_mean)) {
     om_diff <- abs(user_profile$om - species_profile$om_mean)
-    om_score <- max(0, 100 - om_diff * 8)
+    om_score <- max(0, 100 - om_diff * OM_SCORE_MULTIPLIER)
     scores <- c(scores, om_score)
     weights <- c(weights, 20)
   }
@@ -155,8 +175,8 @@ findPlantsUI <- function(id) {
         )
       ),
 
-      # Main content area
-      uiOutput(ns("results"))
+      # Main content area (with loading spinner during calculations)
+      withSpinner(uiOutput(ns("results")), type = 6, color = "#7A9A86")
     )
   )
 }
@@ -172,27 +192,32 @@ findPlantsServer <- function(id, pool, current_user, is_admin, data_changed, pdf
     # Reactive to store results
     results_data <- reactiveVal(NULL)
 
-    # Get all species profiles with 10+ samples
+    # Get all species profiles with enough samples (MIN_SAMPLES_FOR_RECOMMENDATIONS+)
     get_all_species_profiles <- reactive({
       data_changed()
 
       species_counts <- tryCatch({
-        dbGetQuery(pool, "
+        dbGetQuery(pool, sprintf("
           SELECT species, COUNT(*) as n
           FROM soil_samples
           GROUP BY species
-          HAVING COUNT(*) >= 10
+          HAVING COUNT(*) >= %d
           ORDER BY COUNT(*) DESC
-        ")
+        ", MIN_SAMPLES_FOR_RECOMMENDATIONS))
       }, error = function(e) data.frame())
 
       if (nrow(species_counts) == 0) return(list())
 
       profiles <- list()
       for (sp in species_counts$species) {
-        dat <- db_get_species_data(sp)
-        profiles[[sp]] <- calc_species_profile(dat)
-        profiles[[sp]]$species <- sp
+        tryCatch({
+          dat <- db_get_species_data(sp)
+          profiles[[sp]] <- calc_species_profile(dat)
+          profiles[[sp]]$species <- sp
+        }, error = function(e) {
+          message("Profile calculation error for '", sp, "': ", conditionMessage(e))
+          # Skip this species, don't add to profiles
+        })
       }
 
       profiles
@@ -263,9 +288,26 @@ findPlantsServer <- function(id, pool, current_user, is_admin, data_changed, pdf
       }
     })
 
-    # Status output for PDF extraction
+    # Status output for PDF extraction (shows remaining extractions)
     output$pdf_extract_status <- renderUI({
-      NULL  # Placeholder for future status messages
+      u <- current_user()
+      if (is.null(u)) {
+        return(div(class = "text-muted small", "Sign in to use PDF extraction"))
+      }
+
+      # Admin has unlimited extractions
+      if (is_admin()) {
+        return(div(class = "text-success small", icon("infinity"), " Unlimited extractions (admin)"))
+      }
+
+      remaining <- db_get_remaining_extractions(u$user_uid, pdf_extract_limit)
+      if (remaining > 0) {
+        div(class = "text-muted small",
+            icon("clock"), sprintf(" %d extractions remaining today", remaining))
+      } else {
+        div(class = "text-warning small",
+            icon("exclamation-triangle"), " Daily limit reached. Try again tomorrow.")
+      }
     })
 
     # Handle Find Plants button click
@@ -292,7 +334,7 @@ findPlantsServer <- function(id, pool, current_user, is_admin, data_changed, pdf
       all_profiles <- get_all_species_profiles()
 
       if (length(all_profiles) == 0) {
-        results_data(list(error = "No species have enough data (10+ samples) for recommendations yet."))
+        results_data(list(error = sprintf("No species have enough data (%d+ samples) for recommendations yet.", MIN_SAMPLES_FOR_RECOMMENDATIONS)))
         return()
       }
 
@@ -310,8 +352,8 @@ findPlantsServer <- function(id, pool, current_user, is_admin, data_changed, pdf
       # Sort by score descending
       matches <- matches[order(sapply(matches, function(x) -x$score))]
 
-      # Take top 15
-      matches <- head(matches, 15)
+      # Take top N recommendations
+      matches <- head(matches, MAX_RECOMMENDATIONS)
 
       results_data(list(
         user_profile = user_profile,
@@ -455,7 +497,7 @@ findPlantsServer <- function(id, pool, current_user, is_admin, data_changed, pdf
         div(class = "mt-3 small text-muted",
           icon("info-circle"), " Recommendations based on user-submitted data from successful plantings. ",
           "Match scores consider pH (35%), organic matter (20%), texture (15%), and nutrients (30%). ",
-          "Only species with 10+ samples are shown."
+          sprintf("Only species with %d+ samples are shown.", MIN_SAMPLES_FOR_RECOMMENDATIONS)
         ),
 
         # Important caveats

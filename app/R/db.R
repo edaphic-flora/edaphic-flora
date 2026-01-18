@@ -4,8 +4,11 @@ library(DBI)
 library(RPostgres)
 library(pool)
 
-# Null-coalescing operator
-`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+# Note: %||% operator defined in R/usda.R (with robust NA/empty handling)
+# If usda.R is not loaded, use this simple fallback:
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+}
 
 # ---------------------------
 # Database Connection
