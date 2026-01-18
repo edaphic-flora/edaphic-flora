@@ -87,6 +87,18 @@ helpUI <- function(id) {
                       ))
             ),
 
+            div(class = "mt-3 p-3 bg-light rounded border-start border-primary border-3",
+              tags$strong(icon("lightbulb"), " Note on Annuals and Biennials"),
+              p(class = "text-muted mb-2 mt-2",
+                "For annuals and biennials that naturally complete their lifecycle (flowering, setting seed, then dying), ",
+                "do ", tags$strong("not"), " record these as 'Failed/Died'\u2014this is normal, expected behavior."),
+              p(class = "text-muted mb-0",
+                "Instead, assess the outcome based on how well the plant performed ", tags$em("during"), " its lifecycle: ",
+                "Did it thrive, establish normally, or struggle before completing its cycle? ",
+                "If you have historical data on how the species fared in your landscape, use that to guide your rating. ",
+                "Alternatively, you may choose not to submit data for completed-lifecycle plants if you're unsure how to rate them.")
+            ),
+
             h4(class = "mt-4", "Analysis Charts Explained"),
             tags$dl(class = "row",
               tags$dt(class = "col-sm-3", "pH Distribution"),
@@ -202,6 +214,15 @@ helpUI <- function(id) {
               tags$strong("Failed/Died"), " \u2014 Plant died or was removed due to poor performance. ",
               "Recording unsuccessful plantings is just as valuable as successes!"),
 
+            h5("How should I record annuals or biennials that completed their lifecycle?"),
+            p(class = "text-muted mb-4",
+              "For annuals and biennials that naturally die after flowering and setting seed, rate them based on how well they performed ",
+              tags$em("during"), " their lifecycle\u2014not based on the fact that they died afterward. A sunflower that grew vigorously, ",
+              "bloomed beautifully, and set abundant seed should be rated 'Thriving' or 'Established', not 'Failed/Died'. ",
+              "Reserve 'Failed/Died' for plants that died prematurely or never established properly. ",
+              "If you're unsure how to rate a completed-lifecycle plant, consider using historical data on how that species typically ",
+              "performs in your landscape, or simply choose not to submit data for that particular planting."),
+
             h5("What does the Performance tab show?"),
             p(class = "text-muted mb-4",
               "The Performance tab analyzes plant success patterns. It shows outcome distributions, identifies which sun exposure ",
@@ -251,11 +272,20 @@ helpUI <- function(id) {
                 " or your state's invasive species list.")
             ),
 
+            h5("Found a bug or have a suggestion?"),
+            p(class = "text-muted mb-4",
+              "We welcome feedback! If you encounter any issues, have feature requests, or want to contribute, please ",
+              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues", target = "_blank", "open an issue on GitHub"),
+              ". You can also reach us at ",
+              tags$a(href = "mailto:todd@edaphicgardenconsulting.com", "todd@edaphicgardenconsulting.com"), "."),
+
             hr(class = "my-4"),
             div(class = "text-center text-muted small",
               tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/blob/main/PRIVACY.md", target = "_blank", "Privacy Policy"),
               span(class = "mx-2", "|"),
               tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/blob/main/TERMS.md", target = "_blank", "Terms of Service"),
+              span(class = "mx-2", "|"),
+              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues", target = "_blank", "Report Issue"),
               span(class = "mx-2", "|"),
               tags$a(href = "https://github.com/todd-testerman/EdaphicFlora", target = "_blank", "GitHub"),
               span(class = "mx-2", "|"),

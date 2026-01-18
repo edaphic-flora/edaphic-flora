@@ -417,12 +417,16 @@ findPlantsServer <- function(id, pool, current_user, is_admin, data_changed, pdf
                       div(class = "d-flex align-items-center gap-2 mb-1",
                         tags$strong(class = "fs-5", m$species),
                         tags$span(class = "badge", style = paste0("background-color:", score_color),
+                                  title = "Soil match: how closely this species' optimal conditions match your soil profile",
                                   paste0(score, "% match"))
                       ),
                       div(class = "small text-muted mb-2",
                         paste(profile$n_samples, "samples"),
                         if (!is.null(profile$success_rate)) {
-                          span(class = success_color, paste0(" \u00b7 ", round(profile$success_rate), "% success rate"))
+                          span(class = success_color,
+                               title = "Success rate: % of samples with Thriving or Established outcomes",
+                               style = "cursor: help; border-bottom: 1px dotted currentColor;",
+                               paste0(" \u00b7 ", round(profile$success_rate), "% success rate"))
                         }
                       ),
                       # Optimal conditions

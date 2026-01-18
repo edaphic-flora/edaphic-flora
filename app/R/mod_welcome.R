@@ -85,7 +85,16 @@ welcomeUI <- function(id) {
                              icon("info-circle"), " ",
                              tags$strong("Data Usage: "),
                              "All submitted data is shared under CC BY-NC 4.0. ",
-                             "By contributing, you help build a free resource for the gardening and research community."))
+                             "By contributing, you help build a free resource for the gardening and research community.")),
+
+              div(class = "mt-3 text-center",
+                  tags$small(class = "text-muted",
+                             "Found a bug or have feedback? ",
+                             tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues",
+                                    target = "_blank", "Report an issue"),
+                             " or email ",
+                             tags$a(href = "mailto:todd@edaphicgardenconsulting.com",
+                                    "todd@edaphicgardenconsulting.com")))
           )
         )
       ),
