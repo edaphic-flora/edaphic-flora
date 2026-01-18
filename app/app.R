@@ -38,6 +38,7 @@ source("R/usda.R")
 source("R/pdf_extract.R")
 source("R/mod_help.R")
 source("R/mod_welcome.R")
+source("R/mod_admin.R")
 
 # --- Initialize
 db_migrate()
@@ -602,11 +603,7 @@ base_ui <- page_navbar(
  ),
 
  # ========== ADMIN TAB ==========
- nav_panel(
-   title = "Admin",
-   icon = icon("shield-halved"),
-   uiOutput("admin_panel_ui")
- ),
+ adminUI("admin"),
 
  # ========== HELP MENU ==========
  helpUI("help"),
@@ -792,6 +789,7 @@ server_inner <- function(input, output, session) {
  # --- Module servers ---
  helpServer("help")
  welcomeServer("welcome", pool, data_changed)
+ adminServer("admin", pool, is_admin, current_user, data_changed)
 
  # --- Species dropdown population ---
  observe({
@@ -3659,93 +3657,6 @@ output$find_pdf_extract_status <- renderUI({
    }
  })
 
- # ---------------------------
- # Admin Panel
- # ---------------------------
-
- output$admin_panel_ui <- renderUI({
-   if (!is_admin()) {
-     return(
-       div(class = "text-center py-5",
-           icon("lock", class = "fa-3x text-muted mb-3"),
-           h4("Admin Access Required"),
-           p(class = "text-muted", "This section is only available to administrators."))
-     )
-   }
-
-   # Admin panel content
-   tagList(
-     layout_columns(
-       col_widths = c(12),
-
-       card(
-         card_header(
-           class = "d-flex justify-content-between align-items-center",
-           span(icon("shield-halved"), " Admin Data Management"),
-           span(class = "badge bg-danger", "Admin Only")
-         ),
-         card_body(
-           p(class = "text-muted",
-             "As an admin, you can edit or delete any entry. Use the edit/delete buttons ",
-             "in the Actions column, or use the buttons below for bulk operations."),
-           hr(),
-           h5("All Database Entries"),
-           DTOutput("admin_all_entries"),
-           hr(),
-           h5("Bulk Operations"),
-           layout_column_wrap(
-             width = 1/3,
-             downloadButton("admin_export", "Export All Data", class = "btn-outline-primary"),
-             actionButton("admin_refresh", "Refresh Table", class = "btn-outline-secondary", icon = icon("refresh"))
-           )
-         )
-       )
-     )
-   )
- })
-
- # Admin: all entries table with full edit/delete capabilities
- output$admin_all_entries <- renderDT({
-   input$admin_refresh  # React to refresh button
-   data_changed()
-
-   if (!is_admin()) return(NULL)
-
-   dat <- db_get_all_samples()
-   if (nrow(dat) == 0) return(NULL)
-
-   display <- dat %>%
-     select(id, species, created_by, ph, organic_matter, texture_class, date, created_at) %>%
-     mutate(date = as.character(date),
-            created_at = as.character(created_at))
-
-   # Add action buttons for all entries
-   display$actions <- sapply(display$id, function(entry_id) {
-     sprintf(
-       "<button class=\"btn btn-sm btn-outline-primary me-1\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
-       entry_id, entry_id
-     )
-   })
-
-   datatable(display,
-             options = list(pageLength = 25, scrollX = TRUE, order = list(list(0, 'desc'))),
-             rownames = FALSE,
-             escape = FALSE,
-             colnames = c("ID", "Species", "Created By", "pH", "OM %", "Texture", "Date", "Created At", "Actions"))
- })
-
- # Admin export
- output$admin_export <- downloadHandler(
-   filename = function() paste0("admin_export_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv"),
-   content = function(file) {
-     if (is_admin()) {
-       data <- db_get_all_samples()
-       write.csv(data, file, row.names = FALSE)
-       u <- session$userData$user()
-       db_audit_log("admin_export", "soil_samples", NULL, u$user_uid, sprintf("Admin export: %d records", nrow(data)))
-     }
-   }
- )
 }
 
 server <- polished::secure_server(server_inner)
