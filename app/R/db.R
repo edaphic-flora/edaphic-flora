@@ -20,7 +20,7 @@ pool <- dbPool(
   password = Sys.getenv("POSTGRES_PASSWORD"),
   sslmode  = Sys.getenv("POSTGRES_SSLMODE", unset = "require"),
   minSize  = 1,
-  maxSize  = 25
+  maxSize  = as.integer(Sys.getenv("DB_POOL_SIZE", "5"))  # Lower default for memory-constrained envs
 )
 
 # ---------------------------
