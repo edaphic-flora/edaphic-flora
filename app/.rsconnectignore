@@ -1,7 +1,32 @@
 # Exclude large cache files from deployment
-# These are already loaded into the database
-data/cache/
+# These are already loaded into the database via ETL scripts
+data/cache/*
+data/cache/**/*
+data/cache/usda_char/
+data/cache/usda_char/*
+*.json
+
+# Large raw data files (for ETL only)
+data/raw/
+data/raw/*
+data/raw/**/*
 
 # Large ecoregion files (grid lookup is small enough to include)
 data/ecoregions_simplified.rds
+data/ecoregion_grid.csv
 # data/ecoregion_grid.rds  # This one IS included - small enough for prod
+
+# Use RDS version (3MB) instead of CSV (22MB)
+species_accepted.csv
+
+# ETL and development scripts (not needed in production)
+R/etl/
+R/etl/*
+scripts/
+scripts/*
+generate_species_db.R
+generate_state_grid.R
+fetch_usda_data.R
+
+# Documentation
+docs/
