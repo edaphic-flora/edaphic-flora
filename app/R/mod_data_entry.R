@@ -366,9 +366,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       card(
         class = "mb-3",
         card_header(
-          class = "py-2",
-          icon("list"), " Species Details",
-          tags$small(class = "text-muted ms-2", "(per species)")
+          class = "py-2 d-flex justify-content-between align-items-center",
+          span(icon("list"), " Species Details",
+               tags$small(class = "text-muted ms-2", "(per species)")),
+          tags$small(class = "text-muted",
+                     title = "See Help > Field Guide for field definitions",
+                     icon("question-circle"), " Field definitions in Help")
         ),
         card_body(
           class = "p-2",
@@ -384,26 +387,38 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                 width = 1/2,
                 textInput(ns(paste0("cultivar_", sp_id)), "Cultivar",
                           placeholder = "e.g., 'Forest Pansy'"),
-                selectInput(ns(paste0("outcome_", sp_id)), "Outcome",
-                            choices = c("Select..." = "", "Thriving" = "Thriving",
-                                        "Established" = "Established",
-                                        "Struggling" = "Struggling",
-                                        "Failed/Died" = "Failed/Died"),
-                            selected = "")
+                div(
+                  selectInput(ns(paste0("outcome_", sp_id)), "Outcome",
+                              choices = c("Select..." = "", "Thriving" = "Thriving",
+                                          "Established" = "Established",
+                                          "Struggling" = "Struggling",
+                                          "Failed/Died" = "Failed/Died"),
+                              selected = ""),
+                  tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                             "How is this plant performing?")
+                )
               ),
               layout_column_wrap(
                 width = 1/2,
-                selectInput(ns(paste0("sun_", sp_id)), "Sun Exposure",
-                            choices = c("Select..." = "", "Full Sun" = "Full Sun",
-                                        "Part Sun" = "Part Sun",
-                                        "Part Shade" = "Part Shade",
-                                        "Full Shade" = "Full Shade"),
-                            selected = ""),
-                selectInput(ns(paste0("hydrology_", sp_id)), "Site Hydrology",
-                            choices = c("Select..." = "", "Dry/Xeric" = "Dry",
-                                        "Mesic" = "Mesic",
-                                        "Wet/Hydric" = "Wet"),
-                            selected = "")
+                div(
+                  selectInput(ns(paste0("sun_", sp_id)), "Sun Exposure",
+                              choices = c("Select..." = "", "Full Sun" = "Full Sun",
+                                          "Part Sun" = "Part Sun",
+                                          "Part Shade" = "Part Shade",
+                                          "Full Shade" = "Full Shade"),
+                              selected = ""),
+                  tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                             "Light at planting site")
+                ),
+                div(
+                  selectInput(ns(paste0("hydrology_", sp_id)), "Site Hydrology",
+                              choices = c("Select..." = "", "Dry/Xeric" = "Dry",
+                                          "Mesic" = "Mesic",
+                                          "Wet/Hydric" = "Wet"),
+                              selected = ""),
+                  tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                             "Soil moisture conditions")
+                )
               ),
               textInput(ns(paste0("inat_", sp_id)), "iNaturalist URL",
                         placeholder = "https://www.inaturalist.org/observations/...")
@@ -430,14 +445,13 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       user_id <- if (!is.null(u)) u$user_uid else ""
       admin_user <- is_admin()
 
-      dat <- db_get_all_samples()
+      dat <- db_get_all_samples(limit = 50)  # Limit at SQL level for performance
       if (nrow(dat) == 0) return(NULL)
 
       display <- dat %>%
         select(id, species, outcome, ph, organic_matter, texture_class, date, created_by) %>%
         mutate(date = as.character(date),
-               outcome = ifelse(is.na(outcome), "", outcome)) %>%
-        head(50)
+               outcome = ifelse(is.na(outcome), "", outcome))
 
       # Add action buttons for user's own entries (or all entries for admin)
       # Note: Using global (non-namespaced) input IDs for edit/delete
