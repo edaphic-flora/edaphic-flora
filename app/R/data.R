@@ -5,6 +5,16 @@ library(ecoregions)
 library(dplyr)
 
 # ---------------------------
+# Constants
+# ---------------------------
+
+# Grid resolution for ecoregion/state lookups (degrees, ~6-7 miles at US latitudes)
+GRID_RESOLUTION <- 0.1
+
+# Tolerance for grid cell matching (small buffer for floating point comparison)
+GRID_MATCH_TOLERANCE <- 0.001
+
+# ---------------------------
 # Species Database
 # ---------------------------
 
@@ -37,7 +47,7 @@ load_ecoregion_grid <- function() {
 
 # Grid-based ecoregion lookup (for production)
 # Rounds coordinates to nearest grid cell and returns matching ecoregion
-get_ecoregion_from_grid <- function(lat, lon, grid, resolution = 0.1) {
+get_ecoregion_from_grid <- function(lat, lon, grid, resolution = GRID_RESOLUTION) {
   if (is.null(grid) || is.na(lat) || is.na(lon)) {
     return(list(name = NA_character_, code = NA_character_))
   }
@@ -47,8 +57,8 @@ get_ecoregion_from_grid <- function(lat, lon, grid, resolution = 0.1) {
   grid_lon <- round(lon / resolution) * resolution
 
   # Find matching row
-  match_idx <- which(abs(grid$lat - grid_lat) < 0.001 &
-                     abs(grid$lon - grid_lon) < 0.001)
+  match_idx <- which(abs(grid$lat - grid_lat) < GRID_MATCH_TOLERANCE &
+                     abs(grid$lon - grid_lon) < GRID_MATCH_TOLERANCE)
 
   if (length(match_idx) > 0) {
     list(
@@ -77,7 +87,7 @@ load_state_grid <- function() {
 
 # Grid-based state lookup (for production)
 # Rounds coordinates to nearest grid cell and returns matching state
-get_state_from_grid <- function(lat, lon, grid, resolution = 0.1) {
+get_state_from_grid <- function(lat, lon, grid, resolution = GRID_RESOLUTION) {
   if (is.null(grid) || is.na(lat) || is.na(lon)) {
     return(NA_character_)
   }
@@ -87,8 +97,8 @@ get_state_from_grid <- function(lat, lon, grid, resolution = 0.1) {
   grid_lon <- round(lon / resolution) * resolution
 
   # Find matching row
-  match_idx <- which(abs(grid$lat - grid_lat) < 0.001 &
-                     abs(grid$lon - grid_lon) < 0.001)
+  match_idx <- which(abs(grid$lat - grid_lat) < GRID_MATCH_TOLERANCE &
+                     abs(grid$lon - grid_lon) < GRID_MATCH_TOLERANCE)
 
   if (length(match_idx) > 0) {
     grid$state_code[match_idx[1]]
@@ -98,7 +108,7 @@ get_state_from_grid <- function(lat, lon, grid, resolution = 0.1) {
 }
 
 # Get unique states from a set of coordinates
-get_states_from_coords <- function(lats, lons, grid, resolution = 0.1) {
+get_states_from_coords <- function(lats, lons, grid, resolution = GRID_RESOLUTION) {
   if (is.null(grid) || length(lats) == 0) {
     return(character(0))
   }

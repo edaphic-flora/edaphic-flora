@@ -28,9 +28,6 @@ library(mapdata)
 library(polished)
 library(plotly)
 library(leaflet)
-# Note: promises/future packages available for future async features if needed
-# library(promises)
-# library(future)
 
 # --- Load modules
 source("R/db.R")
