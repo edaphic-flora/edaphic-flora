@@ -473,3 +473,67 @@ Shows whether a selected species is native or introduced in the user's area, bas
   - `GRID_RESOLUTION` (0.1) and `GRID_MATCH_TOLERANCE` (0.001) in `R/data.R`
 - Updated functions to use new constants
 
+### 2025-01-17: App Modularization (Phase 1)
+
+**Completed Module Extractions:**
+
+Extracted 5 modules from app.R, reducing it from ~4,100 lines to ~3,019 lines:
+
+1. **mod_help.R** (273 lines)
+   - Static Field Guide and FAQ content
+   - No server logic needed
+   - Fixed broken USDA Web Soil Survey link (was 404)
+
+2. **mod_welcome.R** (186 lines)
+   - Welcome page with database stats and sample locations map
+   - Dependencies: pool, data_changed
+
+3. **mod_admin.R** (107 lines)
+   - Admin panel with lock screen for non-admins
+   - All entries table with edit/delete buttons
+   - Edit/delete buttons trigger global handlers (not namespaced)
+
+4. **mod_data_management.R** (147 lines)
+   - Export all data as CSV
+   - Download template
+   - CSV import with validation
+
+5. **mod_find_plants.R** (471 lines)
+   - Find Plants UI with soil profile form
+   - PDF upload extraction support
+   - `calc_user_match()` function for user-to-species matching
+   - Results rendering with match scores and recommendations
+
+**Shared Functions Moved to helpers.R:**
+- `calc_species_profile()` - Calculate soil profile stats for a species
+- `calc_similarity()` - Calculate similarity between two profiles
+- Used by both Find Plants module and Similar Species (Analysis tab)
+
+**Module Pattern:**
+```r
+# UI function
+moduleUI <- function(id) {
+  ns <- NS(id)
+  nav_panel(title = "...", ...)
+}
+
+# Server function
+moduleServer <- function(id, pool, current_user, ...) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    # Server logic
+  })
+}
+```
+
+**Remaining Modules (Higher Risk):**
+- mod_data_entry.R (~800 lines) - Complex form with PDF upload, species selection
+- mod_analysis.R (~1,200 lines) - Multiple tabs, many reactive dependencies
+
+**Known Issues:**
+- PDF upload error for non-admin users was reported but couldn't reproduce without error message
+- Code reviewed and appears correct with proper error handling
+
+**Next Steps:**
+- Revisit Data section UX (better guidance on CSV upload results)
+- Consider extracting mod_data_entry.R and mod_analysis.R (higher risk)
