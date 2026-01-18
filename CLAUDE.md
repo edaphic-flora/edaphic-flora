@@ -107,19 +107,22 @@ app/
 - **R/mod_analysis.R**: Shiny module template for analysis tab (not yet integrated into app.R)
 - **R/mod_data_entry.R**: Shiny module template for data entry tab (not yet integrated into app.R)
 
-### Modularization Status (TODO)
+### Modularization Status (COMPLETE)
 
-A detailed modularization plan exists at `app/docs/MODULARIZATION_PLAN.md`. The plan identifies 7 modules to extract from app.R:
+All 7 modules have been extracted from app.R:
 
-1. **mod_help.R** - Static help pages (lowest risk)
-2. **mod_welcome.R** - Landing page with stats and map
-3. **mod_admin.R** - Admin-only data management
-4. **mod_data_management.R** - Import/export functionality
-5. **mod_find_plants.R** - Species recommendation engine
-6. **mod_data_entry.R** - Soil sample data collection
-7. **mod_analysis.R** - Species data visualization (largest, most complex)
+| Module | Lines | Description |
+|--------|-------|-------------|
+| **mod_help.R** | 309 | Field Guide + FAQ |
+| **mod_welcome.R** | 193 | Landing page with stats and map |
+| **mod_admin.R** | 114 | Admin-only data management |
+| **mod_data_management.R** | 223 | Export and CSV import |
+| **mod_find_plants.R** | 499 | Species recommendation engine |
+| **mod_data_entry.R** | 704 | Soil sample data collection |
+| **mod_analysis.R** | 1,733 | Species data visualization |
+| **app.R** | 568 | Core app (routing, auth, edit handlers) |
 
-The existing `mod_analysis.R` and `mod_data_entry.R` templates need updating to match the current app.R structure. See the plan document for dependencies, testing checkpoints, and implementation order.
+Total: ~4,343 lines (previously ~4,100 in app.R alone)
 
 ### UI Structure
 
@@ -251,6 +254,22 @@ The app integrates USDA PLANTS database reference data for species traits and we
 - USDA Traits tab displaying all available characteristics
 
 ## Future Improvements
+
+### Memory Optimization (for shinyapps.io Free Tier)
+
+The free tier has 1GB RAM. Current optimizations:
+
+1. **Ecoregion lookup disabled** in production (saves ~95MB)
+2. **Species database** - supports RDS format (faster load, smaller footprint)
+3. **DB pool size** - configurable via `DB_POOL_SIZE` env var (default: 5)
+4. **Grid-based lookups** - ecoregion_grid.rds (~2MB) instead of shapefile
+
+**To convert CSV files to RDS (recommended):**
+```bash
+cd app && Rscript scripts/convert_to_rds.R
+```
+
+This converts species_accepted.csv (21MB) to RDS (~8MB) for faster loading.
 
 ### Ecoregion Lookup (Disabled in Production)
 The ecoregion lookup feature is currently disabled in production due to memory constraints on shinyapps.io's free tier. The `ecoregions` package loads a large shapefile (~95MB in memory) that causes OOM crashes. Even simplified versions (~93MB) exceed limits.
@@ -535,5 +554,6 @@ moduleServer <- function(id, pool, current_user, ...) {
 - Code reviewed and appears correct with proper error handling
 
 **Next Steps:**
-- Revisit Data section UX (better guidance on CSV upload results)
-- Consider extracting mod_data_entry.R and mod_analysis.R (higher risk)
+- Run `Rscript scripts/convert_to_rds.R` to optimize data file loading
+- Continue USDA data expansion with `fetch_usda_batch()`
+- Monitor shinyapps.io memory usage in dashboard

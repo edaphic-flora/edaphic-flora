@@ -19,7 +19,14 @@ GRID_MATCH_TOLERANCE <- 0.001
 # ---------------------------
 
 load_species_db <- function() {
-  read.csv("species_accepted.csv", stringsAsFactors = FALSE)
+  # Prefer RDS (faster loading, smaller memory footprint during parse)
+  rds_path <- "species_accepted.rds"
+  csv_path <- "species_accepted.csv"
+
+  if (file.exists(rds_path)) {
+    return(readRDS(rds_path))
+  }
+  read.csv(csv_path, stringsAsFactors = FALSE)
 }
 
 # ---------------------------
