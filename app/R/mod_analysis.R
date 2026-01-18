@@ -116,7 +116,7 @@ analysisUI <- function(id) {
         nav_panel(
           title = "Similar Species",
           icon = icon("shuffle"),
-          uiOutput(ns("similar_species_ui"))
+          withSpinner(uiOutput(ns("similar_species_ui")), type = 6, color = "#7A9A86")
         ),
         nav_panel(
           title = "Raw Data",
@@ -1294,22 +1294,22 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           width = 1/2,
           card(
             card_header("Outcome Distribution"),
-            card_body(plotlyOutput(ns("performance_outcome_plot"), height = "300px"))
+            card_body(withSpinner(plotlyOutput(ns("performance_outcome_plot"), height = "300px"), type = 6, color = "#7A9A86"))
           ),
           card(
             card_header(icon("lightbulb"), " Key Insights"),
-            card_body(uiOutput(ns("performance_insights")))
+            card_body(withSpinner(uiOutput(ns("performance_insights")), type = 6, color = "#7A9A86"))
           )
         ),
         layout_column_wrap(
           width = 1/2,
           card(
             card_header("Sun Exposure"),
-            card_body(plotlyOutput(ns("performance_sun_plot"), height = "250px"))
+            card_body(withSpinner(plotlyOutput(ns("performance_sun_plot"), height = "250px"), type = 6, color = "#7A9A86"))
           ),
           card(
             card_header("Site Hydrology"),
-            card_body(plotlyOutput(ns("performance_hydro_plot"), height = "250px"))
+            card_body(withSpinner(plotlyOutput(ns("performance_hydro_plot"), height = "250px"), type = 6, color = "#7A9A86"))
           )
         ),
         if (has_outcome) {

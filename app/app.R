@@ -28,6 +28,7 @@ library(mapdata)
 library(polished)
 library(plotly)
 library(leaflet)
+library(shinycssloaders)
 
 # --- Load modules
 source("R/db.R")

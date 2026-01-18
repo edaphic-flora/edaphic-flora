@@ -17,6 +17,12 @@ POSTGRES_USER=
 POSTGRES_PASSWORD=
 POSTGRES_SSLMODE=require
 
+# Admin database credentials (optional, for ETL scripts only)
+# These are used by scripts in app/R/etl/ for loading USDA reference data.
+# If not set, ETL scripts will fall back to POSTGRES_USER/POSTGRES_PASSWORD.
+# POSTGRES_ADMIN_USER=
+# POSTGRES_ADMIN_PASSWORD=
+
 # Auth (Polished + Firebase)
 POLISHED_APP_NAME=
 POLISHED_API_KEY=
