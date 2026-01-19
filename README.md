@@ -169,7 +169,7 @@ This project uses a dual-license model:
 - **Code**: [AGPL-3.0-or-later](LICENSE) - Free to use, modify, and distribute with source code disclosure
 - **Data**: [CC BY-NC 4.0](LICENSE-data.md) - Free for non-commercial use with attribution
 
-For commercial licensing inquiries, contact: todd@edaphicgardenconsulting.com
+For commercial licensing inquiries, contact: edaphicflora@gmail.com
 
 ## Acknowledgments
 
@@ -191,6 +191,6 @@ Donations help cover:
 
 ## Author
 
-**Todd Testerman** - [Edaphic Garden Consulting](https://edaphicgardenconsulting.com)
+**Todd Testerman**
 
-todd@edaphicgardenconsulting.com
+edaphicflora@gmail.com

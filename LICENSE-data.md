@@ -14,4 +14,4 @@ Legal code: https://creativecommons.org/licenses/by-nc/4.0/legalcode
 Attribution suggestion:
 "Edaphic Flora dataset (CC BY-NC 4.0). Maintained by Todd Testerman and contributors."
 
-For commercial licensing of the data, contact: todd@edaphicgardenconsulting.com
+For commercial licensing of the data, contact: edaphicflora@gmail.com
