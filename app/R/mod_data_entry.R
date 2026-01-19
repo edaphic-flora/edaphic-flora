@@ -204,8 +204,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                            choices = sort(species_db$taxon_name),
                            selected = character(0),
                            server = TRUE,
-                           options = list(maxItems = 20, maxOptions = 100,
-                                          placeholder = "Type to search species..."))
+                           options = list(
+                             maxItems = 20,
+                             maxOptions = 100,
+                             placeholder = "Type to search species..."
+                           ))
     })
 
     # --- Texture class dropdown ---
@@ -421,7 +424,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                 )
               ),
               textInput(ns(paste0("inat_", sp_id)), "iNaturalist URL",
-                        placeholder = "https://www.inaturalist.org/observations/...")
+                        placeholder = "https://www.inaturalist.org/observations/..."),
+              tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                         "Optional. Helps verify plant ID for data quality. Mark on iNaturalist as ",
+                         tags$em("Captive/Cultivated"), " for planted specimens or ",
+                         tags$em("Wild"), " if it appeared spontaneously.")
             )
           })
         )

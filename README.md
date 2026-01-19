@@ -191,6 +191,6 @@ Donations help cover:
 
 ## Author
 
-**Todd Testerman** - [Edaphic Flora](https://edaphicflora.org)
+**Todd Testerman**
 
 edaphicflora@gmail.com
