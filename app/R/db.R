@@ -294,10 +294,11 @@ db_get_extraction_count_today <- function(user_id) {
       "SELECT COUNT(*) as count FROM pdf_extractions
        WHERE user_id = $1 AND extracted_at >= CURRENT_DATE",
       params = list(user_id))
-    result$count[1]
+    as.integer(result$count[1])
   }, error = function(e) {
     message("Error getting extraction count: ", e$message)
-    0
+    # Fail closed: return high count to prevent unlimited extractions on DB error
+    Inf
   })
 }
 
@@ -320,7 +321,9 @@ db_can_extract <- function(user_id, daily_limit = 5) {
 
 db_get_remaining_extractions <- function(user_id, daily_limit = 5) {
   count <- db_get_extraction_count_today(user_id)
-  max(0, daily_limit - count)
+  # If count is Inf (error case), return 0 remaining
+  if (is.infinite(count)) return(0L)
+  as.integer(max(0, daily_limit - count))
 }
 
 # ---------------------------
