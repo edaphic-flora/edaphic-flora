@@ -104,9 +104,9 @@ analysisUI <- function(id) {
           uiOutput(ns("texture_plot_ui"))
         ),
         nav_panel(
-          title = "Map",
-          icon = icon("map"),
-          uiOutput(ns("map_ui"))
+          title = "Geography",
+          icon = icon("globe-americas"),
+          uiOutput(ns("geography_ui"))
         ),
         nav_panel(
           title = "Performance",
@@ -479,7 +479,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         export_cols <- c("species", "cultivar", "outcome", "sun_exposure", "site_hydrology",
                          "ph", "organic_matter", "texture_class", "texture_sand", "texture_silt", "texture_clay",
                          "nitrate_ppm", "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
-                         "calcium_ppm", "magnesium_ppm", "cec", "soluble_salts_ppm",
+                         "calcium_ppm", "magnesium_ppm", "cec_meq", "soluble_salts_ppm",
                          "location_lat", "location_long", "ecoregion_l4", "date", "notes")
         export_cols <- export_cols[export_cols %in% names(dat)]
         write.csv(dat[, export_cols, drop = FALSE], file, row.names = FALSE, na = "")
@@ -1270,24 +1270,58 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     # ---------------------------
-    # Map Tab
+    # ---------------------------
+    # Geography Tab (combined Map, Ecoregions, Hardiness)
     # ---------------------------
 
-    output$map_ui <- renderUI({
+    output$geography_ui <- renderUI({
       if (is.null(input$analysis_species) || input$analysis_species == "") {
-        return(empty_state("map", "No Species Selected", "Choose a species from the sidebar"))
+        return(empty_state("globe-americas", "No Species Selected", "Choose a species from the sidebar"))
       }
+
+      navset_card_pill(
+        id = ns("geography_tabs"),
+
+        nav_panel(
+          title = "Sample Map",
+          icon = icon("map-marker-alt"),
+          uiOutput(ns("map_content_ui"))
+        ),
+        nav_panel(
+          title = "Ecoregions",
+          icon = icon("layer-group"),
+          uiOutput(ns("ecoregion_content_ui"))
+        )
+      )
+    })
+
+    # Sample Map sub-tab content
+    output$map_content_ui <- renderUI({
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$location_lat) & !is.na(dat$location_long), ]
       if (nrow(dat) == 0) {
         return(empty_state("map-marker-alt", "No Location Data", "No samples with coordinates matching filters"))
       }
+
+      has_outcome <- sum(!is.na(dat$outcome)) > 0
+
       tagList(
-        leafletOutput(ns("map_plot"), height = "550px"),
-        tags$p(class = "text-muted small mt-2 px-3",
-               icon("info-circle"), " ",
-               "Geographic distribution of sample locations. Click markers to view soil data and ecoregion information. ",
-               "Clustering samples by geography helps identify regional soil patterns and growing conditions.")
+        leafletOutput(ns("map_plot"), height = "500px"),
+        if (has_outcome) {
+          tags$p(class = "text-muted small mt-2 px-3",
+                 icon("info-circle"), " ",
+                 "Markers colored by outcome: ",
+                 tags$span(style = "color: #27ae60;", icon("circle"), " Thriving"), " ",
+                 tags$span(style = "color: #7A9A86;", icon("circle"), " Established"), " ",
+                 tags$span(style = "color: #f39c12;", icon("circle"), " Struggling"), " ",
+                 tags$span(style = "color: #e74c3c;", icon("circle"), " Failed/Died"), " ",
+                 tags$span(style = "color: #999;", icon("circle"), " No outcome data"))
+        } else {
+          tags$p(class = "text-muted small mt-2 px-3",
+                 icon("info-circle"), " ",
+                 "Geographic distribution of sample locations. Click markers to view soil data. ",
+                 "Add outcome data to samples to see color-coded success rates.")
+        }
       )
     })
 
@@ -1332,6 +1366,314 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         setView(lng = mean(dat$location_long), lat = mean(dat$location_lat), zoom = 5)
     })
 
+    # ---------------------------
+    # Ecoregions sub-tab
+    # ---------------------------
+
+    output$ecoregion_content_ui <- renderUI({
+      dat <- filtered_species_data()
+      dat_eco <- dat[!is.na(dat$ecoregion_l4) & nzchar(dat$ecoregion_l4), ]
+      if (nrow(dat_eco) == 0) {
+        return(empty_state("globe-americas", "No Ecoregion Data",
+                           "Ecoregion lookup is currently disabled in production. Samples without coordinates cannot be assigned ecoregions."))
+      }
+
+      div(
+        style = "max-height: 600px; overflow-y: auto; padding-right: 5px;",
+        # Header with EPA link
+        div(class = "mb-3 d-flex align-items-center justify-content-between",
+            tags$span(class = "text-muted small",
+                      icon("layer-group"), " Showing EPA Level IV Ecoregions"),
+            tags$a(
+              href = epa_ecoregion_url(),
+              target = "_blank",
+              class = "btn btn-sm btn-outline-secondary",
+              icon("external-link-alt"), " EPA Ecoregions"
+            )
+        ),
+        layout_column_wrap(
+          width = 1/2,
+          card(
+            card_header("Sample Distribution by Ecoregion"),
+            card_body(withSpinner(plotlyOutput(ns("ecoregion_dist_plot"), height = "250px"), type = 6, color = "#7A9A86"))
+          ),
+          card(
+            card_header(uiOutput(ns("ecoregion_second_card_header"))),
+            card_body(uiOutput(ns("ecoregion_second_card_body")))
+          )
+        ),
+        uiOutput(ns("ecoregion_details_card")),
+        tags$p(class = "text-muted small mt-2 px-3",
+               icon("info-circle"), " ",
+               "EPA Level IV ecoregions represent areas with similar ecosystems, geology, soils, vegetation, and climate. ",
+               tags$a(href = epa_ecoregion_url(), target = "_blank", "Learn more about EPA ecoregions."))
+      )
+    })
+
+    # Helper to get ecoregion data (L4)
+    ecoregion_data_by_level <- reactive({
+      dat <- filtered_species_data()
+      dat <- dat[!is.na(dat$ecoregion_l4) & nzchar(dat$ecoregion_l4), ]
+      if (nrow(dat) == 0) return(NULL)
+
+      dat$ecoregion_display <- dat$ecoregion_l4
+      dat$ecoregion_code <- dat$ecoregion_l4_code
+      dat
+    })
+
+    # Second card header (dynamic)
+    output$ecoregion_second_card_header <- renderUI({
+      dat <- ecoregion_data_by_level()
+      has_outcome <- !is.null(dat) && sum(!is.na(dat$outcome)) > 0
+      if (has_outcome) "Success Rate by Ecoregion" else "Ecoregion Summary"
+    })
+
+    # Second card body (dynamic)
+    output$ecoregion_second_card_body <- renderUI({
+      dat <- ecoregion_data_by_level()
+      if (is.null(dat)) return(NULL)
+      has_outcome <- sum(!is.na(dat$outcome)) > 0
+      if (has_outcome) {
+        withSpinner(plotlyOutput(ns("ecoregion_success_plot"), height = "250px"), type = 6, color = "#7A9A86")
+      } else {
+        tableOutput(ns("ecoregion_table"))
+      }
+    })
+
+    # Ecoregion details card
+    output$ecoregion_details_card <- renderUI({
+      dat <- filtered_species_data()
+      dat_eco <- dat[!is.na(dat$ecoregion_l4) & nzchar(dat$ecoregion_l4), ]
+      if (nrow(dat_eco) == 0) return(NULL)
+
+      # Check if L3/L2 columns exist in the data
+      has_l3 <- "ecoregion_l3" %in% names(dat_eco)
+      has_l2 <- "ecoregion_l2" %in% names(dat_eco)
+
+      # Build ecoregion hierarchy data (include L3/L2 if available)
+      if (has_l3 && has_l2) {
+        eco_summary <- dat_eco %>%
+          group_by(ecoregion_l4, ecoregion_l4_code, ecoregion_l3, ecoregion_l3_code, ecoregion_l2, ecoregion_l2_code) %>%
+          summarize(
+            n = n(),
+            avg_ph = round(mean(ph, na.rm = TRUE), 1),
+            success_rate = if (sum(!is.na(outcome)) > 0) {
+              round(sum(outcome %in% c("Thriving", "Established"), na.rm = TRUE) / sum(!is.na(outcome)) * 100, 0)
+            } else NA_real_,
+            .groups = "drop"
+          ) %>%
+          arrange(desc(n))
+      } else if (has_l3) {
+        eco_summary <- dat_eco %>%
+          group_by(ecoregion_l4, ecoregion_l4_code, ecoregion_l3, ecoregion_l3_code) %>%
+          summarize(
+            n = n(),
+            avg_ph = round(mean(ph, na.rm = TRUE), 1),
+            success_rate = if (sum(!is.na(outcome)) > 0) {
+              round(sum(outcome %in% c("Thriving", "Established"), na.rm = TRUE) / sum(!is.na(outcome)) * 100, 0)
+            } else NA_real_,
+            .groups = "drop"
+          ) %>%
+          mutate(ecoregion_l2 = NA_character_, ecoregion_l2_code = NA_character_) %>%
+          arrange(desc(n))
+      } else {
+        eco_summary <- dat_eco %>%
+          group_by(ecoregion_l4, ecoregion_l4_code) %>%
+          summarize(
+            n = n(),
+            avg_ph = round(mean(ph, na.rm = TRUE), 1),
+            success_rate = if (sum(!is.na(outcome)) > 0) {
+              round(sum(outcome %in% c("Thriving", "Established"), na.rm = TRUE) / sum(!is.na(outcome)) * 100, 0)
+            } else NA_real_,
+            .groups = "drop"
+          ) %>%
+          mutate(ecoregion_l3 = NA_character_, ecoregion_l3_code = NA_character_,
+                 ecoregion_l2 = NA_character_, ecoregion_l2_code = NA_character_) %>%
+          arrange(desc(n))
+      }
+
+      # Build accordion items
+      accordion_items <- lapply(seq_len(min(nrow(eco_summary), 8)), function(i) {
+        row <- eco_summary[i, ]
+        code <- if (!is.na(row$ecoregion_l4_code)) row$ecoregion_l4_code else ""
+
+        # Use stored L3/L2 data if available, otherwise fall back to parsing
+        if (!is.na(row$ecoregion_l3) && nzchar(row$ecoregion_l3)) {
+          # Use stored L2 if available, otherwise derive from L3 code
+          l2_name <- if (!is.na(row$ecoregion_l2) && nzchar(row$ecoregion_l2)) {
+            row$ecoregion_l2
+          } else {
+            get_l2_name(row$ecoregion_l3_code)
+          }
+          hierarchy <- list(
+            l3_name = row$ecoregion_l3,
+            l3_code = row$ecoregion_l3_code,
+            l2_name = l2_name
+          )
+        } else {
+          # Try parsing from code first
+          hierarchy <- build_ecoregion_hierarchy(row$ecoregion_l4, code)
+
+          # If parsing failed (no L3 found), check if L4 name is actually an L3 name
+          if (is.na(hierarchy$l3_name) || !nzchar(hierarchy$l3_name %||% "")) {
+            # Reverse lookup: find L3 code from name
+            l3_codes <- names(EPA_L3_ECOREGIONS)
+            l3_match <- l3_codes[sapply(l3_codes, function(c) {
+              EPA_L3_ECOREGIONS[[c]] == row$ecoregion_l4
+            })]
+            if (length(l3_match) > 0) {
+              # The "L4" field actually contains L3 data
+              l3_code <- l3_match[1]
+              hierarchy <- list(
+                l3_name = row$ecoregion_l4,  # The stored name IS the L3 name
+                l3_code = l3_code,
+                l2_name = get_l2_name(l3_code)
+              )
+            }
+          }
+        }
+
+        accordion_panel(
+          title = div(
+            class = "d-flex justify-content-between align-items-center w-100",
+            span(row$ecoregion_l4),
+            tags$span(class = "badge bg-secondary", paste0(row$n, " samples"))
+          ),
+          value = paste0("eco_", i),
+          div(
+            class = "ps-2",
+            # Show hierarchy section
+            div(
+              class = "mb-2",
+              tags$small(class = "text-muted", icon("sitemap"), " Hierarchy:"),
+              div(class = "ps-3 border-start border-2",
+                  style = "border-color: #7A9A86 !important;",
+                  if (!is.na(hierarchy$l2_name)) {
+                    tags$div(class = "small", tags$strong("II:"), " ", hierarchy$l2_name)
+                  },
+                  if (!is.na(hierarchy$l3_name)) {
+                    tags$div(class = "small", tags$strong("III:"), " ", hierarchy$l3_name,
+                             if (!is.na(hierarchy$l3_code)) tags$span(class = "text-muted", paste0(" (", hierarchy$l3_code, ")")))
+                  },
+                  tags$div(class = "small", tags$strong("IV:"), " ", row$ecoregion_l4,
+                           if (nzchar(code)) tags$span(class = "text-muted", paste0(" (", code, ")")))
+              )
+            ),
+            div(class = "mb-2",
+                tags$small(class = "text-muted", "Avg pH: "),
+                tags$span(row$avg_ph)
+            ),
+            if (!is.na(row$success_rate)) {
+              div(class = "mb-2",
+                  tags$small(class = "text-muted", "Success Rate: "),
+                  tags$span(
+                    class = if (row$success_rate >= 70) "text-success" else if (row$success_rate >= 40) "text-warning" else "text-danger",
+                    paste0(row$success_rate, "%")
+                  )
+              )
+            },
+            tags$a(
+              href = epa_ecoregion_url(),
+              target = "_blank",
+              class = "small",
+              icon("external-link-alt"), " EPA Ecoregion Resources"
+            )
+          )
+        )
+      })
+
+      card(
+        class = "mt-3",
+        card_header(span(icon("layer-group"), " Level IV Ecoregion Details")),
+        card_body(
+          tags$p(class = "text-muted small mb-3",
+                 "Click an ecoregion to see its hierarchy (Level II \u2192 III \u2192 IV)."),
+          do.call(accordion, c(
+            list(id = ns("ecoregion_accordion"), open = FALSE),
+            accordion_items
+          ))
+        )
+      )
+    })
+
+    output$ecoregion_dist_plot <- renderPlotly({
+      req(input$analysis_species, input$analysis_species != "")
+      dat <- ecoregion_data_by_level()
+      if (is.null(dat) || nrow(dat) == 0) return(NULL)
+
+      eco_counts <- as.data.frame(table(dat$ecoregion_display))
+      names(eco_counts) <- c("Ecoregion", "Count")
+      eco_counts <- eco_counts[order(-eco_counts$Count), ]
+      eco_counts <- head(eco_counts, 10)  # Top 10 ecoregions
+      eco_counts$Ecoregion <- factor(eco_counts$Ecoregion, levels = rev(eco_counts$Ecoregion))
+
+      p <- ggplot(eco_counts, aes(x = Ecoregion, y = Count)) +
+        geom_col(fill = edaphic_colors$accent, alpha = 0.85) +
+        coord_flip() +
+        labs(x = NULL, y = "Number of Samples", title = NULL) +
+        theme_edaphic() +
+        theme(axis.text.y = element_text(size = 9))
+
+      ggplotly(p, tooltip = c("y")) %>%
+        layout(margin = list(l = 10, r = 10, t = 10, b = 40))
+    })
+
+    output$ecoregion_success_plot <- renderPlotly({
+      req(input$analysis_species, input$analysis_species != "")
+      dat <- ecoregion_data_by_level()
+      if (is.null(dat)) return(NULL)
+      dat <- dat[!is.na(dat$outcome), ]
+      if (nrow(dat) < 3) return(NULL)
+
+      eco_stats <- dat %>%
+        group_by(ecoregion_display) %>%
+        summarize(
+          n = n(),
+          success_rate = sum(outcome %in% c("Thriving", "Established")) / n() * 100,
+          .groups = "drop"
+        ) %>%
+        filter(n >= 2) %>%  # At least 2 samples per ecoregion
+        arrange(desc(success_rate)) %>%
+        head(10)
+
+      if (nrow(eco_stats) == 0) return(NULL)
+
+      eco_stats$ecoregion_display <- factor(eco_stats$ecoregion_display,
+                                             levels = rev(eco_stats$ecoregion_display))
+
+      p <- ggplot(eco_stats, aes(x = ecoregion_display, y = success_rate, text = paste0("Samples: ", n))) +
+        geom_col(aes(fill = success_rate), alpha = 0.85) +
+        scale_fill_gradient(low = "#e74c3c", high = "#27ae60", guide = "none") +
+        coord_flip() +
+        labs(x = NULL, y = "Success Rate (%)", title = NULL) +
+        theme_edaphic() +
+        theme(axis.text.y = element_text(size = 9)) +
+        ylim(0, 100)
+
+      ggplotly(p, tooltip = c("y", "text")) %>%
+        layout(margin = list(l = 10, r = 10, t = 10, b = 40))
+    })
+
+    output$ecoregion_table <- renderTable({
+      req(input$analysis_species, input$analysis_species != "")
+      dat <- ecoregion_data_by_level()
+      if (is.null(dat) || nrow(dat) == 0) return(NULL)
+
+      eco_stats <- dat %>%
+        group_by(Ecoregion = ecoregion_display) %>%
+        summarize(
+          Samples = n(),
+          `Avg pH` = round(mean(ph, na.rm = TRUE), 1),
+          `Avg OM%` = round(mean(organic_matter, na.rm = TRUE), 1),
+          .groups = "drop"
+        ) %>%
+        arrange(desc(Samples)) %>%
+        head(10)
+
+      eco_stats
+    }, striped = TRUE, hover = TRUE, width = "100%")
+
+    # Ecoregion map
     # ---------------------------
     # Performance Tab
     # ---------------------------
@@ -1758,43 +2100,89 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         }
       }
 
+      add_section <- function(label) {
+        result <<- rbind(result, data.frame(Trait = label, Value = "", stringsAsFactors = FALSE))
+      }
+
+      # -- Identification --
+      add_section("Identification")
       add_row("USDA Symbol", tr$usda_symbol[1])
       add_row("Scientific Name", tr$scientific_name[1])
-
-      if ("duration" %in% names(tr)) add_row("Duration", tr$duration[1])
-      if ("growth_habit" %in% names(tr)) add_row("Growth Habit", tr$growth_habit[1])
+      if ("usda_group" %in% names(tr)) add_row("Group", tr$usda_group[1])
       if ("native_status" %in% names(tr)) add_row("Native Status", tr$native_status[1])
 
+      # -- Growth Characteristics --
+      add_section("Growth Characteristics")
+      if ("duration" %in% names(tr)) add_row("Duration", tr$duration[1])
+      if ("growth_habit" %in% names(tr)) add_row("Growth Habit", tr$growth_habit[1])
+      if ("growth_rate" %in% names(tr)) add_row("Growth Rate", tr$growth_rate[1])
+      if ("lifespan" %in% names(tr)) add_row("Lifespan", tr$lifespan[1])
+      if ("height_mature_ft" %in% names(tr) && !is.na(tr$height_mature_ft[1])) {
+        add_row("Mature Height", sprintf("%.0f ft", tr$height_mature_ft[1]))
+      }
+      if ("root_depth_min_in" %in% names(tr) && !is.na(tr$root_depth_min_in[1])) {
+        add_row("Minimum Root Depth", sprintf("%.0f in", tr$root_depth_min_in[1]))
+      }
+      if ("leaf_retention" %in% names(tr)) add_row("Leaf Retention", tr$leaf_retention[1])
+
+      # -- Soil Requirements --
+      add_section("Soil Requirements")
       ph_min <- tr$soil_ph_min[1]
       ph_max <- tr$soil_ph_max[1]
       if (!is.null(ph_min) && !is.na(ph_min) && !is.null(ph_max) && !is.na(ph_max)) {
         add_row("Soil pH Range", sprintf("%.1f - %.1f", ph_min, ph_max))
       }
+      if ("soil_texture_adapted" %in% names(tr)) add_row("Adapted Soil Textures", tr$soil_texture_adapted[1])
+      if ("nitrogen_fixation" %in% names(tr)) add_row("Nitrogen Fixation", tr$nitrogen_fixation[1])
+      if ("caco3_tolerance" %in% names(tr)) add_row("CaCO3 Tolerance", tr$caco3_tolerance[1])
 
-      add_row("Shade Tolerance", tr$shade_tolerance[1])
-      add_row("Drought Tolerance", tr$drought_tolerance[1])
-      add_row("Salinity Tolerance", tr$salinity_tolerance[1])
-      if ("moisture_use" %in% names(tr)) add_row("Moisture Use", tr$moisture_use[1])
-      if ("bloom_period" %in% names(tr)) add_row("Bloom Period", tr$bloom_period[1])
-
-      if (all(c("soil_texture_coarse", "soil_texture_medium", "soil_texture_fine") %in% names(tr))) {
-        texture <- format_soil_texture(tr$soil_texture_coarse[1], tr$soil_texture_medium[1], tr$soil_texture_fine[1])
-        add_row("Adapted Soil Textures", texture)
-      }
-
+      # -- Climate & Tolerances --
+      add_section("Climate & Tolerances")
       if ("precip_min_in" %in% names(tr) && !is.na(tr$precip_min_in[1]) && !is.na(tr$precip_max_in[1])) {
-        add_row("Precipitation Range", sprintf("%.0f - %.0f in", tr$precip_min_in[1], tr$precip_max_in[1]))
+        add_row("Precipitation Range", sprintf("%.0f - %.0f in/yr", tr$precip_min_in[1], tr$precip_max_in[1]))
       } else if ("precipitation_min_mm" %in% names(tr) && !is.na(tr$precipitation_min_mm[1])) {
         precip_min_in <- round(tr$precipitation_min_mm[1] / 25.4, 1)
         precip_max_in <- round(tr$precipitation_max_mm[1] / 25.4, 1)
-        add_row("Precipitation Range", sprintf("%.1f - %.1f in", precip_min_in, precip_max_in))
+        add_row("Precipitation Range", sprintf("%.1f - %.1f in/yr", precip_min_in, precip_max_in))
       }
-
       if ("temp_min_f" %in% names(tr) && !is.na(tr$temp_min_f[1])) {
-        add_row("Minimum Temperature", sprintf("%.0f F", tr$temp_min_f[1]))
+        add_row("Minimum Temperature", sprintf("%.0f\u00b0F", tr$temp_min_f[1]))
       } else if ("min_temp_c" %in% names(tr) && !is.na(tr$min_temp_c[1])) {
         temp_f <- as.integer(round(tr$min_temp_c[1] * 9 / 5 + 32))
-        add_row("Minimum Temperature", sprintf("%d F", temp_f))
+        add_row("Minimum Temperature", sprintf("%d\u00b0F", temp_f))
+      }
+      if ("moisture_use" %in% names(tr)) add_row("Moisture Use", tr$moisture_use[1])
+      add_row("Shade Tolerance", tr$shade_tolerance[1])
+      add_row("Drought Tolerance", tr$drought_tolerance[1])
+      add_row("Salinity Tolerance", tr$salinity_tolerance[1])
+      if ("fire_tolerance" %in% names(tr)) add_row("Fire Tolerance", tr$fire_tolerance[1])
+      if ("anaerobic_tolerance" %in% names(tr)) add_row("Anaerobic Tolerance", tr$anaerobic_tolerance[1])
+
+      # -- Ornamental Characteristics --
+      add_section("Ornamental Characteristics")
+      if ("bloom_period" %in% names(tr)) add_row("Bloom Period", tr$bloom_period[1])
+      if ("fruit_seed_period" %in% names(tr)) add_row("Fruit/Seed Period", tr$fruit_seed_period[1])
+      if ("flower_color" %in% names(tr)) add_row("Flower Color", tr$flower_color[1])
+      if ("foliage_color" %in% names(tr)) add_row("Foliage Color", tr$foliage_color[1])
+
+      # Section headers (rows with empty Value)
+      section_labels <- c("Identification", "Growth Characteristics", "Soil Requirements",
+                          "Climate & Tolerances", "Ornamental Characteristics")
+
+      # Remove empty section headers (sections with no data after them)
+      if (nrow(result) > 0) {
+        is_section <- result$Trait %in% section_labels
+        keep <- rep(TRUE, nrow(result))
+        for (i in seq_len(nrow(result) - 1)) {
+          if (is_section[i] && is_section[i + 1]) {
+            keep[i] <- FALSE
+          }
+        }
+        # Check last row - if it's a section header, remove it
+        if (nrow(result) > 0 && is_section[nrow(result)]) {
+          keep[nrow(result)] <- FALSE
+        }
+        result <- result[keep, , drop = FALSE]
       }
 
       result
