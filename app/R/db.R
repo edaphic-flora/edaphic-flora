@@ -294,9 +294,7 @@ db_get_extraction_count_today <- function(user_id) {
       "SELECT COUNT(*) as count FROM pdf_extractions
        WHERE user_id = $1 AND extracted_at >= CURRENT_DATE",
       params = list(user_id))
-    count <- as.integer(result$count[1])
-    message("PDF extraction count for user ", user_id, ": ", count)
-    count
+    as.integer(result$count[1])
   }, error = function(e) {
     message("Error getting extraction count: ", e$message)
     # Fail closed: return high count to prevent unlimited extractions on DB error
@@ -306,11 +304,9 @@ db_get_extraction_count_today <- function(user_id) {
 
 db_log_extraction <- function(user_id, filename = NULL, tokens_used = NULL) {
   tryCatch({
-    message("Attempting to log PDF extraction for user ", user_id, ", file: ", filename)
-    result <- dbExecute(pool,
+    dbExecute(pool,
       "INSERT INTO pdf_extractions (user_id, filename, tokens_used) VALUES ($1, $2, $3)",
       params = list(user_id, filename, tokens_used))
-    message("Successfully logged PDF extraction, rows affected: ", result)
     TRUE
   }, error = function(e) {
     message("Error logging extraction: ", e$message)
