@@ -241,7 +241,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       remaining <- db_get_remaining_extractions(u$user_uid, pdf_extract_limit)
       if (remaining > 0) {
         div(class = "text-muted small",
-            icon("clock"), sprintf(" %d extractions remaining today", remaining))
+            icon("clock"), sprintf(" %d extraction%s remaining today", remaining, if (remaining == 1) "" else "s"))
       } else {
         div(class = "text-warning small",
             icon("exclamation-triangle"), " Daily limit reached. Try again tomorrow.")
@@ -356,7 +356,19 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         showNotification("Data extracted! Please review values before submitting.", type = "message", duration = 5)
 
       } else {
-        showNotification(paste("Extraction failed:", result$error), type = "error", duration = 8)
+        # Log full error for debugging
+        message("PDF extraction error: ", result$error)
+        # Show user-friendly message
+        error_msg <- if (grepl("API key", result$error, ignore.case = TRUE)) {
+          "AI extraction service not configured. Please enter values manually."
+        } else if (grepl("timeout|timed out", result$error, ignore.case = TRUE)) {
+          "Extraction timed out. Try a smaller file or enter values manually."
+        } else if (grepl("file|format|read", result$error, ignore.case = TRUE)) {
+          "Could not read file. Please ensure it's a valid PDF, image, or text file."
+        } else {
+          "Could not extract data from this file. Please enter values manually."
+        }
+        showNotification(error_msg, type = "error", duration = 8)
       }
     })
 
@@ -595,8 +607,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           })
         }
       }, error = function(e) {
+        # Log the full error for debugging
+        message("Geocoding error: ", e$message)
+        # Show user-friendly message
         output$geocode_status <- renderUI({
-          div(class = "text-danger", icon("times-circle"), " Geocoding error: ", e$message)
+          div(class = "text-danger", icon("times-circle"), " Unable to look up address. Please check the city/state or enter coordinates manually.")
         })
       })
     })
@@ -613,6 +628,25 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       species_list <- input$species
       if (is.null(species_list) || length(species_list) == 0) {
         showNotification("Please select at least one species.", type = "error")
+        return()
+      }
+
+      # Validate species are in the database
+      invalid_species <- species_list[!species_list %in% species_db$taxon_name]
+      if (length(invalid_species) > 0) {
+        showNotification(
+          paste("Invalid species:", paste(invalid_species[1:min(3, length(invalid_species))], collapse = ", "),
+                if (length(invalid_species) > 3) "..." else ""),
+          type = "error"
+        )
+        return()
+      }
+
+      # Require at least pH or organic matter
+      has_ph <- !is.null(input$ph) && !is.na(input$ph)
+      has_om <- !is.null(input$organic_matter) && !is.na(input$organic_matter)
+      if (!has_ph && !has_om) {
+        showNotification("Please enter at least pH or organic matter percentage.", type = "error")
         return()
       }
 
