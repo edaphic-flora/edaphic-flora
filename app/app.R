@@ -200,7 +200,9 @@ base_ui <- page_navbar(
  analysisUI("analysis"),
 
 # ========== FIND PLANTS TAB ==========
-findPlantsUI("find_plants"),
+# HIDDEN FOR INITIAL RELEASE: Requires 10+ samples per species for meaningful recommendations
+# Uncomment when database has sufficient data:
+# findPlantsUI("find_plants"),
 
  # ========== DATA MANAGEMENT TAB ==========
  dataManagementUI("data_mgmt"),
@@ -396,14 +398,16 @@ server_inner <- function(input, output, session) {
  dataManagementServer("data_mgmt", pool, current_user, data_changed, soil_data_template)
 
  # --- Find Plants module ---
- pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "5"))
- find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
-                                      pdf_extract_limit)
-
- # Handle FAQ link from Find Plants module
- observeEvent(find_plants_faq(), {
-   nav_select("main_nav", "FAQ")
- }, ignoreInit = TRUE)
+ # HIDDEN FOR INITIAL RELEASE: Requires 10+ samples per species for meaningful recommendations
+ # Uncomment when database has sufficient data:
+ # pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "5"))
+ # find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
+ #                                      pdf_extract_limit)
+ #
+ # # Handle FAQ link from Find Plants module
+ # observeEvent(find_plants_faq(), {
+ #   nav_select("main_nav", "FAQ")
+ # }, ignoreInit = TRUE)
 
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,

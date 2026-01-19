@@ -93,11 +93,13 @@ analysisUI <- function(id) {
           icon = icon("leaf"),
           uiOutput(ns("nutrient_plot_ui"))
         ),
-        nav_panel(
-          title = "Correlations",
-          icon = icon("project-diagram"),
-          uiOutput(ns("heatmap_ui"))
-        ),
+        # HIDDEN FOR INITIAL RELEASE: Requires sufficient samples for meaningful correlations
+        # Uncomment when database has more data:
+        # nav_panel(
+        #   title = "Correlations",
+        #   icon = icon("project-diagram"),
+        #   uiOutput(ns("heatmap_ui"))
+        # ),
         nav_panel(
           title = "Soil Texture",
           icon = icon("mountain"),
@@ -113,11 +115,13 @@ analysisUI <- function(id) {
           icon = icon("seedling"),
           uiOutput(ns("performance_ui"))
         ),
-        nav_panel(
-          title = "Similar Species",
-          icon = icon("shuffle"),
-          withSpinner(uiOutput(ns("similar_species_ui")), type = 6, color = "#7A9A86")
-        ),
+        # HIDDEN FOR INITIAL RELEASE: Requires 10+ samples per species for meaningful recommendations
+        # Uncomment when database has sufficient data:
+        # nav_panel(
+        #   title = "Similar Species",
+        #   icon = icon("shuffle"),
+        #   withSpinner(uiOutput(ns("similar_species_ui")), type = 6, color = "#7A9A86")
+        # ),
         nav_panel(
           title = "Raw Data",
           icon = icon("database"),
@@ -897,17 +901,18 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       pl <- ggplotly(p, tooltip = c("x", "y")) %>%
         config(displayModeBar = TRUE, displaylogo = FALSE)
 
-      # Add USDA range as a filled polygon trace (shapes don't render reliably with ggplotly)
+      # Add USDA range as polygon trace inserted at the beginning so it renders behind histogram bars
       if (has_usda_ph) {
         ph_min <- as.numeric(tr$soil_ph_min[1])
         ph_max <- as.numeric(tr$soil_ph_max[1])
         message(sprintf("Adding USDA overlay: pH %.1f - %.1f", ph_min, ph_max))
 
-        # Get y-axis range from histogram to create full-height rectangle
+        # Get y-axis range from histogram
         hist_data <- hist(dat$ph, breaks = 15, plot = FALSE)
         y_max <- max(hist_data$counts) * 1.05
 
-        pl <- pl %>% add_trace(
+        # Create USDA trace as a list
+        usda_trace <- list(
           x = c(ph_min, ph_max, ph_max, ph_min, ph_min),
           y = c(0, 0, y_max, y_max, 0),
           type = "scatter",
@@ -920,6 +925,9 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           text = sprintf("USDA Reference: pH %.1f - %.1f", ph_min, ph_max),
           showlegend = FALSE
         )
+
+        # Insert at the beginning of trace list so it renders behind everything else
+        pl$x$data <- c(list(usda_trace), pl$x$data)
       }
 
       pl
@@ -1040,15 +1048,14 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
        }
      }
 
-     # Add USDA pH range as filled polygon trace (shapes don't render reliably with ggplotly)
+     # Add USDA pH range as polygon trace inserted at the beginning so it renders behind data points
      if (has_usda_ph) {
        ph_min <- as.numeric(tr$soil_ph_min[1])
        ph_max <- as.numeric(tr$soil_ph_max[1])
-
-       # Get y-axis range from data
        y_max <- max(dat$organic_matter, na.rm = TRUE) * 1.1
 
-       plt <- plt %>% add_trace(
+       # Create USDA trace as a list (same structure as plotly traces)
+       usda_trace <- list(
          x = c(ph_min, ph_max, ph_max, ph_min, ph_min),
          y = c(0, 0, y_max, y_max, 0),
          type = "scatter",
@@ -1061,6 +1068,9 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
          text = sprintf("USDA Reference: pH %.1f - %.1f", ph_min, ph_max),
          showlegend = FALSE
        )
+
+       # Insert at the beginning of trace list so it renders behind everything else
+       plt$x$data <- c(list(usda_trace), plt$x$data)
      }
 
      plt
@@ -1724,53 +1734,56 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
             card_header("Site Hydrology"),
             card_body(withSpinner(plotlyOutput(ns("performance_hydro_plot"), height = "250px"), type = 6, color = "#7A9A86"))
           )
-        ),
-        if (has_outcome) {
-          tagList(
-            tags$h5(class = "mt-4 mb-3", icon("search"), " Success Factors"),
-            tags$p(class = "text-muted small mb-3",
-                   "Compare soil conditions between thriving and struggling/failed plants to identify optimal ranges."),
-            layout_column_wrap(
-              width = 1/2,
-              card(
-                card_header(
-                  class = "d-flex justify-content-between align-items-center",
-                  span(icon("chart-bar"), " Parameter by Outcome"),
-                  selectInput(ns("success_factor_param"), NULL,
-                              choices = c("pH" = "ph",
-                                          "Organic Matter (%)" = "organic_matter",
-                                          "Clay Content (%)" = "texture_clay",
-                                          "Sand Content (%)" = "texture_sand",
-                                          "Nitrate (ppm)" = "nitrate_ppm",
-                                          "Phosphorus (ppm)" = "phosphorus_ppm",
-                                          "Potassium (ppm)" = "potassium_ppm",
-                                          "Calcium (ppm)" = "calcium_ppm"),
-                              selected = "ph",
-                              width = "180px")
-                ),
-                card_body(plotlyOutput(ns("success_factor_plot"), height = "320px"))
-              ),
-              if (has_sun && has_hydro) {
-                card(
-                  card_header(icon("th"), " Success Matrix: Sun x Hydrology"),
-                  card_body(
-                    plotlyOutput(ns("success_matrix_plot"), height = "320px"),
-                    tags$p(class = "text-muted small mt-2",
-                           "Success rate (% Thriving + Established) by condition. Darker green = higher success.")
-                  )
-                )
-              } else {
-                card(
-                  card_header(icon("info-circle"), " More Data Needed"),
-                  card_body(
-                    class = "text-center text-muted",
-                    tags$p("Record sun exposure and hydrology data to see the Success Matrix visualization.")
-                  )
-                )
-              }
-            )
-          )
-        }
+        )
+        # HIDDEN FOR INITIAL RELEASE: Success Factors requires sufficient data per outcome category
+        # Uncomment when database has more data:
+        # ,
+        # if (has_outcome) {
+        #   tagList(
+        #     tags$h5(class = "mt-4 mb-3", icon("search"), " Success Factors"),
+        #     tags$p(class = "text-muted small mb-3",
+        #            "Compare soil conditions between thriving and struggling/failed plants to identify optimal ranges."),
+        #     layout_column_wrap(
+        #       width = 1/2,
+        #       card(
+        #         card_header(
+        #           class = "d-flex justify-content-between align-items-center",
+        #           span(icon("chart-bar"), " Parameter by Outcome"),
+        #           selectInput(ns("success_factor_param"), NULL,
+        #                       choices = c("pH" = "ph",
+        #                                   "Organic Matter (%)" = "organic_matter",
+        #                                   "Clay Content (%)" = "texture_clay",
+        #                                   "Sand Content (%)" = "texture_sand",
+        #                                   "Nitrate (ppm)" = "nitrate_ppm",
+        #                                   "Phosphorus (ppm)" = "phosphorus_ppm",
+        #                                   "Potassium (ppm)" = "potassium_ppm",
+        #                                   "Calcium (ppm)" = "calcium_ppm"),
+        #                       selected = "ph",
+        #                       width = "180px")
+        #         ),
+        #         card_body(plotlyOutput(ns("success_factor_plot"), height = "320px"))
+        #       ),
+        #       if (has_sun && has_hydro) {
+        #         card(
+        #           card_header(icon("th"), " Success Matrix: Sun x Hydrology"),
+        #           card_body(
+        #             plotlyOutput(ns("success_matrix_plot"), height = "320px"),
+        #             tags$p(class = "text-muted small mt-2",
+        #                    "Success rate (% Thriving + Established) by condition. Darker green = higher success.")
+        #           )
+        #         )
+        #       } else {
+        #         card(
+        #           card_header(icon("info-circle"), " More Data Needed"),
+        #           card_body(
+        #             class = "text-center text-muted",
+        #             tags$p("Record sun exposure and hydrology data to see the Success Matrix visualization.")
+        #           )
+        #         )
+        #       }
+        #     )
+        #   )
+        # }
       )
     })
 
