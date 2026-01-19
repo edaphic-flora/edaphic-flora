@@ -175,6 +175,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # Reactive trigger to refresh extraction status after each extraction
+    extraction_trigger <- reactiveVal(0)
+
     # --- PDF Upload Section (conditional on API key) ---
     output$pdf_upload_section <- renderUI({
       if (!is_pdf_extraction_available()) return(NULL)
@@ -228,6 +231,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
     # --- PDF Extraction Status ---
     output$pdf_extract_status <- renderUI({
+      # Depend on trigger to refresh after each extraction
+      extraction_trigger()
+
       u <- current_user()
       if (is.null(u)) {
         return(div(class = "text-muted small", "Sign in to use PDF extraction"))
@@ -273,8 +279,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       removeNotification(notif_id)
 
       if (result$success) {
-        # Log the extraction
+        # Log the extraction and refresh status display
         db_log_extraction(u$user_uid, input$pdf_upload$name, result$tokens_used)
+        extraction_trigger(extraction_trigger() + 1)
 
         # Populate form fields
         data <- result$data
