@@ -82,6 +82,14 @@ db_migrate <- function() {
     # Qualitative organic matter class (added 2025-01)
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS organic_matter_class VARCHAR(50)")
 
+    # Level III ecoregion columns (added 2025-01)
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS ecoregion_l3 VARCHAR(255)")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS ecoregion_l3_code VARCHAR(50)")
+
+    # Level II ecoregion columns (added 2025-01)
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS ecoregion_l2 VARCHAR(255)")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS ecoregion_l2_code VARCHAR(50)")
+
     # Indices
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
