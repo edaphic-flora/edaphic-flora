@@ -18,6 +18,25 @@ welcomeUI <- function(id) {
       card(
         card_header(
           class = "bg-transparent border-0 pt-4",
+          # Alpha feedback banner
+          div(class = "alert alert-warning mb-4 mx-3",
+              style = "border-left: 4px solid #7A9A86;",
+              div(class = "d-flex align-items-start",
+                  icon("flask", class = "me-3 mt-1", style = "font-size: 1.5rem; color: #7A9A86;"),
+                  div(
+                    tags$strong("Welcome to the Alpha!", class = "d-block mb-1"),
+                    "You're among the first to test edaphic flora. Your feedback is invaluable! ",
+                    "Please report bugs, suggest improvements, or share your experience:",
+                    div(class = "mt-2",
+                        tags$a(href = "https://github.com/todd-testerman/edaphic-flora/issues",
+                               target = "_blank", class = "btn btn-sm btn-outline-secondary me-2",
+                               icon("github"), " Open an Issue"),
+                        tags$a(href = "mailto:edaphicflora@gmail.com?subject=Alpha%20Feedback",
+                               class = "btn btn-sm btn-outline-secondary",
+                               icon("envelope"), " Email Feedback"))
+                  )
+              )
+          ),
           div(class = "text-center",
               h1(class = "welcome-brand mb-3",
                  span(class = "brand-name-edaphic", "edaphic"),
@@ -103,6 +122,11 @@ welcomeUI <- function(id) {
       card(
         card_header(icon("chart-simple"), "Database Stats"),
         card_body(
+          # Alpha test data notice
+          div(class = "alert alert-info py-2 px-2 mb-3", style = "font-size: 0.75rem;",
+              icon("info-circle"), " ",
+              tags$strong("Alpha Note:"), " Current data is simulated for testing. ",
+              "Real community data will replace this as users contribute."),
           uiOutput(ns("stats")),
           div(class = "text-muted text-center mb-1", style = "font-size: 0.7rem;",
               icon("map-location-dot"), " Sample Locations"),
