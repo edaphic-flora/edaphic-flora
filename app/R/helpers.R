@@ -15,20 +15,51 @@ TEXTURE_TOLERANCE <- 0.1
 
 get_ecoregion <- function(lat, long, eco_sf) {
   if (is.null(lat) || is.null(long) || is.na(lat) || is.na(long)) {
-    return(list(name = NA_character_, code = NA_character_))
+    return(list(
+      l4_name = NA_character_, l4_code = NA_character_,
+      l3_name = NA_character_, l3_code = NA_character_,
+      l2_name = NA_character_, l2_code = NA_character_,
+      # Legacy fields for backwards compatibility
+      name = NA_character_, code = NA_character_
+    ))
   }
   tryCatch({
     pt <- st_as_sf(data.frame(long = long, lat = lat), coords = c("long", "lat"), crs = 4326)
     inters <- st_intersects(eco_sf, pt, sparse = FALSE)
     if (any(inters)) {
       idx <- which(inters)[1]
-      list(name = as.character(eco_sf$us_l4name[idx]),
-           code = as.character(eco_sf$us_l4code[idx]))
+      # Extract L4 data
+      l4_name <- if ("us_l4name" %in% names(eco_sf)) as.character(eco_sf$us_l4name[idx]) else NA_character_
+      l4_code <- if ("us_l4code" %in% names(eco_sf)) as.character(eco_sf$us_l4code[idx]) else NA_character_
+      # Extract L3 data
+      l3_name <- if ("us_l3name" %in% names(eco_sf)) as.character(eco_sf$us_l3name[idx]) else NA_character_
+      l3_code <- if ("us_l3code" %in% names(eco_sf)) as.character(eco_sf$us_l3code[idx]) else NA_character_
+      # Extract L2 data (North American level)
+      l2_name <- if ("na_l2name" %in% names(eco_sf)) as.character(eco_sf$na_l2name[idx]) else NA_character_
+      l2_code <- if ("na_l2code" %in% names(eco_sf)) as.character(eco_sf$na_l2code[idx]) else NA_character_
+
+      list(
+        l4_name = l4_name, l4_code = l4_code,
+        l3_name = l3_name, l3_code = l3_code,
+        l2_name = l2_name, l2_code = l2_code,
+        # Legacy fields
+        name = l4_name, code = l4_code
+      )
     } else {
-      list(name = NA_character_, code = NA_character_)
+      list(
+        l4_name = NA_character_, l4_code = NA_character_,
+        l3_name = NA_character_, l3_code = NA_character_,
+        l2_name = NA_character_, l2_code = NA_character_,
+        name = NA_character_, code = NA_character_
+      )
     }
   }, error = function(e) {
-    list(name = NA_character_, code = NA_character_)
+    list(
+      l4_name = NA_character_, l4_code = NA_character_,
+      l3_name = NA_character_, l3_code = NA_character_,
+      l2_name = NA_character_, l2_code = NA_character_,
+      name = NA_character_, code = NA_character_
+    )
   })
 }
 

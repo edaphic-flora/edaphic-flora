@@ -43,6 +43,7 @@ source("R/mod_admin.R")
 source("R/mod_data_management.R")
 source("R/mod_find_plants.R")
 source("R/mod_data_entry.R")
+source("R/ecoregion_ref.R")
 source("R/mod_analysis.R")
 
 # --- Initialize
@@ -75,14 +76,26 @@ if (is_prod) {
   })
 }
 
-# Unified ecoregion lookup function
+# Unified ecoregion lookup function (returns L4, L3, and L2 data)
 lookup_ecoregion <- function(lat, lon) {
   if (!is.null(eco_sf)) {
     get_ecoregion(lat, lon, eco_sf)
   } else if (!is.null(eco_grid)) {
-    get_ecoregion_from_grid(lat, lon, eco_grid)
+    # Grid lookup only has L4 - return structure with NA for L3/L2
+    result <- get_ecoregion_from_grid(lat, lon, eco_grid)
+    list(
+      l4_name = result$name, l4_code = result$code,
+      l3_name = NA_character_, l3_code = NA_character_,
+      l2_name = NA_character_, l2_code = NA_character_,
+      name = result$name, code = result$code
+    )
   } else {
-    list(name = NA_character_, code = NA_character_)
+    list(
+      l4_name = NA_character_, l4_code = NA_character_,
+      l3_name = NA_character_, l3_code = NA_character_,
+      l2_name = NA_character_, l2_code = NA_character_,
+      name = NA_character_, code = NA_character_
+    )
   }
 }
 
