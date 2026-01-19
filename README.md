@@ -169,6 +169,8 @@ This project uses a dual-license model:
 - **Code**: [AGPL-3.0-or-later](LICENSE) - Free to use, modify, and distribute with source code disclosure
 - **Data**: [CC BY-NC 4.0](LICENSE-data.md) - Free for non-commercial use with attribution
 
+Third-party data sources (WCVP, USDA, etc.) retain their original licenses. See [DATA_SOURCES.md](DATA_SOURCES.md) for details.
+
 For commercial licensing inquiries, contact: edaphicflora@gmail.com
 
 ## Acknowledgments
