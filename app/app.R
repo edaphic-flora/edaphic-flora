@@ -411,8 +411,8 @@ server_inner <- function(input, output, session) {
  #   nav_select("main_nav", "FAQ")
  # }, ignoreInit = TRUE)
 
- # PDF extraction daily limit for non-admin users
- pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "3"))
+ # PDF extraction daily limit for non-admin users (hardcoded for free tier)
+ pdf_extract_limit <- 3L
 
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
