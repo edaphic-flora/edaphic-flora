@@ -402,7 +402,7 @@ server_inner <- function(input, output, session) {
  # --- Find Plants module ---
  # HIDDEN FOR INITIAL RELEASE: Requires 10+ samples per species for meaningful recommendations
  # Uncomment when database has sufficient data:
- # pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "5"))
+ # pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "3"))
  # find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
  #                                      pdf_extract_limit)
  #
@@ -410,6 +410,9 @@ server_inner <- function(input, output, session) {
  # observeEvent(find_plants_faq(), {
  #   nav_select("main_nav", "FAQ")
  # }, ignoreInit = TRUE)
+
+ # PDF extraction daily limit for non-admin users
+ pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "3"))
 
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,

@@ -30,6 +30,7 @@ edaphic_colors <- list(
   soil = c("#DEB887", "#D2691E", "#A0522D", "#8B4513", "#654321"),
 
 # Categorical palette (for discrete scales, brand-harmonious)
+# 12 colors to support all nutrient types in charts
   categorical = c(
     "#7A9A86",
     "#373D3C",
@@ -40,7 +41,9 @@ edaphic_colors <- list(
     "#5D7A6A",
     "#9B8B7A",
     "#4A5D5A",
-    "#C4B7A6"
+    "#C4B7A6",
+    "#7B6B5A",
+    "#5A7A8B"
   )
 )
 
