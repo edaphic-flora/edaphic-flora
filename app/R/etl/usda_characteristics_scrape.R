@@ -112,7 +112,7 @@ ensure_schema_with_admin <- function() {
 }
 
 # ---------- HTTP helpers ----------
-ua <- "EdaphicFlora/1.0 (research; contact: todd@edaphicgardenconsulting.com)"
+ua <- "EdaphicFlora/1.0 (research; contact: edaphicflora@gmail.com)"
 
 get_json <- function(url, cache_key = NULL, cache_dir = "data/cache/usda_char") {
   if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)

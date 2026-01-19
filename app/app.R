@@ -222,6 +222,8 @@ base_ui <- page_navbar(
  nav_item(
    tags$span(class = "navbar-text me-3", textOutput("user_display", inline = TRUE))
  )
+ # NOTE: Sign out button removed - Polished sign-out endpoint not working locally
+ # Future improvement: investigate polished::sign_out_button() or custom sign-out handling
 )
 
 # Edit Modal

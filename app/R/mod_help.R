@@ -277,7 +277,7 @@ helpUI <- function(id) {
               "We welcome feedback! If you encounter any issues, have feature requests, or want to contribute, please ",
               tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues", target = "_blank", "open an issue on GitHub"),
               ". You can also reach us at ",
-              tags$a(href = "mailto:todd@edaphicgardenconsulting.com", "todd@edaphicgardenconsulting.com"), "."),
+              tags$a(href = "mailto:edaphicflora@gmail.com", "edaphicflora@gmail.com"), "."),
 
             hr(class = "my-4"),
             div(class = "text-center text-muted small",

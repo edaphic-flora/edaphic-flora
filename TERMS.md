@@ -98,7 +98,7 @@ These terms are governed by the laws of Connecticut, USA, without regard to conf
 Questions? Contact:
 
 **Todd Testerman**
-todd@edaphicgardenconsulting.com
+edaphicflora@gmail.com
 
 ---
 

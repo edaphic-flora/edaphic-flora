@@ -83,7 +83,7 @@ We may update this policy occasionally. Significant changes will be noted in the
 Questions about this privacy policy? Contact:
 
 **Todd Testerman**
-todd@edaphicgardenconsulting.com
+edaphicflora@gmail.com
 
 ---
 
