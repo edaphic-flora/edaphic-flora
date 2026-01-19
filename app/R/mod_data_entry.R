@@ -232,12 +232,15 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     # --- PDF Extraction Status ---
     output$pdf_extract_status <- renderUI({
       # Depend on trigger to refresh after each extraction
-      extraction_trigger()
+      trigger_val <- extraction_trigger()
+      message("[PDF Status] Rendering status, trigger value: ", trigger_val)
 
       u <- current_user()
       if (is.null(u)) {
         return(div(class = "text-muted small", "Sign in to use PDF extraction"))
       }
+
+      message("[PDF Status] User: ", u$user_uid, ", pdf_extract_limit: ", pdf_extract_limit)
 
       # Admin has unlimited extractions
       if (is_admin()) {
@@ -245,6 +248,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
 
       remaining <- db_get_remaining_extractions(u$user_uid, pdf_extract_limit)
+      message("[PDF Status] Remaining extractions: ", remaining)
       if (remaining > 0) {
         div(class = "text-muted small",
             icon("clock"), sprintf(" %d extraction%s remaining today", remaining, if (remaining == 1) "" else "s"))
@@ -280,8 +284,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
       if (result$success) {
         # Log the extraction and refresh status display
-        db_log_extraction(u$user_uid, input$pdf_upload$name, result$tokens_used)
+        message("[PDF Extract] Logging extraction for user: ", u$user_uid, ", file: ", input$pdf_upload$name)
+        log_result <- db_log_extraction(u$user_uid, input$pdf_upload$name, result$tokens_used)
+        message("[PDF Extract] Log result: ", log_result)
         extraction_trigger(extraction_trigger() + 1)
+        message("[PDF Extract] Trigger incremented to: ", extraction_trigger())
 
         # Populate form fields
         data <- result$data
