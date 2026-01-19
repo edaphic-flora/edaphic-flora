@@ -93,8 +93,8 @@ welcomeUI <- function(id) {
                              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues",
                                     target = "_blank", "Report an issue"),
                              " or email ",
-                             tags$a(href = "mailto:todd@edaphicgardenconsulting.com",
-                                    "todd@edaphicgardenconsulting.com")))
+                             tags$a(href = "mailto:edaphicflora@gmail.com",
+                                    "edaphicflora@gmail.com")))
           )
         )
       ),

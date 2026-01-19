@@ -1389,7 +1389,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       }
 
       div(
-        style = "max-height: 600px; overflow-y: auto; padding-right: 5px;",
+        # Content expands naturally (no scroll container)
         # Header with EPA link
         div(class = "mb-3 d-flex align-items-center justify-content-between",
             tags$span(class = "text-muted small",
@@ -1547,7 +1547,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           title = div(
             class = "d-flex justify-content-between align-items-center w-100",
             span(row$ecoregion_l4),
-            tags$span(class = "badge bg-secondary", paste0(row$n, " samples"))
+            tags$span(class = "badge bg-secondary ms-3", paste0(row$n, " samples"))
           ),
           value = paste0("eco_", i),
           div(
@@ -2113,8 +2113,10 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         }
       }
 
+      # Section headers styled with bold and sage color
       add_section <- function(label) {
-        result <<- rbind(result, data.frame(Trait = label, Value = "", stringsAsFactors = FALSE))
+        styled_label <- sprintf('<span style="font-weight: 600; color: #7A9A86;">%s</span>', label)
+        result <<- rbind(result, data.frame(Trait = styled_label, Value = "", stringsAsFactors = FALSE))
       }
 
       # -- Identification --
@@ -2178,13 +2180,10 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if ("flower_color" %in% names(tr)) add_row("Flower Color", tr$flower_color[1])
       if ("foliage_color" %in% names(tr)) add_row("Foliage Color", tr$foliage_color[1])
 
-      # Section headers (rows with empty Value)
-      section_labels <- c("Identification", "Growth Characteristics", "Soil Requirements",
-                          "Climate & Tolerances", "Ornamental Characteristics")
-
+      # Section headers (rows with empty Value) - identified by having HTML styling
       # Remove empty section headers (sections with no data after them)
       if (nrow(result) > 0) {
-        is_section <- result$Trait %in% section_labels
+        is_section <- grepl('font-weight: 600', result$Trait)
         keep <- rep(TRUE, nrow(result))
         for (i in seq_len(nrow(result) - 1)) {
           if (is_section[i] && is_section[i + 1]) {
@@ -2199,7 +2198,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       }
 
       result
-    }, striped = TRUE, hover = TRUE, width = "100%")
+    }, striped = TRUE, hover = TRUE, width = "100%", sanitize.text.function = identity)
 
   })
 }
