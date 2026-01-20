@@ -364,3 +364,68 @@ db_get_audit_log <- function(limit = 100) {
     data.frame()
   })
 }
+
+# ---------------------------
+# Reuse Previous Soil Data
+# ---------------------------
+
+#' Get user's recent unique soil profiles for reuse
+#' Groups by soil chemistry to show distinct soil tests (not every species entry)
+#' @param user_id Firebase UID
+#' @param limit Max number of profiles to return (default 10)
+#' @return Data frame with unique soil profiles
+db_get_user_soil_profiles <- function(user_id, limit = 10) {
+  if (is.null(user_id) || !nzchar(user_id)) return(data.frame())
+
+  tryCatch({
+    # Get distinct soil profiles (group by key soil properties)
+    # Use the most recent entry for each unique soil test
+    query <- "
+      SELECT DISTINCT ON (ph, organic_matter, texture_class)
+        id, date, created_at, ph, organic_matter, organic_matter_class,
+        texture_class, texture_sand, texture_silt, texture_clay,
+        nitrate_ppm, ammonium_ppm, phosphorus_ppm, potassium_ppm,
+        calcium_ppm, magnesium_ppm, sulfur_ppm, cec_meq, soluble_salts_ppm,
+        iron_ppm, manganese_ppm, zinc_ppm, copper_ppm, boron_ppm,
+        location_lat, location_long
+      FROM soil_samples
+      WHERE created_by = $1
+        AND (ph IS NOT NULL OR organic_matter IS NOT NULL)
+      ORDER BY ph, organic_matter, texture_class, created_at DESC
+      LIMIT $2
+    "
+
+    dbGetQuery(pool, query, params = list(user_id, limit))
+  }, error = function(e) {
+    message("Error fetching user soil profiles: ", e$message)
+    data.frame()
+  })
+}
+
+#' Get soil data from a specific entry for reuse
+#' @param entry_id The soil_samples.id to get data from
+#' @return Named list of soil chemistry fields, or NULL if not found
+db_get_soil_data_by_id <- function(entry_id) {
+  if (is.null(entry_id) || is.na(entry_id)) return(NULL)
+
+  tryCatch({
+    query <- "
+      SELECT ph, organic_matter, organic_matter_class,
+             texture_class, texture_sand, texture_silt, texture_clay,
+             nitrate_ppm, ammonium_ppm, phosphorus_ppm, potassium_ppm,
+             calcium_ppm, magnesium_ppm, sulfur_ppm, cec_meq, soluble_salts_ppm,
+             iron_ppm, manganese_ppm, zinc_ppm, copper_ppm, boron_ppm,
+             date as source_date
+      FROM soil_samples
+      WHERE id = $1
+    "
+    result <- dbGetQuery(pool, query, params = list(entry_id))
+
+    if (nrow(result) == 0) return(NULL)
+
+    as.list(result[1, ])
+  }, error = function(e) {
+    message("Error fetching soil data by id: ", e$message)
+    NULL
+  })
+}

@@ -21,6 +21,9 @@ dataEntryUI <- function(id) {
         # Soil Report Upload Section (conditional on API key availability)
         uiOutput(ns("pdf_upload_section")),
 
+        # Reuse Previous Soil Data (shown if user has previous entries)
+        uiOutput(ns("reuse_soil_section")),
+
         # Species (always visible - most important)
         selectizeInput(ns("species"), "Plant Species", choices = NULL, multiple = TRUE,
                        options = list(maxItems = 20, maxOptions = 100,
@@ -118,20 +121,23 @@ dataEntryUI <- function(id) {
             title = "Location",
             value = "location",
             icon = icon("map-marker-alt"),
-            textInput(ns("street"), "Street Address (optional)", ""),
-            textInput(ns("zipcode"), "Zip Code", "", placeholder = "Enter 5-digit zip to auto-fill city/state"),
-            div(class = "small text-muted mb-2", uiOutput(ns("zipcode_status"))),
-            textInput(ns("city"), "City/Town", ""),
-            selectInput(ns("state"), "State", choices = state.name, selected = "New York"),
-            actionButton(ns("geocode"), "Get Coordinates", class = "btn-info btn-sm w-100",
-                         icon = icon("search-location")),
-            div(class = "mt-2 small", uiOutput(ns("geocode_status"))),
-            hr(),
+            textInput(ns("street"), "Street Address (optional)", "",
+                      placeholder = "123 Main St"),
+            textInput(ns("zipcode"), "Zip Code", "",
+                      placeholder = "Enter 5-digit zip"),
+            div(class = "small mb-3", uiOutput(ns("location_status"))),
             layout_column_wrap(
               width = 1/2,
-              numericInput(ns("latitude"), "Latitude", value = 0, min = -90, max = 90, step = 0.0001),
-              numericInput(ns("longitude"), "Longitude", value = 0, min = -180, max = 180, step = 0.0001)
-            )
+              textInput(ns("city"), "City/Town", ""),
+              selectInput(ns("state"), "State", choices = state.name, selected = "New York")
+            ),
+            layout_column_wrap(
+              width = 1/2,
+              numericInput(ns("latitude"), "Latitude", value = NA, min = -90, max = 90, step = 0.0001),
+              numericInput(ns("longitude"), "Longitude", value = NA, min = -180, max = 180, step = 0.0001)
+            ),
+            tags$small(class = "text-muted",
+                       "Coordinates auto-fill from zip code, or enter manually.")
           ),
 
           # Additional
@@ -171,12 +177,15 @@ dataEntryUI <- function(id) {
 
 dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_classes,
                             current_user, is_admin, data_changed, lookup_ecoregion,
-                            pdf_extract_limit) {
+                            pdf_extract_limit, beta_features = list()) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     # Reactive trigger to refresh extraction status after each extraction
     extraction_trigger <- reactiveVal(0)
+
+    # State for soil data reuse
+    user_soil_profiles <- reactiveVal(NULL)  # Cached soil profiles for picker
 
     # --- PDF Upload Section (conditional on API key) ---
     output$pdf_upload_section <- renderUI({
@@ -199,6 +208,148 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                  "Upload a soil report to auto-fill the form. ",
                  "Supports PDF, RTF, TXT, and images (PNG, JPG).")
       )
+    })
+
+    # --- Reuse Previous Soil Data Section ---
+    output$reuse_soil_section <- renderUI({
+      u <- current_user()
+      if (is.null(u)) return(NULL)
+
+      # Check if user has any previous entries
+      profiles <- db_get_user_soil_profiles(u$user_uid, limit = 5)
+      user_soil_profiles(profiles)  # Cache for modal
+
+      if (nrow(profiles) == 0) return(NULL)
+
+      div(
+        class = "mb-3",
+        actionLink(ns("show_reuse_modal"),
+                   label = tagList(icon("recycle"), " Use previous soil data"),
+                   class = "text-success"),
+        tags$small(class = "text-muted d-block",
+                   sprintf("You have %d saved soil test%s",
+                           nrow(profiles), if (nrow(profiles) == 1) "" else "s"))
+      )
+    })
+
+    # Show reuse modal when link clicked
+    observeEvent(input$show_reuse_modal, {
+      profiles <- user_soil_profiles()
+      if (is.null(profiles) || nrow(profiles) == 0) {
+        showNotification("No previous soil data found.", type = "warning")
+        return()
+      }
+
+      # Build choices for the picker
+      choices <- lapply(seq_len(nrow(profiles)), function(i) {
+        p <- profiles[i, ]
+        label <- sprintf("pH %.1f | OM %.1f%% | %s (from %s)",
+                         p$ph %||% NA, p$organic_matter %||% NA,
+                         p$texture_class %||% "Unknown texture",
+                         format(as.Date(p$date), "%b %d, %Y"))
+        list(id = p$id, label = label)
+      })
+
+      showModal(modalDialog(
+        title = span(icon("recycle"), " Use Previous Soil Data"),
+        size = "m",
+        easyClose = TRUE,
+        footer = modalButton("Cancel"),
+
+        p("Select a previous soil test to auto-fill the form:"),
+
+        radioButtons(ns("reuse_profile_choice"), NULL,
+                     choices = setNames(
+                       sapply(choices, function(x) x$id),
+                       sapply(choices, function(x) x$label)
+                     )),
+
+        actionButton(ns("apply_reuse"), "Apply Soil Data",
+                     class = "btn-primary mt-3", icon = icon("check"))
+      ))
+    })
+
+    # Apply selected soil data to form
+    observeEvent(input$apply_reuse, {
+      selected_id <- as.integer(input$reuse_profile_choice)
+      soil_data <- db_get_soil_data_by_id(selected_id)
+
+      if (is.null(soil_data)) {
+        showNotification("Could not load soil data.", type = "error")
+        return()
+      }
+
+      # Fill form fields
+      if (!is.null(soil_data$ph) && !is.na(soil_data$ph)) {
+        updateNumericInput(session, "ph", value = soil_data$ph)
+      }
+      if (!is.null(soil_data$organic_matter) && !is.na(soil_data$organic_matter)) {
+        updateNumericInput(session, "organic_matter", value = soil_data$organic_matter)
+      }
+      if (!is.null(soil_data$organic_matter_class) && !is.na(soil_data$organic_matter_class)) {
+        updateSelectInput(session, "organic_matter_class", selected = soil_data$organic_matter_class)
+      }
+      if (!is.null(soil_data$cec_meq) && !is.na(soil_data$cec_meq)) {
+        updateNumericInput(session, "cec", value = soil_data$cec_meq)
+      }
+      if (!is.null(soil_data$soluble_salts_ppm) && !is.na(soil_data$soluble_salts_ppm)) {
+        updateNumericInput(session, "soluble_salts", value = soil_data$soluble_salts_ppm)
+      }
+
+      # Macronutrients
+      if (!is.null(soil_data$nitrate_ppm) && !is.na(soil_data$nitrate_ppm)) {
+        updateNumericInput(session, "nitrate", value = soil_data$nitrate_ppm)
+      }
+      if (!is.null(soil_data$ammonium_ppm) && !is.na(soil_data$ammonium_ppm)) {
+        updateNumericInput(session, "ammonium", value = soil_data$ammonium_ppm)
+      }
+      if (!is.null(soil_data$phosphorus_ppm) && !is.na(soil_data$phosphorus_ppm)) {
+        updateNumericInput(session, "phosphorus", value = soil_data$phosphorus_ppm)
+      }
+      if (!is.null(soil_data$potassium_ppm) && !is.na(soil_data$potassium_ppm)) {
+        updateNumericInput(session, "potassium", value = soil_data$potassium_ppm)
+      }
+      if (!is.null(soil_data$calcium_ppm) && !is.na(soil_data$calcium_ppm)) {
+        updateNumericInput(session, "calcium", value = soil_data$calcium_ppm)
+      }
+      if (!is.null(soil_data$magnesium_ppm) && !is.na(soil_data$magnesium_ppm)) {
+        updateNumericInput(session, "magnesium", value = soil_data$magnesium_ppm)
+      }
+      if (!is.null(soil_data$sulfur_ppm) && !is.na(soil_data$sulfur_ppm)) {
+        updateNumericInput(session, "sulfur", value = soil_data$sulfur_ppm)
+      }
+
+      # Micronutrients
+      if (!is.null(soil_data$iron_ppm) && !is.na(soil_data$iron_ppm)) {
+        updateNumericInput(session, "iron", value = soil_data$iron_ppm)
+      }
+      if (!is.null(soil_data$manganese_ppm) && !is.na(soil_data$manganese_ppm)) {
+        updateNumericInput(session, "manganese", value = soil_data$manganese_ppm)
+      }
+      if (!is.null(soil_data$zinc_ppm) && !is.na(soil_data$zinc_ppm)) {
+        updateNumericInput(session, "zinc", value = soil_data$zinc_ppm)
+      }
+      if (!is.null(soil_data$copper_ppm) && !is.na(soil_data$copper_ppm)) {
+        updateNumericInput(session, "copper", value = soil_data$copper_ppm)
+      }
+      if (!is.null(soil_data$boron_ppm) && !is.na(soil_data$boron_ppm)) {
+        updateNumericInput(session, "boron", value = soil_data$boron_ppm)
+      }
+
+      # Texture
+      if (!is.null(soil_data$texture_class) && !is.na(soil_data$texture_class)) {
+        updateRadioButtons(session, "texture_input_type", selected = "class")
+        updateSelectInput(session, "texture_class", selected = soil_data$texture_class)
+      } else if (!is.null(soil_data$texture_sand) && !is.na(soil_data$texture_sand)) {
+        updateRadioButtons(session, "texture_input_type", selected = "pct")
+        updateNumericInput(session, "sand", value = soil_data$texture_sand)
+        updateNumericInput(session, "silt", value = soil_data$texture_silt)
+        updateNumericInput(session, "clay", value = soil_data$texture_clay)
+      }
+
+      removeModal()
+      showNotification("Soil data applied! Now select species and submit.",
+                       type = "message", duration = 4)
     })
 
     # --- Species dropdown population ---
@@ -521,109 +672,278 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
     })
 
-    # --- Zipcode Lookup ---
-    observeEvent(input$zipcode, {
-      zip <- input$zipcode
+    # --- Auto Location Lookup ---
+    cached_zip_result <- reactiveVal(NULL)
 
-      # Only lookup when we have 5 digits
-      zip_clean <- gsub("[^0-9]", "", zip)
-      if (nchar(zip_clean) != 5) {
-        output$zipcode_status <- renderUI(NULL)
-        return()
-      }
-
-      result <- lookup_zipcode(zip_clean, zipcode_db)
-
-      if (!is.null(result)) {
-        # Auto-fill city and state (convert abbreviation to full name for dropdown)
-        state_full <- state.name[match(result$state, state.abb)]
-        if (is.na(state_full)) state_full <- result$state  # Fallback if not found
-
-        updateTextInput(session, "city", value = result$city)
-        updateSelectInput(session, "state", selected = state_full)
-
-        # Also set coordinates from zipcode centroid
-        if (!is.na(result$latitude) && !is.na(result$longitude)) {
-          updateNumericInput(session, "latitude", value = round(result$latitude, 6))
-          updateNumericInput(session, "longitude", value = round(result$longitude, 6))
-
-          # Lookup ecoregion
-          eco <- tryCatch(lookup_ecoregion(result$latitude, result$longitude),
-                          error = function(e) list(name = NA, code = NA))
-
-          output$zipcode_status <- renderUI({
-            tagList(
-              icon("check-circle", class = "text-success"),
-              sprintf(" %s, %s", result$city, result$state),
-              if (!is.null(eco$name) && !is.na(eco$name)) {
-                span(class = "text-muted", sprintf(" - %s", eco$name))
-              }
-            )
-          })
-        } else {
-          output$zipcode_status <- renderUI({
-            tagList(
-              icon("check-circle", class = "text-success"),
-              sprintf(" %s, %s", result$city, result$state)
-            )
-          })
-        }
+    # Helper function to perform geocoding (called after delay so spinner shows)
+    do_geocode <- function(zip_result, zip_clean, street) {
+      # Build address for geocoding
+      address <- if (nzchar(trimws(street))) {
+        paste0(street, ", ", zip_result$city, ", ", zip_result$state, " ", zip_clean)
       } else {
-        output$zipcode_status <- renderUI({
-          tagList(icon("times-circle", class = "text-warning"), " Zipcode not found")
-        })
+        paste0(zip_result$city, ", ", zip_result$state, " ", zip_clean)
       }
-    }, ignoreInit = TRUE)
-
-    # --- Geocoding ---
-    observeEvent(input$geocode, {
-      req(input$city, input$state)
-
-      output$geocode_status <- renderUI({
-        div(class = "text-info", icon("spinner", class = "fa-spin"), " Looking up address...")
-      })
 
       tryCatch({
-        address <- paste(
-          if (nzchar(input$street)) paste0(input$street, ", ") else "",
-          input$city, ", ", input$state
-        )
-
-        res <- tryCatch({ geo(address = address, method = "osm") }, error = function(e) NULL)
+        res <- geo(address = address, method = "osm")
 
         if (!is.null(res) && nrow(res) > 0 && !is.na(res$lat[1])) {
+          # Geocoding succeeded
           updateNumericInput(session, "latitude", value = round(res$lat[1], 6))
           updateNumericInput(session, "longitude", value = round(res$long[1], 6))
 
-          # Ecoregion lookup
+          # Lookup ecoregion
           eco <- tryCatch(lookup_ecoregion(res$lat[1], res$long[1]),
                           error = function(e) list(name = NA, code = NA))
 
-          output$geocode_status <- renderUI({
-            tagList(
-              div(class = "text-success", icon("check-circle"),
-                  sprintf(" Found: %.4f, %.4f", res$lat[1], res$long[1])),
-              if (!is.null(eco$name) && !is.na(eco$name)) {
-                div(class = "text-muted mt-1", icon("map"), " ", eco$name)
-              }
+          output$location_status <- renderUI({
+            div(class = "text-success",
+                icon("check-circle"),
+                sprintf(" %s, %s", zip_result$city, zip_result$state),
+                if (!is.null(eco$l4_name) && !is.na(eco$l4_name)) {
+                  tags$small(class = "text-muted d-block",
+                             icon("map"), " ", eco$l4_name)
+                } else if (!is.null(eco$name) && !is.na(eco$name)) {
+                  tags$small(class = "text-muted d-block",
+                             icon("map"), " ", eco$name)
+                }
             )
           })
         } else {
-          output$geocode_status <- renderUI({
-            div(class = "text-danger", icon("times-circle"), " Address not found")
-          })
+          # Geocoding failed, fall back to zipcode centroid
+          if (!is.na(zip_result$latitude) && !is.na(zip_result$longitude)) {
+            updateNumericInput(session, "latitude", value = round(zip_result$latitude, 6))
+            updateNumericInput(session, "longitude", value = round(zip_result$longitude, 6))
+
+            output$location_status <- renderUI({
+              div(class = "text-success",
+                  icon("check-circle"),
+                  sprintf(" %s, %s (approximate)", zip_result$city, zip_result$state))
+            })
+          } else {
+            output$location_status <- renderUI({
+              div(class = "text-warning",
+                  icon("exclamation-triangle"),
+                  sprintf(" %s, %s - coordinates unavailable", zip_result$city, zip_result$state))
+            })
+          }
         }
       }, error = function(e) {
-        # Log the full error for debugging
         message("Geocoding error: ", e$message)
-        # Show user-friendly message
-        output$geocode_status <- renderUI({
-          div(class = "text-danger", icon("times-circle"), " Unable to look up address. Please check the city/state or enter coordinates manually.")
-        })
+        # Fall back to zipcode centroid on error
+        if (!is.na(zip_result$latitude) && !is.na(zip_result$longitude)) {
+          updateNumericInput(session, "latitude", value = round(zip_result$latitude, 6))
+          updateNumericInput(session, "longitude", value = round(zip_result$longitude, 6))
+
+          output$location_status <- renderUI({
+            div(class = "text-success",
+                icon("check-circle"),
+                sprintf(" %s, %s (approximate)", zip_result$city, zip_result$state))
+          })
+        } else {
+          output$location_status <- renderUI({
+            div(class = "text-warning",
+                icon("exclamation-triangle"),
+                " Could not get coordinates. Enter manually if needed.")
+          })
+        }
       })
-    })
+    }
+
+    # When zipcode changes, show spinner then geocode after delay
+    observeEvent(input$zipcode, {
+      zip <- input$zipcode
+      zip_clean <- gsub("[^0-9]", "", zip)
+
+      if (nchar(zip_clean) != 5) {
+        output$location_status <- renderUI(NULL)
+        cached_zip_result(NULL)
+        return()
+      }
+
+      # Lookup city/state from zipcode database (fast, local)
+      zip_result <- lookup_zipcode(zip_clean, zipcode_db)
+
+      if (is.null(zip_result)) {
+        output$location_status <- renderUI({
+          div(class = "text-warning",
+              icon("exclamation-triangle"),
+              " Zip code not found. Enter city/state manually.")
+        })
+        cached_zip_result(NULL)
+        return()
+      }
+
+      # Auto-fill city and state immediately
+      state_full <- state.name[match(zip_result$state, state.abb)]
+      if (is.na(state_full)) state_full <- zip_result$state
+
+      updateTextInput(session, "city", value = zip_result$city)
+      updateSelectInput(session, "state", selected = state_full)
+      cached_zip_result(zip_result)
+
+      # Show spinner
+      output$location_status <- renderUI({
+        div(class = "text-info",
+            icon("spinner", class = "fa-spin"),
+            sprintf(" Looking up coordinates for %s, %s...", zip_result$city, zip_result$state))
+      })
+
+      # Schedule geocoding after brief delay so spinner can render
+      street <- input$street
+      later::later(function() {
+        do_geocode(zip_result, zip_clean, street)
+      }, delay = 0.1)
+    }, ignoreInit = TRUE)
+
+    # When street address changes (and we have a zip), re-geocode
+    observeEvent(input$street, {
+      zip_result <- cached_zip_result()
+      if (is.null(zip_result)) return()
+
+      # Only re-geocode if street has content
+      street <- trimws(input$street)
+      if (!nzchar(street)) return()
+
+      zip_clean <- gsub("[^0-9]", "", input$zipcode)
+
+      # Show spinner
+      output$location_status <- renderUI({
+        div(class = "text-info",
+            icon("spinner", class = "fa-spin"),
+            " Refining coordinates with street address...")
+      })
+
+      # Schedule geocoding after brief delay so spinner can render
+      later::later(function() {
+        do_geocode(zip_result, zip_clean, street)
+      }, delay = 0.1)
+    }, ignoreInit = TRUE)
 
     # --- Submit sample ---
+
+    # Helper function to perform the actual submission
+    perform_submit <- function(reuse_soil_data = NULL) {
+      u <- current_user()
+      if (is.null(u)) {
+        showNotification("Please sign in to submit data.", type = "error")
+        return()
+      }
+
+      species_list <- input$species
+
+      # Calculate shared values once
+      eco <- tryCatch(lookup_ecoregion(input$latitude, input$longitude),
+                      error = function(e) list(name = NA, code = NA))
+
+      # Get soil chemistry from form (form may have been pre-filled via "Use previous soil data")
+      ph_val <- input$ph
+      om_val <- input$organic_matter
+      om_class_val <- if (nzchar(input$organic_matter_class)) input$organic_matter_class else NA
+      cec_val <- input$cec
+      salts_val <- input$soluble_salts
+      nitrate_val <- input$nitrate
+      ammonium_val <- input$ammonium
+      phosphorus_val <- input$phosphorus
+      potassium_val <- input$potassium
+      calcium_val <- input$calcium
+      magnesium_val <- input$magnesium
+      sulfur_val <- input$sulfur
+      iron_val <- input$iron
+      manganese_val <- input$manganese
+      zinc_val <- input$zinc
+      copper_val <- input$copper
+      boron_val <- input$boron
+
+      # Calculate texture
+      if (input$texture_input_type == "pct") {
+        texture_class_val <- classify_texture(input$sand, input$silt, input$clay, soil_texture_classes)
+        sand_val <- input$sand
+        silt_val <- input$silt
+        clay_val <- input$clay
+      } else {
+        texture_class_val <- input$texture_class
+        texture_pcts <- get_texture_percentages(input$texture_class, soil_texture_classes)
+        sand_val <- texture_pcts$sand
+        silt_val <- texture_pcts$silt
+        clay_val <- texture_pcts$clay
+      }
+
+      # Helper to safely get per-species input values
+      get_sp_input <- function(prefix, sp) {
+        sp_id <- gsub("[^a-zA-Z0-9]", "_", sp)
+        val <- input[[paste0(prefix, "_", sp_id)]]
+        if (is.null(val) || !nzchar(trimws(as.character(val)))) NA_character_ else trimws(val)
+      }
+
+      # Create one record per species with per-species metadata
+      success_count <- 0
+      for (sp in species_list) {
+        new_data <- data.frame(
+          species = sp,
+          cultivar = get_sp_input("cultivar", sp),
+          outcome = get_sp_input("outcome", sp),
+          sun_exposure = get_sp_input("sun", sp),
+          site_hydrology = get_sp_input("hydrology", sp),
+          inat_url = get_sp_input("inat", sp),
+          ph = ph_val,
+          organic_matter = om_val,
+          organic_matter_class = om_class_val,
+          cec_meq = cec_val,
+          soluble_salts_ppm = salts_val,
+          nitrate_ppm = nitrate_val,
+          ammonium_ppm = ammonium_val,
+          phosphorus_ppm = phosphorus_val,
+          potassium_ppm = potassium_val,
+          calcium_ppm = calcium_val,
+          magnesium_ppm = magnesium_val,
+          sulfur_ppm = sulfur_val,
+          iron_ppm = iron_val,
+          manganese_ppm = manganese_val,
+          zinc_ppm = zinc_val,
+          copper_ppm = copper_val,
+          boron_ppm = boron_val,
+          texture_class = texture_class_val,
+          texture_sand = sand_val,
+          texture_silt = silt_val,
+          texture_clay = clay_val,
+          ecoregion_l4 = eco$l4_name %||% eco$name,
+          ecoregion_l4_code = eco$l4_code %||% eco$code,
+          ecoregion_l3 = eco$l3_name,
+          ecoregion_l3_code = eco$l3_code,
+          ecoregion_l2 = eco$l2_name,
+          ecoregion_l2_code = eco$l2_code,
+          location_lat = input$latitude,
+          location_long = input$longitude,
+          notes = input$notes,
+          date = input$date,
+          created_by = u$user_uid,
+          stringsAsFactors = FALSE
+        )
+
+        sample_id <- db_add_sample(new_data)
+        if (!is.null(sample_id)) {
+          success_count <- success_count + 1
+          db_audit_log("create", "soil_samples", sample_id, u$user_uid, sprintf("species: %s", sp))
+        }
+      }
+
+      if (success_count > 0) {
+        showNotification(
+          span(icon("check-circle"),
+               sprintf(" %d sample%s added successfully!",
+                       success_count, if (success_count == 1) "" else "s")),
+          type = "message", duration = 3
+        )
+        data_changed(data_changed() + 1)
+
+        # Reset form
+        updateSelectizeInput(session, "species", selected = character(0))
+      } else {
+        showNotification("Error adding samples. Please try again.", type = "error")
+      }
+    }
+
     observeEvent(input$submit, {
       u <- current_user()
       if (is.null(u)) {
@@ -667,103 +987,21 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       # Validate coordinates if provided
       lat <- input$latitude
       lon <- input$longitude
-      if (!is.null(lat) && !is.na(lat) && lat != 0) {
+      if (!is.null(lat) && !is.na(lat)) {
         if (lat < -90 || lat > 90) {
           showNotification("Latitude must be between -90 and 90 degrees", type = "error")
           return()
         }
       }
-      if (!is.null(lon) && !is.na(lon) && lon != 0) {
+      if (!is.null(lon) && !is.na(lon)) {
         if (lon < -180 || lon > 180) {
           showNotification("Longitude must be between -180 and 180 degrees", type = "error")
           return()
         }
       }
 
-      # Calculate shared values once
-      eco <- tryCatch(lookup_ecoregion(input$latitude, input$longitude),
-                      error = function(e) list(name = NA, code = NA))
-      texture_pcts <- if (input$texture_input_type == "class") {
-        get_texture_percentages(input$texture_class, soil_texture_classes)
-      } else NULL
-
-      texture_class_val <- if (input$texture_input_type == "pct") {
-        classify_texture(input$sand, input$silt, input$clay, soil_texture_classes)
-      } else input$texture_class
-
-      # Helper to safely get per-species input values
-      get_sp_input <- function(prefix, sp) {
-        sp_id <- gsub("[^a-zA-Z0-9]", "_", sp)
-        val <- input[[paste0(prefix, "_", sp_id)]]
-        if (is.null(val) || !nzchar(trimws(as.character(val)))) NA_character_ else trimws(val)
-      }
-
-      # Create one record per species with per-species metadata
-      success_count <- 0
-      for (sp in species_list) {
-        new_data <- data.frame(
-          species = sp,
-          cultivar = get_sp_input("cultivar", sp),
-          outcome = get_sp_input("outcome", sp),
-          sun_exposure = get_sp_input("sun", sp),
-          site_hydrology = get_sp_input("hydrology", sp),
-          inat_url = get_sp_input("inat", sp),
-          ph = input$ph,
-          organic_matter = input$organic_matter,
-          organic_matter_class = if (nzchar(input$organic_matter_class)) input$organic_matter_class else NA,
-          cec_meq = input$cec,
-          soluble_salts_ppm = input$soluble_salts,
-          nitrate_ppm = input$nitrate,
-          ammonium_ppm = input$ammonium,
-          phosphorus_ppm = input$phosphorus,
-          potassium_ppm = input$potassium,
-          calcium_ppm = input$calcium,
-          magnesium_ppm = input$magnesium,
-          sulfur_ppm = input$sulfur,
-          iron_ppm = input$iron,
-          manganese_ppm = input$manganese,
-          zinc_ppm = input$zinc,
-          copper_ppm = input$copper,
-          boron_ppm = input$boron,
-          texture_class = texture_class_val,
-          texture_sand = if (input$texture_input_type == "pct") input$sand else texture_pcts$sand,
-          texture_silt = if (input$texture_input_type == "pct") input$silt else texture_pcts$silt,
-          texture_clay = if (input$texture_input_type == "pct") input$clay else texture_pcts$clay,
-          ecoregion_l4 = eco$l4_name %||% eco$name,
-          ecoregion_l4_code = eco$l4_code %||% eco$code,
-          ecoregion_l3 = eco$l3_name,
-          ecoregion_l3_code = eco$l3_code,
-          ecoregion_l2 = eco$l2_name,
-          ecoregion_l2_code = eco$l2_code,
-          location_lat = input$latitude,
-          location_long = input$longitude,
-          notes = input$notes,
-          date = input$date,
-          created_by = u$user_uid,
-          stringsAsFactors = FALSE
-        )
-
-        sample_id <- db_add_sample(new_data)
-        if (!is.null(sample_id)) {
-          success_count <- success_count + 1
-          db_audit_log("create", "soil_samples", sample_id, u$user_uid, sprintf("species: %s", sp))
-        }
-      }
-
-      if (success_count > 0) {
-        showNotification(
-          span(icon("check-circle"),
-               sprintf(" %d sample%s added successfully!",
-                       success_count, if (success_count == 1) "" else "s")),
-          type = "message", duration = 3
-        )
-        data_changed(data_changed() + 1)
-
-        # Reset form
-        updateSelectizeInput(session, "species", selected = character(0))
-      } else {
-        showNotification("Error adding samples. Please try again.", type = "error")
-      }
+      # Proceed with submit
+      perform_submit(reuse_soil_data = NULL)
     })
 
   })
