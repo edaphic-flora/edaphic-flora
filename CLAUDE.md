@@ -109,7 +109,7 @@ app/
 
 ### Modularization Status (COMPLETE)
 
-All 7 modules have been extracted from app.R:
+All 6 modules have been extracted from app.R:
 
 | Module | Lines | Description |
 |--------|-------|-------------|
@@ -117,18 +117,20 @@ All 7 modules have been extracted from app.R:
 | **mod_welcome.R** | 193 | Landing page with stats and map |
 | **mod_admin.R** | 114 | Admin-only data management |
 | **mod_data_management.R** | 223 | Export and CSV import |
-| **mod_find_plants.R** | 499 | Species recommendation engine |
-| **mod_data_entry.R** | 704 | Soil sample data collection |
+| **mod_find_plants.R** | 499 | Species recommendation engine (hidden until data threshold met) |
+| **mod_data_entry.R** | 1,307 | Soil sample data collection + user data management (Recent/All My Data tabs) |
 | **mod_analysis.R** | 1,733 | Species data visualization |
-| **app.R** | 568 | Core app (routing, auth, edit handlers) |
+| **app.R** | 600 | Core app (routing, auth, edit handlers) |
 
-Total: ~4,343 lines (previously ~4,100 in app.R alone)
+Total: ~4,978 lines (previously 7 modules, mod_my_data.R merged into mod_data_entry.R)
 
 ### UI Structure
 
 The app uses `page_navbar` with these main sections:
 1. **Welcome**: Landing page with app overview, stats, and help links
-2. **Data Entry**: Sidebar form with accordion sections + recent entries table (users can edit/delete their own entries)
+2. **Data Entry**: Sidebar form with accordion sections + tabbed data view:
+   - **Recent**: Last 10 entries from all users with edit/delete buttons for own entries
+   - **All My Data**: Full user data with filters, stats, bulk delete, and CSV export
 3. **Analysis**: Species selector sidebar with filters (Outcome, Sun, Hydrology, Cultivar) + tabbed visualizations:
    - Summary, pH Distribution, Organic Matter, Texture, Nutrients, Correlations, Map, Performance (new), USDA Traits
 4. **Data Management**: Import/export functionality
@@ -619,3 +621,32 @@ moduleServer <- function(id, pool, current_user, ...) {
 - [x] "Apply Soil Data" fills all soil chemistry fields
 - [x] Texture properly switches to class mode when applied
 - [x] User can still edit values after applying
+
+### 2025-01-20: Combined Data Entry + My Data Tabs
+
+**Status:** COMPLETE - The separate "My Data" tab has been merged into the Data Entry tab.
+
+**Changes:**
+- Data Entry tab now uses `navset_card_tab` with two subtabs:
+  - **Recent**: Shows last 10 entries from all users (same as before)
+  - **All My Data**: Full user data management with filters, stats, bulk delete, and CSV export
+- Removed standalone `mod_my_data.R` module
+- Removed `myDataUI` and `myDataServer` calls from app.R
+
+**Features in "All My Data" subtab:**
+- Stats summary (total entries, species count, success rate)
+- Species search filter
+- Outcome filter dropdown
+- Bulk selection and delete
+- CSV export of user's data
+- Edit/delete buttons per row (triggers global handlers in app.R)
+
+**Files Modified:**
+- `app/R/mod_data_entry.R` - Added All My Data UI and server logic
+- `app/app.R` - Removed My Data module references
+- `app/R/mod_my_data.R` - Deleted (functionality merged)
+
+**User Experience:**
+- Fewer top-level tabs = simpler navigation
+- All data entry and personal data management in one place
+- Users can easily switch between adding new entries and viewing/managing existing data
