@@ -133,7 +133,7 @@ is_dev <- (app_env == "dev")
 # --- Beta features config
 # Note: "Reuse previous soil data" is now always available (no longer location-based)
 BETA_FEATURES <- list(
-  batch_plant_upload = is_dev,        # CSV upload for bulk plant entry (dev only for now)
+  batch_plant_upload = TRUE,          # CSV upload for bulk plant entry (enabled for alpha)
   outcome_reminders = FALSE           # Email reminders for outcome updates (not implemented)
 )
 
