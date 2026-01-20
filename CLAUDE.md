@@ -179,6 +179,17 @@ FIREBASE_PROJECT_ID=
 ADMIN_EMAILS=admin@example.com,owner@example.com
 ```
 
+### shinyapps.io Deployment (Free Tier)
+
+**Important:** The shinyapps.io free tier does NOT allow setting environment variables through the dashboard. The workaround is to include the `.Renviron` file directly in the deployment:
+
+1. The `app/.Renviron` file contains all production credentials
+2. This file is gitignored but MUST be present locally for deployment
+3. When deploying via `rsconnect::deployApp()`, the .Renviron is uploaded with the app
+4. Set `ENV=prod` in .Renviron before deploying to production
+
+**Never commit `.Renviron` to git** - it contains sensitive credentials.
+
 ### Admin Features
 Admin users (defined by `ADMIN_EMAILS`) can:
 - Edit/delete any user's entries (not just their own)
