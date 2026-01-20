@@ -197,3 +197,146 @@ calc_similarity <- function(profile1, profile2) {
   if (length(scores) == 0) return(0)
   sum(scores * weights) / sum(weights)
 }
+
+# ---------------------------
+# Batch Plant Upload
+# ---------------------------
+
+#' Parse plant list CSV for batch upload
+#' @param file_path Path to uploaded CSV file
+#' @param species_db Species database for validation
+#' @param max_rows Maximum rows to allow (default 100)
+#' @return List with $valid (data frame), $invalid (character vector), $error (string or NULL)
+parse_plant_list <- function(file_path, species_db, max_rows = 100) {
+  # Read file based on extension
+  ext <- tolower(tools::file_ext(file_path))
+
+  df <- tryCatch({
+    if (ext == "xlsx" || ext == "xls") {
+      if (!requireNamespace("readxl", quietly = TRUE)) {
+        return(list(valid = NULL, invalid = NULL, error = "Excel support requires the readxl package"))
+      }
+      readxl::read_excel(file_path)
+    } else {
+      read.csv(file_path, stringsAsFactors = FALSE, na.strings = c("", "NA"))
+    }
+  }, error = function(e) {
+    return(NULL)
+  })
+
+  if (is.null(df)) {
+    return(list(valid = NULL, invalid = NULL, error = "Could not read file. Please check the format."))
+  }
+
+  # Normalize column names (lowercase, trim whitespace)
+  names(df) <- tolower(trimws(names(df)))
+
+  # Require species column
+  if (!"species" %in% names(df)) {
+    return(list(valid = NULL, invalid = NULL, error = "Missing required 'species' column"))
+  }
+
+  # Clean species names
+ df$species <- trimws(as.character(df$species))
+  df <- df[!is.na(df$species) & df$species != "", ]
+
+  if (nrow(df) == 0) {
+    return(list(valid = NULL, invalid = NULL, error = "No valid species found in file"))
+  }
+
+  # Check row limit
+  if (nrow(df) > max_rows) {
+    return(list(valid = NULL, invalid = NULL,
+                error = sprintf("Too many rows (%d). Maximum allowed is %d.", nrow(df), max_rows)))
+  }
+
+  # Validate species against WCVP database
+  valid_species_mask <- df$species %in% species_db$taxon_name
+
+  # Standardize column names to expected format
+  col_mapping <- list(
+    cultivar = "cultivar",
+    outcome = "outcome",
+    sun_exposure = c("sun_exposure", "sun", "light"),
+    site_hydrology = c("site_hydrology", "hydrology", "moisture"),
+    inat_url = c("inat_url", "inaturalist", "inat"),
+    notes = "notes"
+  )
+
+  # Apply column mapping
+  for (target_col in names(col_mapping)) {
+    possible_names <- col_mapping[[target_col]]
+    found_col <- intersect(names(df), possible_names)[1]
+    if (!is.na(found_col) && found_col != target_col) {
+      df[[target_col]] <- df[[found_col]]
+    }
+  }
+
+  # Ensure all expected columns exist
+  expected_cols <- c("species", "cultivar", "outcome", "sun_exposure", "site_hydrology", "inat_url", "notes")
+  for (col in expected_cols) {
+    if (!col %in% names(df)) {
+      df[[col]] <- NA_character_
+    }
+  }
+
+  # Clean and validate enum values
+  valid_outcomes <- c("Thriving", "Established", "Struggling", "Failed/Died")
+  valid_sun <- c("Full Sun", "Part Sun", "Part Shade", "Full Shade")
+  valid_hydro <- c("Dry", "Mesic", "Wet")
+
+  # Normalize outcome values (handle case variations)
+  if ("outcome" %in% names(df)) {
+    df$outcome <- trimws(as.character(df$outcome))
+    # Try to match case-insensitively
+    outcome_lower <- tolower(df$outcome)
+    for (valid_val in valid_outcomes) {
+      df$outcome[outcome_lower == tolower(valid_val)] <- valid_val
+    }
+    # Set invalid values to NA
+    df$outcome[!df$outcome %in% valid_outcomes] <- NA_character_
+  }
+
+  # Normalize sun_exposure values
+  if ("sun_exposure" %in% names(df)) {
+    df$sun_exposure <- trimws(as.character(df$sun_exposure))
+    sun_lower <- tolower(df$sun_exposure)
+    for (valid_val in valid_sun) {
+      df$sun_exposure[sun_lower == tolower(valid_val)] <- valid_val
+    }
+    df$sun_exposure[!df$sun_exposure %in% valid_sun] <- NA_character_
+  }
+
+  # Normalize site_hydrology values
+  if ("site_hydrology" %in% names(df)) {
+    df$site_hydrology <- trimws(as.character(df$site_hydrology))
+    hydro_lower <- tolower(df$site_hydrology)
+    for (valid_val in valid_hydro) {
+      df$site_hydrology[hydro_lower == tolower(valid_val)] <- valid_val
+    }
+    df$site_hydrology[!df$site_hydrology %in% valid_hydro] <- NA_character_
+  }
+
+  # Clean other text fields
+  if ("cultivar" %in% names(df)) {
+    df$cultivar <- trimws(as.character(df$cultivar))
+    df$cultivar[df$cultivar == ""] <- NA_character_
+  }
+  if ("inat_url" %in% names(df)) {
+    df$inat_url <- trimws(as.character(df$inat_url))
+    df$inat_url[df$inat_url == ""] <- NA_character_
+  }
+  if ("notes" %in% names(df)) {
+    df$notes <- trimws(as.character(df$notes))
+    df$notes[df$notes == ""] <- NA_character_
+  }
+
+  # Select only expected columns
+  df <- df[, expected_cols, drop = FALSE]
+
+  list(
+    valid = df[valid_species_mask, , drop = FALSE],
+    invalid = df$species[!valid_species_mask],
+    error = NULL
+  )
+}

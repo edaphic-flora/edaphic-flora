@@ -24,17 +24,19 @@ dataEntryUI <- function(id) {
         # Reuse Previous Soil Data (shown if user has previous entries)
         uiOutput(ns("reuse_soil_section")),
 
+        # Batch Plant Upload (Beta feature)
+        uiOutput(ns("plant_list_upload_section")),
+
         # Species (always visible - most important)
-        selectizeInput(ns("species"), "Plant Species", choices = NULL, multiple = TRUE,
-                       options = list(maxItems = 20, maxOptions = 100,
-                                      placeholder = "Type to search species...")),
-        uiOutput(ns("species_count_indicator")),
+        # Hidden when batch upload is active
+        uiOutput(ns("species_input_section")),
 
         # Per-species metadata (dynamic based on selected species)
+        # Hidden when batch upload is active
         uiOutput(ns("per_species_fields")),
 
-        helpText(class = "text-muted small",
-                 "Tip: Select multiple species if they share the same soil sample."),
+        # Plant list preview (shown when batch upload is active)
+        uiOutput(ns("plant_list_preview_section")),
 
         accordion(
           id = ns("form_sections"),
@@ -231,6 +233,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     # State for soil data reuse
     user_soil_profiles <- reactiveVal(NULL)  # Cached soil profiles for picker
 
+    # State for batch plant upload
+    plant_list_data <- reactiveVal(NULL)  # Parsed plant list from CSV upload
+
     # --- PDF Upload Section (conditional on API key) ---
     output$pdf_upload_section <- renderUI({
       if (!is_pdf_extraction_available()) return(NULL)
@@ -396,8 +401,188 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                        type = "message", duration = 4)
     })
 
+    # --- Batch Plant Upload Section (Beta feature) ---
+    output$plant_list_upload_section <- renderUI({
+      # Only show if batch_plant_upload feature is enabled
+      if (!isTRUE(beta_features$batch_plant_upload)) return(NULL)
+
+      div(
+        class = "mb-3 p-3 border rounded bg-light",
+        div(class = "d-flex align-items-center mb-2",
+            icon("seedling", class = "text-success me-2"),
+            strong("Batch Plant Upload"),
+            span(class = "badge bg-info ms-2", "Beta")),
+        fileInput(ns("plant_list_upload"), NULL,
+                  accept = c(".csv", ".xlsx", ".xls",
+                             "text/csv", "application/vnd.ms-excel",
+                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                  buttonLabel = "Choose File",
+                  placeholder = "No file selected"),
+        div(class = "d-flex justify-content-between align-items-center",
+            downloadLink(ns("download_plant_template"), "Download template",
+                         class = "small text-success"),
+            # Clear button (shown when data is loaded)
+            uiOutput(ns("clear_plant_list_btn"))
+        ),
+        helpText(class = "text-muted small",
+                 "Upload a CSV with your plants to bulk add them. ",
+                 "All plants will share the same soil data.")
+      )
+    })
+
+    # Clear plant list button
+    output$clear_plant_list_btn <- renderUI({
+      if (is.null(plant_list_data())) return(NULL)
+      actionLink(ns("clear_plant_list"), "Clear list",
+                 class = "small text-danger")
+    })
+
+    # Clear plant list handler
+    observeEvent(input$clear_plant_list, {
+      plant_list_data(NULL)
+      showNotification("Plant list cleared.", type = "message")
+    })
+
+    # Template download handler
+    output$download_plant_template <- downloadHandler(
+      filename = "plant_list_template.csv",
+      content = function(file) {
+        template <- data.frame(
+          species = c("Acer rubrum", "Echinacea purpurea", "Baptisia australis"),
+          cultivar = c("October Glory", "", "Purple Smoke"),
+          outcome = c("Thriving", "Established", ""),
+          sun_exposure = c("Full Sun", "Part Shade", "Full Sun"),
+          site_hydrology = c("Mesic", "Dry", "Mesic"),
+          inat_url = c("", "", ""),
+          notes = c("Example entry - delete this row", "Another example", "")
+        )
+        write.csv(template, file, row.names = FALSE)
+      }
+    )
+
+    # Plant list upload handler
+    observeEvent(input$plant_list_upload, {
+      req(input$plant_list_upload)
+
+      result <- parse_plant_list(input$plant_list_upload$datapath, species_db, max_rows = 100)
+
+      if (!is.null(result$error)) {
+        showNotification(result$error, type = "error", duration = 8)
+        plant_list_data(NULL)
+        return()
+      }
+
+      if (nrow(result$valid) == 0) {
+        showNotification("No valid species found in file.", type = "error")
+        plant_list_data(NULL)
+        return()
+      }
+
+      # Store the parsed data
+      plant_list_data(result)
+
+      # Show warnings for invalid species
+      if (length(result$invalid) > 0) {
+        invalid_display <- if (length(result$invalid) > 3) {
+          paste(c(result$invalid[1:3], sprintf("... and %d more", length(result$invalid) - 3)), collapse = ", ")
+        } else {
+          paste(result$invalid, collapse = ", ")
+        }
+        showNotification(
+          sprintf("%d species not found and will be skipped: %s", length(result$invalid), invalid_display),
+          type = "warning",
+          duration = 10
+        )
+      }
+
+      showNotification(
+        sprintf("Loaded %d plants from file.", nrow(result$valid)),
+        type = "message"
+      )
+    })
+
+    # --- Species input section (always visible, can add to batch upload) ---
+    output$species_input_section <- renderUI({
+      pld <- plant_list_data()
+      has_batch <- !is.null(pld) && nrow(pld$valid) > 0
+
+      tagList(
+        selectizeInput(ns("species"),
+                       if (has_batch) "Add More Species (Optional)" else "Plant Species",
+                       choices = NULL, multiple = TRUE,
+                       options = list(maxItems = 20, maxOptions = 100,
+                                      placeholder = if (has_batch) "Add species to CSV list..." else "Type to search species...")),
+        uiOutput(ns("species_count_indicator")),
+        if (!has_batch) {
+          helpText(class = "text-muted small",
+                   "Tip: Select multiple species if they share the same soil sample.")
+        }
+      )
+    })
+
+    # --- Plant list preview section (shown when batch upload is active) ---
+    output$plant_list_preview_section <- renderUI({
+      pld <- plant_list_data()
+      if (is.null(pld) || nrow(pld$valid) == 0) return(NULL)
+
+      valid_df <- pld$valid
+      n_csv <- nrow(valid_df)
+      n_manual <- length(input$species)
+      # Don't double-count species in both
+      n_manual_extra <- length(setdiff(input$species, valid_df$species))
+
+      div(
+        class = "mb-3",
+        div(class = "d-flex justify-content-between align-items-center mb-2",
+            span(class = "fw-bold text-success",
+                 icon("check-circle"),
+                 sprintf(" %d plants from CSV", n_csv)),
+            if (length(pld$invalid) > 0) {
+              span(class = "text-warning small",
+                   icon("exclamation-triangle"),
+                   sprintf(" %d skipped", length(pld$invalid)))
+            }
+        ),
+        # Compact preview table
+        div(
+          class = "border rounded p-2 bg-white",
+          style = "max-height: 200px; overflow-y: auto;",
+          tags$table(
+            class = "table table-sm table-striped mb-0",
+            tags$thead(
+              tags$tr(
+                tags$th("Species"),
+                tags$th("Cultivar"),
+                tags$th("Outcome")
+              )
+            ),
+            tags$tbody(
+              lapply(seq_len(min(nrow(valid_df), 10)), function(i) {
+                tags$tr(
+                  tags$td(class = "text-truncate", style = "max-width: 150px;",
+                          valid_df$species[i]),
+                  tags$td(if (is.na(valid_df$cultivar[i])) "-" else valid_df$cultivar[i]),
+                  tags$td(if (is.na(valid_df$outcome[i])) "-" else valid_df$outcome[i])
+                )
+              }),
+              if (nrow(valid_df) > 10) {
+                tags$tr(
+                  tags$td(colspan = 3, class = "text-muted text-center small",
+                          sprintf("... and %d more", nrow(valid_df) - 10))
+                )
+              }
+            )
+          )
+        )
+      )
+    })
+
     # --- Species dropdown population ---
     observe({
+      # Re-run when plant_list_data changes (UI re-renders the selectizeInput)
+      pld <- plant_list_data()
+      has_batch <- !is.null(pld) && nrow(pld$valid) > 0
+
       updateSelectizeInput(session, "species",
                            choices = sort(species_db$taxon_name),
                            selected = character(0),
@@ -405,7 +590,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                            options = list(
                              maxItems = 20,
                              maxOptions = 100,
-                             placeholder = "Type to search species..."
+                             placeholder = if (has_batch) "Type to add more species..." else "Type to search species..."
                            ))
     })
 
@@ -416,12 +601,24 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
     # --- Species count indicator ---
     output$species_count_indicator <- renderUI({
-      n <- length(input$species)
-      if (n == 0) return(NULL)
-      div(class = "alert alert-info py-2 mb-2",
-          icon("seedling"),
-          sprintf(" %d species selected - %d record%s will be created",
-                  n, n, if (n == 1) "" else "s"))
+      n_manual <- length(input$species)
+      pld <- plant_list_data()
+      n_csv <- if (!is.null(pld) && nrow(pld$valid) > 0) nrow(pld$valid) else 0
+
+      if (n_manual == 0) return(NULL)
+
+      # Show additional species count when batch upload is active
+      if (n_csv > 0) {
+        div(class = "alert alert-info py-2 mb-2",
+            icon("plus-circle"),
+            sprintf(" +%d additional species (%d total records)",
+                    n_manual, n_csv + n_manual))
+      } else {
+        div(class = "alert alert-info py-2 mb-2",
+            icon("seedling"),
+            sprintf(" %d species selected - %d record%s will be created",
+                    n_manual, n_manual, if (n_manual == 1) "" else "s"))
+      }
     })
 
     # --- PDF Extraction Status ---
@@ -1128,7 +1325,26 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
-      species_list <- input$species
+      # Check for batch upload and/or manual species
+      pld <- plant_list_data()
+      has_batch <- !is.null(pld) && nrow(pld$valid) > 0
+      manual_species <- input$species
+      has_manual <- !is.null(manual_species) && length(manual_species) > 0
+
+      # Build combined species list and batch data
+      if (has_batch) {
+        batch_data <- pld$valid  # Data frame with all plant metadata
+        batch_species <- pld$valid$species
+      } else {
+        batch_data <- NULL
+        batch_species <- character(0)
+      }
+
+      # Manual species (not in batch) will use input fields for metadata
+      manual_only <- if (has_manual) setdiff(manual_species, batch_species) else character(0)
+
+      # Combined species list: batch first, then manual additions
+      species_list <- c(batch_species, manual_only)
 
       # Calculate shared values once
       eco <- tryCatch(lookup_ecoregion(input$latitude, input$longitude),
@@ -1176,14 +1392,43 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
       # Create one record per species with per-species metadata
       success_count <- 0
-      for (sp in species_list) {
+      n_batch <- length(batch_species)
+
+      for (i in seq_along(species_list)) {
+        sp <- species_list[i]
+
+        # Get per-species metadata from batch upload or dynamic inputs
+        if (i <= n_batch) {
+          # From CSV upload (first n_batch species)
+          cultivar_val <- batch_data$cultivar[i]
+          outcome_val <- batch_data$outcome[i]
+          sun_val <- batch_data$sun_exposure[i]
+          hydro_val <- batch_data$site_hydrology[i]
+          inat_val <- batch_data$inat_url[i]
+          notes_val <- batch_data$notes[i]
+          # Combine CSV notes with form notes if both exist
+          if (!is.na(notes_val) && nzchar(input$notes)) {
+            notes_val <- paste(input$notes, notes_val, sep = " | ")
+          } else if (is.na(notes_val)) {
+            notes_val <- input$notes
+          }
+        } else {
+          # From dynamic inputs (manual additions after batch)
+          cultivar_val <- get_sp_input("cultivar", sp)
+          outcome_val <- get_sp_input("outcome", sp)
+          sun_val <- get_sp_input("sun", sp)
+          hydro_val <- get_sp_input("hydrology", sp)
+          inat_val <- get_sp_input("inat", sp)
+          notes_val <- input$notes
+        }
+
         new_data <- data.frame(
           species = sp,
-          cultivar = get_sp_input("cultivar", sp),
-          outcome = get_sp_input("outcome", sp),
-          sun_exposure = get_sp_input("sun", sp),
-          site_hydrology = get_sp_input("hydrology", sp),
-          inat_url = get_sp_input("inat", sp),
+          cultivar = cultivar_val,
+          outcome = outcome_val,
+          sun_exposure = sun_val,
+          site_hydrology = hydro_val,
+          inat_url = inat_val,
           ph = ph_val,
           organic_matter = om_val,
           organic_matter_class = om_class_val,
@@ -1213,7 +1458,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           ecoregion_l2_code = eco$l2_code,
           location_lat = input$latitude,
           location_long = input$longitude,
-          notes = input$notes,
+          notes = notes_val,
           date = input$date,
           created_by = u$user_uid,
           stringsAsFactors = FALSE
@@ -1235,8 +1480,13 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         )
         data_changed(data_changed() + 1)
 
-        # Reset form
-        updateSelectizeInput(session, "species", selected = character(0))
+        # Reset form - clear both batch and manual selections
+        if (has_batch) {
+          plant_list_data(NULL)  # Clear batch upload data
+        }
+        if (has_manual) {
+          updateSelectizeInput(session, "species", selected = character(0))
+        }
       } else {
         showNotification("Error adding samples. Please try again.", type = "error")
       }
@@ -1249,21 +1499,28 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
-      # Validation
-      species_list <- input$species
-      if (is.null(species_list) || length(species_list) == 0) {
-        showNotification("Please select at least one species.", type = "error")
-        return()
+      # Check for batch upload and/or manual species selection
+      pld <- plant_list_data()
+      has_batch <- !is.null(pld) && nrow(pld$valid) > 0
+      manual_species <- input$species
+      has_manual <- !is.null(manual_species) && length(manual_species) > 0
+
+      # Validate manual species if any
+      if (has_manual) {
+        invalid_species <- manual_species[!manual_species %in% species_db$taxon_name]
+        if (length(invalid_species) > 0) {
+          showNotification(
+            paste("Invalid species:", paste(invalid_species[1:min(3, length(invalid_species))], collapse = ", "),
+                  if (length(invalid_species) > 3) "..." else ""),
+            type = "error"
+          )
+          return()
+        }
       }
 
-      # Validate species are in the database
-      invalid_species <- species_list[!species_list %in% species_db$taxon_name]
-      if (length(invalid_species) > 0) {
-        showNotification(
-          paste("Invalid species:", paste(invalid_species[1:min(3, length(invalid_species))], collapse = ", "),
-                if (length(invalid_species) > 3) "..." else ""),
-          type = "error"
-        )
+      # Must have at least one species from either source
+      if (!has_batch && !has_manual) {
+        showNotification("Please select at least one species or upload a plant list.", type = "error")
         return()
       }
 
