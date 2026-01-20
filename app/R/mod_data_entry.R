@@ -156,15 +156,59 @@ dataEntryUI <- function(id) {
                      icon = icon("paper-plane"))
       ),
 
-      # Main content - recent entries
-      card(
-        card_header(
-          class = "d-flex justify-content-between align-items-center",
-          span(icon("clock"), "Recent Entries"),
-          span(class = "badge bg-secondary", textOutput(ns("entry_count"), inline = TRUE))
+      # Main content - tabbed view with Recent and All Data
+      navset_card_tab(
+        id = ns("data_view_tabs"),
+
+        # Recent Entries tab
+        nav_panel(
+          title = span(icon("clock"), " Recent"),
+          value = "recent",
+          card_body(
+            class = "p-0",
+            div(class = "d-flex justify-content-between align-items-center p-2 border-bottom",
+                span(class = "text-muted small", "Your 10 most recent entries"),
+                span(class = "badge bg-secondary", textOutput(ns("entry_count"), inline = TRUE))
+            ),
+            DTOutput(ns("recent_entries"))
+          )
         ),
-        card_body(
-          DTOutput(ns("recent_entries"))
+
+        # My Data tab
+        nav_panel(
+          title = span(icon("database"), " My Data"),
+          value = "all_data",
+          card_body(
+            class = "p-0",
+            # Stats and filters row
+            div(class = "p-3 bg-light border-bottom",
+                layout_column_wrap(
+                  width = 1/4,
+                  fill = FALSE,
+                  # Stats
+                  uiOutput(ns("my_data_stats")),
+                  # Species filter
+                  textInput(ns("filter_species"), NULL,
+                            placeholder = "Search species..."),
+                  # Outcome filter
+                  selectInput(ns("filter_outcome"), NULL,
+                              choices = c("All Outcomes" = "",
+                                          "Thriving", "Established",
+                                          "Struggling", "Failed/Died")),
+                  # Actions
+                  div(class = "d-flex gap-2 align-items-end",
+                      actionButton(ns("clear_my_filters"), "Clear",
+                                   class = "btn-outline-secondary btn-sm"),
+                      downloadButton(ns("export_my_data"), "Export CSV",
+                                     class = "btn-success btn-sm")
+                  )
+                )
+            ),
+            # Bulk action bar (shown when rows selected)
+            uiOutput(ns("bulk_action_bar")),
+            # Full data table
+            DTOutput(ns("all_entries_table"))
+          )
         )
       )
     )
@@ -655,6 +699,230 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                 colnames = c("ID", "Species", "Outcome", "pH", "OM %", "Texture", "Date", "Actions"))
     })
 
+    # --- All My Data (full user data with filters) ---
+
+    # Get all user entries
+    all_user_entries <- reactive({
+      data_changed()
+      u <- current_user()
+      if (is.null(u)) return(data.frame())
+
+      tryCatch({
+        query <- "
+          SELECT id, species, cultivar, outcome, sun_exposure, site_hydrology,
+                 ph, organic_matter, texture_class,
+                 location_lat, location_long, date, created_at, notes, created_by
+          FROM soil_samples
+          WHERE created_by = $1
+          ORDER BY created_at DESC
+        "
+        dbGetQuery(pool, query, params = list(u$user_uid))
+      }, error = function(e) {
+        message("Error fetching user entries: ", e$message)
+        data.frame()
+      })
+    })
+
+    # Filtered entries for "All My Data" tab
+    filtered_my_entries <- reactive({
+      entries <- all_user_entries()
+      if (nrow(entries) == 0) return(entries)
+
+      # Species filter
+      if (!is.null(input$filter_species) && nzchar(input$filter_species)) {
+        pattern <- tolower(input$filter_species)
+        entries <- entries[grepl(pattern, tolower(entries$species)), ]
+      }
+
+      # Outcome filter
+      if (!is.null(input$filter_outcome) && nzchar(input$filter_outcome)) {
+        entries <- entries[!is.na(entries$outcome) &
+                            entries$outcome == input$filter_outcome, ]
+      }
+
+      entries
+    })
+
+    # Stats summary
+    output$my_data_stats <- renderUI({
+      entries <- all_user_entries()
+      if (nrow(entries) == 0) {
+        return(div(class = "text-muted small", "No entries yet"))
+      }
+
+      n_entries <- nrow(entries)
+      n_species <- length(unique(entries$species))
+
+      # Success rate
+      outcomes <- entries$outcome[!is.na(entries$outcome)]
+      if (length(outcomes) > 0) {
+        success <- sum(outcomes %in% c("Thriving", "Established"))
+        success_pct <- round(100 * success / length(outcomes))
+        success_text <- span(
+          class = if (success_pct >= 50) "text-success" else "text-warning",
+          paste0(success_pct, "% success")
+        )
+      } else {
+        success_text <- NULL
+      }
+
+      div(class = "small",
+          strong(n_entries), " entries", tags$br(),
+          strong(n_species), " species",
+          if (!is.null(success_text)) tagList(" · ", success_text)
+      )
+    })
+
+    # All entries table
+    output$all_entries_table <- renderDT({
+      entries <- filtered_my_entries()
+      u <- current_user()
+      user_id <- if (!is.null(u)) u$user_uid else ""
+      admin_user <- is_admin()
+
+      if (nrow(entries) == 0) {
+        return(datatable(data.frame(Message = "No entries found"),
+                         options = list(dom = 't'),
+                         rownames = FALSE))
+      }
+
+      display <- entries %>%
+        mutate(
+          Date = format(date, "%Y-%m-%d"),
+          Outcome = ifelse(is.na(outcome), "-", outcome),
+          pH = ifelse(is.na(ph), "-", as.character(round(ph, 1))),
+          OM = ifelse(is.na(organic_matter), "-", paste0(round(organic_matter, 1), "%")),
+          Texture = ifelse(is.na(texture_class), "-", texture_class),
+          Cultivar = ifelse(is.na(cultivar) | cultivar == "", "-", cultivar)
+        )
+
+      # Add action buttons
+      display$Actions <- sapply(seq_len(nrow(display)), function(i) {
+        is_owner <- !is.na(display$created_by[i]) && display$created_by[i] == user_id
+        if (is_owner || admin_user) {
+          sprintf(
+            "<button class=\"btn btn-sm btn-outline-primary me-1\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
+            display$id[i], display$id[i]
+          )
+        } else {
+          ""
+        }
+      })
+
+      display <- display %>%
+        select(ID = id, Species = species, Cultivar, Outcome, pH, OM, Texture, Date, Actions)
+
+      datatable(
+        display,
+        selection = "multiple",
+        options = list(
+          pageLength = 25,
+          lengthMenu = c(10, 25, 50, 100),
+          order = list(list(7, 'desc')),
+          columnDefs = list(
+            list(visible = FALSE, targets = 0)  # Hide ID column
+          )
+        ),
+        rownames = FALSE,
+        escape = FALSE,
+        class = "table table-striped table-hover"
+      )
+    })
+
+    # Bulk action bar
+    output$bulk_action_bar <- renderUI({
+      selected <- input$all_entries_table_rows_selected
+      if (is.null(selected) || length(selected) == 0) return(NULL)
+
+      div(class = "p-2 bg-warning-subtle border-bottom d-flex align-items-center gap-2",
+          icon("check-square"),
+          sprintf("%d selected", length(selected)),
+          actionButton(ns("bulk_delete"), "Delete Selected",
+                       class = "btn-outline-danger btn-sm ms-auto",
+                       icon = icon("trash"))
+      )
+    })
+
+    # Clear filters
+    observeEvent(input$clear_my_filters, {
+      updateTextInput(session, "filter_species", value = "")
+      updateSelectInput(session, "filter_outcome", selected = "")
+    })
+
+    # Export CSV
+    output$export_my_data <- downloadHandler(
+      filename = function() {
+        paste0("my_edaphic_data_", format(Sys.Date(), "%Y%m%d"), ".csv")
+      },
+      content = function(file) {
+        entries <- all_user_entries()
+        # Remove internal columns
+        entries <- entries %>% select(-created_by)
+        write.csv(entries, file, row.names = FALSE)
+      }
+    )
+
+    # Bulk delete
+    observeEvent(input$bulk_delete, {
+      selected <- input$all_entries_table_rows_selected
+      if (length(selected) == 0) return()
+
+      entries <- filtered_my_entries()
+      entry_ids <- entries$id[selected]
+
+      showModal(modalDialog(
+        title = span(icon("exclamation-triangle"), " Confirm Delete"),
+        size = "s",
+        easyClose = FALSE,
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("confirm_bulk_delete"), "Delete", class = "btn-danger")
+        ),
+        p(sprintf("Are you sure you want to delete %d entr%s?",
+                  length(entry_ids),
+                  if (length(entry_ids) == 1) "y" else "ies")),
+        p(class = "text-muted small", "This action cannot be undone.")
+      ))
+    })
+
+    # Confirm bulk delete
+    observeEvent(input$confirm_bulk_delete, {
+      selected <- input$all_entries_table_rows_selected
+      entries <- filtered_my_entries()
+      entry_ids <- entries$id[selected]
+
+      u <- current_user()
+      if (is.null(u)) {
+        showNotification("Please sign in.", type = "error")
+        removeModal()
+        return()
+      }
+
+      success_count <- 0
+      for (eid in entry_ids) {
+        result <- tryCatch({
+          db_delete_sample(eid, u$user_uid, is_admin = is_admin())
+        }, error = function(e) FALSE)
+
+        if (isTRUE(result)) {
+          success_count <- success_count + 1
+          db_audit_log("delete", "soil_samples", eid, u$user_uid, "bulk delete")
+        }
+      }
+
+      removeModal()
+
+      if (success_count > 0) {
+        showNotification(sprintf("Deleted %d entr%s.",
+                                 success_count,
+                                 if (success_count == 1) "y" else "ies"),
+                         type = "message")
+        data_changed(data_changed() + 1)
+      } else {
+        showNotification("Failed to delete entries.", type = "error")
+      }
+    })
+
     # --- Texture validation ---
     output$texture_validation <- renderUI({
       req(input$texture_input_type == "pct")
@@ -677,56 +945,86 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
     # Helper function to perform geocoding (called after delay so spinner shows)
     do_geocode <- function(zip_result, zip_clean, street) {
-      # Build address for geocoding
-      address <- if (nzchar(trimws(street))) {
-        paste0(street, ", ", zip_result$city, ", ", zip_result$state, " ", zip_clean)
-      } else {
-        paste0(zip_result$city, ", ", zip_result$state, " ", zip_clean)
-      }
+      has_street <- nzchar(trimws(street))
+      street_failed <- FALSE
+      final_lat <- NULL
+      final_lon <- NULL
+      is_approximate <- FALSE
 
       tryCatch({
-        res <- geo(address = address, method = "osm")
+        # Step 1: If street provided, try full address first
+        if (has_street) {
+          full_address <- paste0(street, ", ", zip_result$city, ", ", zip_result$state, " ", zip_clean)
+          res <- geo(address = full_address, method = "osm")
 
-        if (!is.null(res) && nrow(res) > 0 && !is.na(res$lat[1])) {
-          # Geocoding succeeded
-          updateNumericInput(session, "latitude", value = round(res$lat[1], 6))
-          updateNumericInput(session, "longitude", value = round(res$long[1], 6))
+          if (!is.null(res) && nrow(res) > 0 && !is.na(res$lat[1])) {
+            final_lat <- res$lat[1]
+            final_lon <- res$long[1]
+          } else {
+            street_failed <- TRUE
+          }
+        }
+
+        # Step 2: If no street or street failed, use city/state/zip
+        if (is.null(final_lat)) {
+          city_address <- paste0(zip_result$city, ", ", zip_result$state, " ", zip_clean)
+          res <- geo(address = city_address, method = "osm")
+
+          if (!is.null(res) && nrow(res) > 0 && !is.na(res$lat[1])) {
+            final_lat <- res$lat[1]
+            final_lon <- res$long[1]
+            is_approximate <- TRUE
+          }
+        }
+
+        # Step 3: If still nothing, fall back to zip centroid
+        if (is.null(final_lat) && !is.na(zip_result$latitude) && !is.na(zip_result$longitude)) {
+          final_lat <- zip_result$latitude
+          final_lon <- zip_result$longitude
+          is_approximate <- TRUE
+        }
+
+        # Update coordinates
+        if (!is.null(final_lat)) {
+          updateNumericInput(session, "latitude", value = round(final_lat, 6))
+          updateNumericInput(session, "longitude", value = round(final_lon, 6))
 
           # Lookup ecoregion
-          eco <- tryCatch(lookup_ecoregion(res$lat[1], res$long[1]),
+          eco <- tryCatch(lookup_ecoregion(final_lat, final_lon),
                           error = function(e) list(name = NA, code = NA))
 
+          # Build status message
+          location_text <- sprintf("%s, %s", zip_result$city, zip_result$state)
+          if (is_approximate) {
+            location_text <- paste0(location_text, " (approximate)")
+          }
+
           output$location_status <- renderUI({
-            div(class = "text-success",
-                icon("check-circle"),
-                sprintf(" %s, %s", zip_result$city, zip_result$state),
-                if (!is.null(eco$l4_name) && !is.na(eco$l4_name)) {
-                  tags$small(class = "text-muted d-block",
-                             icon("map"), " ", eco$l4_name)
-                } else if (!is.null(eco$name) && !is.na(eco$name)) {
-                  tags$small(class = "text-muted d-block",
-                             icon("map"), " ", eco$name)
-                }
+            tagList(
+              # Show street not found warning if applicable
+              if (street_failed) {
+                div(class = "text-warning mb-1",
+                    icon("exclamation-triangle"),
+                    " Street address not found, using zip code location")
+              },
+              div(class = "text-success",
+                  icon("check-circle"), " ", location_text,
+                  if (!is.null(eco$l4_name) && !is.na(eco$l4_name)) {
+                    tags$small(class = "text-muted d-block",
+                               icon("map"), " ", eco$l4_name)
+                  } else if (!is.null(eco$name) && !is.na(eco$name)) {
+                    tags$small(class = "text-muted d-block",
+                               icon("map"), " ", eco$name)
+                  }
+              )
             )
           })
         } else {
-          # Geocoding failed, fall back to zipcode centroid
-          if (!is.na(zip_result$latitude) && !is.na(zip_result$longitude)) {
-            updateNumericInput(session, "latitude", value = round(zip_result$latitude, 6))
-            updateNumericInput(session, "longitude", value = round(zip_result$longitude, 6))
-
-            output$location_status <- renderUI({
-              div(class = "text-success",
-                  icon("check-circle"),
-                  sprintf(" %s, %s (approximate)", zip_result$city, zip_result$state))
-            })
-          } else {
-            output$location_status <- renderUI({
-              div(class = "text-warning",
-                  icon("exclamation-triangle"),
-                  sprintf(" %s, %s - coordinates unavailable", zip_result$city, zip_result$state))
-            })
-          }
+          output$location_status <- renderUI({
+            div(class = "text-warning",
+                icon("exclamation-triangle"),
+                sprintf(" %s, %s - coordinates unavailable", zip_result$city, zip_result$state))
+          })
         }
       }, error = function(e) {
         message("Geocoding error: ", e$message)
