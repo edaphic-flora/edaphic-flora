@@ -622,6 +622,67 @@ moduleServer <- function(id, pool, current_user, ...) {
 - [x] Texture properly switches to class mode when applied
 - [x] User can still edit values after applying
 
+### 2025-01-20: Batch Plant Upload Feature
+
+**Status:** DEV ONLY - Available when ENV=dev. Enable for production by setting `batch_plant_upload = TRUE` in BETA_FEATURES.
+
+**Feature:** Users can upload a CSV file with multiple plants instead of entering them one-by-one. All plants share the same soil data from the form.
+
+**User Flow:**
+1. User uploads a CSV file with plant data
+2. Preview table shows valid plants and any that were skipped (invalid species)
+3. Species dropdown remains visible - user can add more plants manually
+4. User fills in soil data, location, etc.
+5. On submit, all plants from CSV + manual selections are created with shared soil data
+6. CSV data and manual selections are cleared after successful submit
+
+**CSV Template Format:**
+```csv
+species,cultivar,outcome,sun_exposure,site_hydrology,inat_url,notes
+Acer rubrum,October Glory,Thriving,Full Sun,Mesic,,Planted 2022
+Echinacea purpurea,,Established,Part Shade,Dry,,
+```
+
+**Valid Values:**
+- `outcome`: Thriving, Established, Struggling, Failed/Died (case-insensitive)
+- `sun_exposure`: Full Sun, Part Sun, Part Shade, Full Shade
+- `site_hydrology`: Dry, Mesic, Wet
+
+**Implementation:**
+
+1. **Parser Function** (`R/helpers.R`):
+   - `parse_plant_list(file_path, species_db, max_rows)` - Parses CSV/Excel files
+   - Validates species against WCVP database
+   - Normalizes column names and enum values
+   - Returns list with $valid, $invalid, $error
+
+2. **UI Components** (`R/mod_data_entry.R`):
+   - File upload input with template download link
+   - Preview table showing plants ready to submit
+   - Clear list button to reset
+   - Species input hidden when CSV is active
+
+3. **Beta Feature Flag** (`app.R`):
+   - `BETA_FEATURES$batch_plant_upload` - Set to `is_dev` (dev mode only)
+
+**Files Modified:**
+- `app/R/helpers.R` - Added `parse_plant_list()` function
+- `app/R/mod_data_entry.R` - Added upload UI, preview, handlers, modified submit
+- `app/app.R` - Updated BETA_FEATURES config
+
+**Testing Checklist:**
+- [ ] Template download works
+- [ ] CSV upload shows preview table
+- [ ] Invalid species shown as skipped with warning
+- [ ] Valid species count displayed
+- [ ] Clear list button works
+- [ ] Manual species input hidden when CSV loaded
+- [ ] Submit creates correct records with soil data
+- [ ] Per-plant metadata (cultivar, outcome, etc.) saved correctly
+- [ ] CSV notes combined with form notes
+- [ ] Plant list cleared after successful submit
+- [ ] Works with PDF extraction (soil) + CSV (plants) together
+
 ### 2025-01-20: Combined Data Entry + My Data Tabs
 
 **Status:** COMPLETE - The separate "My Data" tab has been merged into the Data Entry tab.
