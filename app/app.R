@@ -130,6 +130,13 @@ polished::polished_config(
 app_env <- Sys.getenv("ENV", "prod")  # Default to prod for safety
 is_dev <- (app_env == "dev")
 
+# --- Beta features config
+# Note: "Reuse previous soil data" is now always available (no longer location-based)
+BETA_FEATURES <- list(
+  batch_plant_upload = FALSE,         # CSV upload for bulk plant entry (not implemented)
+  outcome_reminders = FALSE           # Email reminders for outcome updates (not implemented)
+)
+
 # --- Admin configuration
 # Set ADMIN_EMAILS env var as comma-separated list, e.g., "admin@example.com,owner@example.com"
 admin_emails <- strsplit(Sys.getenv("ADMIN_EMAILS", ""), ",")[[1]]
@@ -416,7 +423,8 @@ server_inner <- function(input, output, session) {
 
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
-                 current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit)
+                 current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit,
+                 BETA_FEATURES)
 
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,

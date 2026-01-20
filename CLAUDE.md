@@ -557,3 +557,39 @@ moduleServer <- function(id, pool, current_user, ...) {
 - Run `Rscript scripts/convert_to_rds.R` to optimize data file loading
 - Continue USDA data expansion with `fetch_usda_batch()`
 - Monitor shinyapps.io memory usage in dashboard
+
+### 2025-01-20: Reuse Previous Soil Data Feature
+
+**Status:** PRODUCTION READY - Available to all users with previous entries.
+
+**Feature:** Users can quickly reuse soil chemistry from a previous entry instead of re-entering all values. A "Use previous soil data" link appears in the Data Entry sidebar if the user has submitted samples before.
+
+**User Flow:**
+1. User clicks "Use previous soil data" link in sidebar
+2. Modal shows their distinct soil profiles (grouped by pH/OM/texture)
+3. User selects one and clicks "Apply Soil Data"
+4. Form fields are auto-filled with that soil data
+5. User selects species and submits as normal
+
+**Implementation:**
+
+1. **Database Functions** (`R/db.R`):
+   - `db_get_user_soil_profiles(user_id, limit)` - Gets distinct soil profiles for picker
+   - `db_get_soil_data_by_id(entry_id)` - Gets soil chemistry from specific entry
+
+2. **UI Components** (`R/mod_data_entry.R`):
+   - `reuse_soil_section` - Shows link + count of saved soil tests
+   - Modal with radio buttons for profile selection
+   - `apply_reuse` handler fills all form fields
+
+**Files Modified:**
+- `app/R/db.R` - Added soil profile query functions
+- `app/R/mod_data_entry.R` - Added reuse UI section, modal, and apply handler
+
+**Testing Checklist:**
+- [x] Link hidden for users with no previous entries
+- [x] Link shows count of saved soil tests
+- [x] Modal displays distinct profiles with pH/OM/texture summary
+- [x] "Apply Soil Data" fills all soil chemistry fields
+- [x] Texture properly switches to class mode when applied
+- [x] User can still edit values after applying
