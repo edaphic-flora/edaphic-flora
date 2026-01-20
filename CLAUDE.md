@@ -302,6 +302,21 @@ Currently only ~335 species have detailed characteristics. Implement continuous 
 4. Cache the JSON response in `data/cache/usda_char/` for reproducibility
 5. Consider rate limiting and background job queue (e.g., using `callr` or external worker)
 
+### Location Geocoding Fallback Improvement
+When street address geocoding fails or returns inaccurate coordinates:
+1. Show a brief error message indicating the street wasn't found
+2. Fall back to zip code centroid coordinates (currently falls back to vague/inaccurate coords)
+3. Consider showing "(approximate)" indicator when using zip centroid vs street-level precision
+
+### User Data History & Management
+Currently users can only see recent entries in the Data Entry tab. For long-term users with months/years of data:
+1. Add a "My Data" or "My Entries" tab/section
+2. Searchable/filterable table of all user's entries (by species, date range, location)
+3. Pagination for large datasets
+4. Bulk edit/delete capabilities
+5. Export user's own data as CSV
+6. Consider showing entry statistics (total entries, species count, date range)
+
 ### Analysis Tab Enhancements (Completed 2025-01-17)
 The per-species metadata fields (outcome, sun_exposure, site_hydrology) are now fully visualized:
 1. **Outcome distribution** - Stacked bar chart on Performance tab
