@@ -1,0 +1,19 @@
+# Exclude USDA cache files (loaded into database, not needed at runtime)
+data/cache/
+
+# Exclude raw data files (used for ETL only)
+data/raw/
+
+# Exclude large processed files not needed at runtime
+data/ecoregions_simplified.rds
+data/ecoregion_grid.csv
+
+# Exclude ETL scripts
+R/etl/
+
+# Exclude generator scripts
+generate_species_db.R
+generate_state_grid.R
+
+# Exclude dev scripts
+scripts/
