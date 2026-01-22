@@ -63,28 +63,10 @@ welcomeUI <- function(id) {
                 tags$li(tags$strong("Discover plants"), " \u2014 Find species that thrive in similar soil conditions or match your soil profile")
               ),
 
-              h4(class = "mt-4", "Discover Plants for Your Soil"),
-              p("One of edaphic flora's most powerful features is plant discovery:"),
-              tags$ul(
-                tags$li(tags$strong("Find Plants"), " \u2014 Enter your soil test values and get recommendations for species ",
-                        "that have thrived in similar conditions. Great for planning new plantings."),
-                tags$li(tags$strong("Similar Species"), " \u2014 When viewing a species in Analysis, see other plants that grow ",
-                        "in comparable soil conditions. Useful for companion planting and diversification.")
-              ),
-              p(class = "small text-muted",
-                "Recommendations are based on real user data, not just reference ranges. We show success rates and ",
-                "optimal growing conditions so you can make informed decisions."),
-             p(class = "small text-muted mt-2 fst-italic",
-               icon("leaf", class = "text-success"), " ",
-               tags$strong("Tip:"), " When exploring recommendations, prioritize native plants! ",
-               "They support local ecosystems, require less maintenance, and help avoid introducing ",
-               "invasive species. Always verify a species is appropriate for your region before planting."),
-
               h4(class = "mt-4", "Getting Started"),
               p("Head to the ", tags$strong("Data Entry"), " tab to submit your first soil sample. ",
                 "You can enter data for multiple species that share the same soil conditions."),
-              p("Use the ", tags$strong("Analysis"), " tab to explore existing data, or try ",
-                tags$strong("Find Plants"), " to discover species for your soil."),
+              p("Use the ", tags$strong("Analysis"), " tab to explore existing data and discover patterns."),
 
               # Help links - NOT namespaced so main app observers can handle navigation
               div(class = "mt-3 p-3 border rounded",

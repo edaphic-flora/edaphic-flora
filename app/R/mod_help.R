@@ -229,33 +229,6 @@ helpUI <- function(id) {
               "and hydrology conditions have the best success rates, and lets you compare soil parameters (pH, nutrients, etc.) ",
               "between thriving and struggling plants. The Key Insights panel summarizes the best conditions for each species."),
 
-            h5("How does Find Plants work?"),
-            p(class = "text-muted mb-4",
-              "Find Plants matches your soil test values against our database of user-submitted samples. We look for species ",
-              "where successful plantings (Thriving or Established) occurred in similar soil conditions. The match score ",
-              "considers pH (35%), organic matter (20%), texture (15%), and nutrients (30%). Only species with 10+ samples ",
-              "are shown to ensure statistical confidence."),
-
-            h5("How does Similar Species work?"),
-            p(class = "text-muted mb-4",
-              "When viewing a species in Analysis, the Similar Species tab shows other plants that thrive in comparable soil ",
-              "conditions. This is useful for companion planting or finding alternatives. We compare the selected species' ",
-              "soil profile against all other species with sufficient data."),
-
-            h5("What are the limitations of plant recommendations?"),
-            p(class = "text-muted mb-4",
-              "Our recommendations are based solely on soil chemistry data and don't account for several important factors:"),
-            tags$ul(class = "text-muted mb-4",
-              tags$li(tags$strong("Climate & hardiness zones"), " \u2014 A plant may match your soil but not survive your winters"),
-              tags$li(tags$strong("Drainage & soil structure"), " \u2014 We measure chemistry, not physical drainage characteristics"),
-              tags$li(tags$strong("Microclimate"), " \u2014 Frost pockets, wind exposure, and heat islands affect plant success"),
-              tags$li(tags$strong("Pests & diseases"), " \u2014 Regional pest pressure varies and isn't captured in our data"),
-              tags$li(tags$strong("Native vs. invasive"), " \u2014 We don't distinguish between native and non-native species (see FAQ below)"),
-              tags$li(tags$strong("Sample bias"), " \u2014 Users may report successes more often than failures")
-            ),
-            p(class = "text-muted mb-4",
-              "Always research a species' full requirements before planting. Our recommendations are a starting point, not a guarantee."),
-
             h5("Why should I prioritize native plants?"),
             div(class = "text-muted mb-4",
               p("Native plants offer significant ecological and practical benefits:"),
