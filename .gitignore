@@ -43,3 +43,6 @@ deploy.R
 
 # Windows artifacts
 nul
+
+# Alpha feedback (local only)
+feedback/

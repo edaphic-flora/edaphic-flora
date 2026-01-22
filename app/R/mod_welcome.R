@@ -26,14 +26,13 @@ welcomeUI <- function(id) {
                   div(
                     tags$strong("Welcome to the Alpha!", class = "d-block mb-1"),
                     "You're among the first to test edaphic flora. Your feedback is invaluable! ",
-                    "Please report bugs, suggest improvements, or share your experience:",
+                    "Please report bugs, suggest improvements, or share your experience.",
+                    tags$small(class = "d-block text-muted mt-1",
+                               icon("desktop"), " Optimized for desktop \u2014 mobile viewing may be limited."),
                     div(class = "mt-2",
-                        tags$a(href = "https://github.com/todd-testerman/edaphic-flora/issues",
-                               target = "_blank", class = "btn btn-sm btn-outline-secondary me-2",
-                               icon("github"), " Open an Issue"),
-                        tags$a(href = "mailto:edaphicflora@gmail.com?subject=Alpha%20Feedback",
+                        tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Alpha%20Feedback",
                                class = "btn btn-sm btn-outline-secondary",
-                               icon("envelope"), " Email Feedback"))
+                               icon("envelope"), " Send Feedback"))
                   )
               )
           ),
@@ -90,12 +89,9 @@ welcomeUI <- function(id) {
 
               div(class = "mt-3 text-center",
                   tags$small(class = "text-muted",
-                             "Found a bug or have feedback? ",
-                             tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues",
-                                    target = "_blank", "Report an issue"),
-                             " or email ",
+                             "Found a bug or have feedback? Email ",
                              tags$a(href = "mailto:edaphicflora@gmail.com",
-                                    "edaphicflora@gmail.com")))
+                                    "todd@edaphicgardenconsulting.com")))
           )
         )
       ),

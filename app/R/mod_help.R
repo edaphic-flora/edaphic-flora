@@ -247,20 +247,12 @@ helpUI <- function(id) {
 
             h5("Found a bug or have a suggestion?"),
             p(class = "text-muted mb-4",
-              "We welcome feedback! If you encounter any issues, have feature requests, or want to contribute, please ",
-              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues", target = "_blank", "open an issue on GitHub"),
-              ". You can also reach us at ",
+              "We welcome feedback! If you encounter any issues or have feature requests, please reach out at ",
               tags$a(href = "mailto:edaphicflora@gmail.com", "edaphicflora@gmail.com"), "."),
 
             hr(class = "my-4"),
             div(class = "text-center text-muted small",
-              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/blob/main/PRIVACY.md", target = "_blank", "Privacy Policy"),
-              span(class = "mx-2", "|"),
-              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/blob/main/TERMS.md", target = "_blank", "Terms of Service"),
-              span(class = "mx-2", "|"),
-              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora/issues", target = "_blank", "Report Issue"),
-              span(class = "mx-2", "|"),
-              tags$a(href = "https://github.com/todd-testerman/EdaphicFlora", target = "_blank", "GitHub"),
+              tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Feedback", "Send Feedback"),
               span(class = "mx-2", "|"),
               tags$a(href = "https://buymeacoffee.com/toddtesterman", target = "_blank", "Support")
             )
