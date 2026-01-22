@@ -136,6 +136,36 @@ db_migrate <- function() {
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_state_dist_taxon ON ref_state_distribution(taxon_id)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_state_dist_state ON ref_state_distribution(state_code)")
 
+    # User preferences table (home location for native status lookups)
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id TEXT PRIMARY KEY,
+        home_zipcode VARCHAR(10),
+        home_state VARCHAR(2),
+        home_city TEXT,
+        home_lat NUMERIC(10,6),
+        home_long NUMERIC(10,6),
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    ")
+
+    # Noxious/invasive species reference table
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_noxious_invasive (
+        id SERIAL PRIMARY KEY,
+        taxon_id INTEGER REFERENCES ref_taxon(id) ON DELETE CASCADE,
+        state_code VARCHAR(2),
+        designation TEXT NOT NULL,
+        source TEXT,
+        source_url TEXT,
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        UNIQUE(taxon_id, state_code, designation)
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_noxious_taxon ON ref_noxious_invasive(taxon_id)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_noxious_state ON ref_noxious_invasive(state_code)")
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
@@ -427,5 +457,84 @@ db_get_soil_data_by_id <- function(entry_id) {
   }, error = function(e) {
     message("Error fetching soil data by id: ", e$message)
     NULL
+  })
+}
+
+# ---------------------------
+# User Preferences
+# ---------------------------
+
+#' Get user preferences (home location for native status lookups)
+#' @param user_id Firebase UID
+#' @param pool Database connection pool (optional, uses global if not provided)
+#' @return Named list with home_zipcode, home_state, home_city, home_lat, home_long, or NULL if not set
+db_get_user_prefs <- function(user_id, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(NULL)
+  if (is.null(pool)) pool <- get("pool", envir = globalenv())
+
+  tryCatch({
+    result <- dbGetQuery(pool, "
+      SELECT home_zipcode, home_state, home_city, home_lat, home_long
+      FROM user_preferences
+      WHERE user_id = $1
+    ", params = list(user_id))
+
+    if (nrow(result) == 0) return(NULL)
+
+    as.list(result[1, ])
+  }, error = function(e) {
+    message("Error fetching user preferences: ", e$message)
+    NULL
+  })
+}
+
+#' Set user preferences (home location)
+#' Uses upsert to insert or update existing preferences
+#' @param user_id Firebase UID
+#' @param zipcode 5-digit US zip code
+#' @param city City name (optional, derived from zipcode lookup)
+#' @param state Two-letter state code (optional, derived from zipcode lookup)
+#' @param lat Latitude (optional, derived from zipcode lookup)
+#' @param lon Longitude (optional, derived from zipcode lookup)
+#' @param pool Database connection pool (optional, uses global if not provided)
+#' @return TRUE on success, FALSE on failure
+db_set_user_prefs <- function(user_id, zipcode, city = NULL, state = NULL, lat = NULL, lon = NULL, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  if (is.null(pool)) pool <- get("pool", envir = globalenv())
+
+  tryCatch({
+    dbExecute(pool, "
+      INSERT INTO user_preferences (user_id, home_zipcode, home_state, home_city, home_lat, home_long, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, now())
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        home_zipcode = EXCLUDED.home_zipcode,
+        home_state = EXCLUDED.home_state,
+        home_city = EXCLUDED.home_city,
+        home_lat = EXCLUDED.home_lat,
+        home_long = EXCLUDED.home_long,
+        updated_at = now()
+    ", params = list(user_id, zipcode, state, city, lat, lon))
+    TRUE
+  }, error = function(e) {
+    message("Error setting user preferences: ", e$message)
+    FALSE
+  })
+}
+
+#' Clear user preferences
+#' @param user_id Firebase UID
+#' @param pool Database connection pool (optional, uses global if not provided)
+#' @return TRUE on success, FALSE on failure
+db_clear_user_prefs <- function(user_id, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  if (is.null(pool)) pool <- get("pool", envir = globalenv())
+
+  tryCatch({
+    dbExecute(pool, "DELETE FROM user_preferences WHERE user_id = $1", params = list(user_id))
+    TRUE
+  }, error = function(e) {
+    message("Error clearing user preferences: ", e$message)
+    FALSE
   })
 }
