@@ -250,14 +250,15 @@ Designer credit: *To be added*
 
 The app integrates USDA PLANTS database reference data for species traits and wetland indicators.
 
-### Current State
-- **Loaded data**: 5,002 taxa in `ref_taxon`, 335 species with detailed characteristics in `ref_usda_characteristics`
-- **Data source**: Cached JSON from USDA API (profile_*.json, char_*.json files in `data/cache/usda_char/`)
-- **ETL script**: `R/etl/load_cached_usda.R` parses cache and loads to database
+### Current State (Completed 2025-01-22)
+- **Database**: 93,915 entries in `ref_usda_traits` table (Neon Postgres) - queried at runtime
+- **Local cache**: JSON backups of API responses (~26,000 files in `data/cache_usda/`) - not used by app, only for debugging/reprocessing
+- **ETL script**: `fetch_usda_data.R` handles fetching, caching, and database insertion
+- **Fetch tracking**: `ref_usda_traits.fetch_status` column tracks success/no_data/failed per species
 
 ### Database Tables
 - `ref_taxon`: Species taxonomy (usda_symbol, scientific_name)
-- `ref_usda_characteristics`: Soil/climate preferences (pH, tolerances, precipitation, temperature)
+- `ref_usda_traits`: 93,915 entries - soil/climate preferences (pH, tolerances, precipitation, temperature, growth habit, etc.)
 - `ref_wetland_indicator`: NWPL regional wetland indicator status
 - `ref_synonym`: Maps synonyms to accepted taxon IDs
 
@@ -296,13 +297,10 @@ The ecoregion lookup feature is currently disabled in production due to memory c
 
 **Development workflow note**: Avoid small incremental changes followed by 5-10 minute redeployments. Batch fixes together and test locally before deploying.
 
-### USDA Data Expansion (Priority)
-Currently only ~335 species have detailed characteristics. Implement continuous querying:
-1. When a species is searched/selected in the app, check if we have characteristics data
-2. If not, queue an async USDA API request for that species
-3. Parse response and insert into `ref_usda_characteristics`
-4. Cache the JSON response in `data/cache/usda_char/` for reproducibility
-5. Consider rate limiting and background job queue (e.g., using `callr` or external worker)
+### USDA Data Expansion (Completed 2025-01-22)
+All available USDA species data has been fetched. See Session Notes for details.
+
+**Cache file note**: The `.rconnectignore` file is unreliable. Keep cache files outside the `app/` folder (at `data/cache_usda/`) to prevent deployment issues. Delete `app/data/cache/` before deploying if it exists.
 
 ### Location Geocoding Fallback Improvement
 When street address geocoding fails or returns inaccurate coordinates:
@@ -310,14 +308,8 @@ When street address geocoding fails or returns inaccurate coordinates:
 2. Fall back to zip code centroid coordinates (currently falls back to vague/inaccurate coords)
 3. Consider showing "(approximate)" indicator when using zip centroid vs street-level precision
 
-### User Data History & Management
-Currently users can only see recent entries in the Data Entry tab. For long-term users with months/years of data:
-1. Add a "My Data" or "My Entries" tab/section
-2. Searchable/filterable table of all user's entries (by species, date range, location)
-3. Pagination for large datasets
-4. Bulk edit/delete capabilities
-5. Export user's own data as CSV
-6. Consider showing entry statistics (total entries, species count, date range)
+### User Data History & Management (Completed 2025-01-20)
+Implemented as "All My Data" subtab within Data Entry. See Session Notes for 2025-01-20.
 
 ### Analysis Tab Enhancements (Completed 2025-01-17)
 The per-species metadata fields (outcome, sun_exposure, site_hydrology) are now fully visualized:
@@ -711,3 +703,204 @@ Echinacea purpurea,,Established,Part Shade,Dry,,
 - Fewer top-level tabs = simpler navigation
 - All data entry and personal data management in one place
 - Users can easily switch between adding new entries and viewing/managing existing data
+
+### 2025-01-22: Alpha Deployment Fixes
+
+**Status:** DEPLOYED - Alpha version updated on shinyapps.io
+
+**Changes Made:**
+
+1. **Removed Find Plants/Similar Species from public docs**
+   - These features are hidden in alpha (require 10+ samples per species threshold)
+   - Removed references from Welcome page and FAQ
+   - Feature code remains intact in `mod_find_plants.R` and `mod_analysis.R` for future re-enable
+
+2. **Fixed deployment bundle size issue**
+   - Moved `app/data/cache/` to `data/cache_usda/` (project root, outside app/)
+   - 18,510 USDA cache files were exceeding shinyapps.io 10,000 file limit
+   - Added `app/.rconnectignore` to exclude cache, raw data, and ETL scripts
+
+3. **Updated alpha banner for private repo**
+   - Removed GitHub issue links (repo is private)
+   - Changed feedback email to edaphicflora@gmail.com
+   - Added desktop optimization notice: "Optimized for desktop — mobile viewing may be limited"
+
+4. **Simplified Help page footer**
+   - Removed Privacy/Terms/GitHub links
+   - Kept only "Send Feedback | Support" links
+
+5. **Created alpha feedback tracking**
+   - New `feedback/` folder (gitignored, local only)
+   - `ALPHA_FEEDBACK.md` for tracking tester feedback, bugs, and feature requests
+
+**Files Modified:**
+- `app/R/mod_welcome.R` - Removed Find Plants section, updated alpha banner
+- `app/R/mod_help.R` - Removed FAQ entries, simplified footer
+- `app/.rconnectignore` - New file for deployment exclusions
+- `.gitignore` - Added feedback folder
+
+**Next Session:**
+- Monitor alpha tester feedback in `feedback/ALPHA_FEEDBACK.md`
+- Re-enable Find Plants/Similar Species once data threshold is met
+
+### 2025-01-22: USDA Data Scraping Complete
+
+**Status:** COMPLETE - All available USDA data has been fetched and stored in the database.
+
+**Summary:**
+- Successfully scraped all fetchable species from USDA PLANTS API
+- **93,915 entries** stored in `ref_usda_traits` table (Neon Postgres)
+- App queries database at runtime - cache files are backups only, not used by app
+
+**Cache Locations (backups only, not needed for deployment):**
+| Location | Files | Purpose |
+|----------|-------|---------|
+| `data/cache_usda/` | ~19,800 | Backup JSON responses at project root |
+| `app/data/cache/usda_char/` | ~6,200 | Old cache location (can be deleted) |
+
+**Deployment Notes:**
+- `.rconnectignore` is unreliable - don't depend on it
+- **Before deploying**: Delete `app/data/cache/` folder to avoid bundle size issues
+- Cache files are NOT needed - all data is in the database
+
+**Retry Commands (if needed in future):**
+```r
+setwd("app")
+source("fetch_usda_data.R")
+usda_stats()                              # Check progress
+fetch_usda_batch(limit=100, retry_errors=TRUE)  # Retry failures
+```
+
+**Fetch Status Values:**
+- `success` - Has USDA trait data
+- `no_data` - Species exists in USDA but has no traits
+- `api_error`, `profile_failed`, `no_plant_id` - Failed (can retry)
+
+### 2025-01-22: Native/Introduced Species Badges
+
+**Status:** IMPLEMENTED - Badges now show on Analysis page for all species with USDA data.
+
+**Features:**
+- **Native badge** (green): Shows "Native to N. America" for species native to any North American region
+- **Introduced badge** (yellow): Shows "Introduced" for species not native to North America
+- **Both badge** (blue): Shows "Native & Introduced" for species that are native in some regions, introduced in others
+- **Hover tooltips**: Shows which specific regions (L48, Alaska, Hawaii, Canada, etc.)
+
+**Implementation:**
+- `parse_native_status_na()` in `R/usda.R` - Parses the `native_status` field from `ref_usda_traits`
+- `get_native_status_na()` in `R/usda.R` - Cached lookup for species native status
+- Updated `native_status_badge` in `R/mod_analysis.R` - Now works in production (removed DEV-only restriction)
+
+**Data source:** `ref_usda_traits.native_status` field (e.g., "L48, N, Native" or "CAN, L48, I, Introduced")
+
+**Region codes:**
+- L48 = Lower 48 US States
+- AK = Alaska
+- HI = Hawaii
+- CAN = Canada
+- PR = Puerto Rico
+- VI = US Virgin Islands
+
+**Future planned:** Invasive species badge (requires state-level invasive species data - see `feedback/ALPHA_FEEDBACK.md`)
+
+**Additional updates (same session):**
+- Moved badge from sidebar to Summary page (more prominent placement with full tooltip text visible)
+- Changed "Drought" to "Drought Tol." in USDA reference chips for clarity
+- Created `scripts/insert_test_data_introduced.R` with test data for:
+  - Ailanthus altissima (Tree of Heaven) - 4 samples
+  - Lonicera japonica (Japanese Honeysuckle) - 4 samples
+  - Pyrus calleryana (Callery Pear) - 3 samples
+  - Miscanthus sinensis (Chinese Silver Grass) - 3 samples
+
+### 2025-01-22: User Preferences & State-Level Species Status
+
+**Status:** IMPLEMENTED - User preferences infrastructure and state-aware species badges.
+
+**Features:**
+
+1. **User Preferences System**
+   - New `user_preferences` table stores user's home zip code and derived location data
+   - Gear icon in navbar opens preferences modal
+   - Users can set their home zip code to see state-specific species information
+   - Zip code auto-resolves to city, state, and coordinates via existing zipcode_db
+
+2. **State-Specific Native Status Badges (Analysis Summary)**
+   - When user has set home location: Shows "Native to [State]" or "Introduced in [State]"
+   - When no preferences set: Falls back to "Native to N. America" with prompt to set location
+   - State-specific data requires `ref_state_distribution` table (currently empty - data ETL needed)
+   - Graceful fallback to North America-level when state data unavailable
+
+3. **Invasive/Noxious Species Badges (Analysis Summary)**
+   - Red badge: "Federal Noxious Weed" or state-level designation in user's state
+   - Orange badge: "Invasive in other US states" when species is listed elsewhere
+   - Requires `ref_noxious_invasive` table (currently empty - data ETL needed)
+   - Tooltip shows which states the species is listed in
+
+4. **Data Entry Location Auto-Fill**
+   - "Use this location" link in Location accordion when user has saved preferences
+   - One-click fills zip code, city, state, and coordinates from saved location
+   - Saves time for users entering multiple samples from the same location
+
+**Database Tables Added:**
+```sql
+-- User preferences (home location for native status lookups)
+CREATE TABLE user_preferences (
+    user_id TEXT PRIMARY KEY,
+    home_zipcode VARCHAR(10),
+    home_state VARCHAR(2),
+    home_city TEXT,
+    home_lat NUMERIC(10,6),
+    home_long NUMERIC(10,6),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Noxious/invasive species reference
+CREATE TABLE ref_noxious_invasive (
+    id SERIAL PRIMARY KEY,
+    taxon_id INTEGER REFERENCES ref_taxon(id),
+    state_code VARCHAR(2),           -- NULL for federal
+    designation TEXT NOT NULL,       -- 'Federal Noxious', 'State Noxious', 'Invasive'
+    source TEXT,
+    source_url TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(taxon_id, state_code, designation)
+);
+```
+
+**New Functions (R/db.R):**
+- `db_get_user_prefs(user_id, pool)` - Get user's saved preferences
+- `db_set_user_prefs(user_id, zipcode, city, state, lat, lon, pool)` - Save preferences (upsert)
+- `db_clear_user_prefs(user_id, pool)` - Clear user's preferences
+
+**New Functions (R/usda.R):**
+- `get_invasive_status(gs_name, user_state, pool)` - Check invasive/noxious status with state fallback
+- `get_native_status_for_user(gs_name, user_prefs, pool)` - State-specific native status with NA fallback
+
+**Files Modified:**
+- `app/R/db.R` - Added tables and CRUD functions
+- `app/R/usda.R` - Added invasive lookup and state-specific native functions
+- `app/R/mod_analysis.R` - Updated badges to use state-specific info
+- `app/R/mod_data_entry.R` - Added "Use saved location" feature
+- `app/app.R` - Added preferences modal and handlers, passed user_prefs to modules
+
+**Data ETL Needed:**
+To fully enable state-level features, data needs to be loaded into:
+1. `ref_state_distribution` - USDA state distribution data (for state-specific native status)
+2. `ref_noxious_invasive` - USDA federal/state noxious weed lists
+
+**Data Sources:**
+- Federal Noxious: https://adminplants.sc.egov.usda.gov/java/noxious?rptType=Federal
+- State Noxious: https://adminplants.sc.egov.usda.gov/java/noxComposite
+- Invasive: Invasive Plant Atlas (invasiveplantatlas.org) - may need scraping
+
+**Testing Checklist:**
+- [ ] Gear icon visible in navbar
+- [ ] Preferences modal opens and shows current settings
+- [ ] Zip code lookup shows city/state preview
+- [ ] Save preferences persists to database
+- [ ] Clear preferences removes saved location
+- [ ] Analysis page shows state-specific badge when prefs set
+- [ ] Analysis page shows "Set location" prompt when no prefs
+- [ ] Data Entry shows "Use this location" when prefs set
+- [ ] Clicking "Use this location" fills form fields

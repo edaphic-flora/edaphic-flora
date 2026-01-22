@@ -123,6 +123,8 @@ dataEntryUI <- function(id) {
             title = "Location",
             value = "location",
             icon = icon("map-marker-alt"),
+            # Use saved location link (shown if user has preferences)
+            uiOutput(ns("use_saved_location_section")),
             textInput(ns("street"), "Street Address (optional)", "",
                       placeholder = "123 Main St"),
             textInput(ns("zipcode"), "Zip Code", "",
@@ -223,7 +225,7 @@ dataEntryUI <- function(id) {
 
 dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_classes,
                             current_user, is_admin, data_changed, lookup_ecoregion,
-                            pdf_extract_limit, beta_features = list()) {
+                            pdf_extract_limit, beta_features = list(), user_prefs = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -399,6 +401,82 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       removeModal()
       showNotification("Soil data applied! Now select species and submit.",
                        type = "message", duration = 4)
+    })
+
+    # --- Use Saved Location Section ---
+    output$use_saved_location_section <- renderUI({
+      # Get user preferences (reactive if provided, or NULL)
+      prefs <- if (is.reactive(user_prefs)) user_prefs() else user_prefs
+
+      # Don't show if no preferences set
+      if (is.null(prefs) || is.null(prefs$home_zipcode) || !nzchar(prefs$home_zipcode)) {
+        return(NULL)
+      }
+
+      div(
+        class = "mb-3 p-2 bg-light rounded border",
+        div(
+          class = "d-flex justify-content-between align-items-center",
+          span(
+            icon("home", class = "text-success me-1"),
+            tags$small(sprintf("%s, %s", prefs$home_city %||% "", prefs$home_state %||% ""))
+          ),
+          actionLink(ns("use_saved_location"), "Use this location",
+                     class = "text-success small")
+        )
+      )
+    })
+
+    # Apply saved location to form
+    observeEvent(input$use_saved_location, {
+      prefs <- if (is.reactive(user_prefs)) user_prefs() else user_prefs
+
+      if (is.null(prefs) || is.null(prefs$home_zipcode)) {
+        showNotification("No saved location found.", type = "warning")
+        return()
+      }
+
+      # Fill location fields
+      updateTextInput(session, "zipcode", value = prefs$home_zipcode)
+      updateTextInput(session, "city", value = prefs$home_city %||% "")
+
+      # Convert state abbreviation to full name for the select input
+      state_abbrevs <- c(
+        AL = "Alabama", AK = "Alaska", AZ = "Arizona", AR = "Arkansas", CA = "California",
+        CO = "Colorado", CT = "Connecticut", DE = "Delaware", FL = "Florida", GA = "Georgia",
+        HI = "Hawaii", ID = "Idaho", IL = "Illinois", IN = "Indiana", IA = "Iowa",
+        KS = "Kansas", KY = "Kentucky", LA = "Louisiana", ME = "Maine", MD = "Maryland",
+        MA = "Massachusetts", MI = "Michigan", MN = "Minnesota", MS = "Mississippi", MO = "Missouri",
+        MT = "Montana", NE = "Nebraska", NV = "Nevada", NH = "New Hampshire", NJ = "New Jersey",
+        NM = "New Mexico", NY = "New York", NC = "North Carolina", ND = "North Dakota", OH = "Ohio",
+        OK = "Oklahoma", OR = "Oregon", PA = "Pennsylvania", RI = "Rhode Island", SC = "South Carolina",
+        SD = "South Dakota", TN = "Tennessee", TX = "Texas", UT = "Utah", VT = "Vermont",
+        VA = "Virginia", WA = "Washington", WV = "West Virginia", WI = "Wisconsin", WY = "Wyoming",
+        DC = "District of Columbia"
+      )
+      state_full <- state_abbrevs[prefs$home_state] %||% prefs$home_state
+      if (!is.null(state_full)) {
+        updateSelectInput(session, "state", selected = state_full)
+      }
+
+      # Fill coordinates
+      if (!is.null(prefs$home_lat) && !is.na(prefs$home_lat)) {
+        updateNumericInput(session, "latitude", value = round(prefs$home_lat, 6))
+      }
+      if (!is.null(prefs$home_long) && !is.na(prefs$home_long)) {
+        updateNumericInput(session, "longitude", value = round(prefs$home_long, 6))
+      }
+
+      # Update location status
+      output$location_status <- renderUI({
+        div(class = "text-success",
+            icon("check-circle"),
+            sprintf(" %s, %s (from saved location)", prefs$home_city %||% "", prefs$home_state %||% ""))
+      })
+
+      showNotification(sprintf("Location set to %s, %s",
+                               prefs$home_city %||% "", prefs$home_state %||% ""),
+                       type = "message", duration = 3)
     })
 
     # --- Batch Plant Upload Section (Beta feature) ---

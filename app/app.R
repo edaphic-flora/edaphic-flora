@@ -226,6 +226,14 @@ base_ui <- page_navbar(
  if (is_dev) nav_item(
    tags$span(class = "badge bg-warning text-dark me-2", "DEV")
  ),
+ # Preferences gear icon
+ nav_item(
+   actionLink("open_preferences", NULL,
+              icon = icon("cog"),
+              class = "nav-link text-muted",
+              title = "Preferences",
+              style = "font-size: 1.1rem; padding: 0.5rem;")
+ ),
  nav_item(
    tags$span(class = "navbar-text me-3", textOutput("user_display", inline = TRUE))
  )
@@ -292,6 +300,50 @@ delete_modal_ui <- modalDialog(
   p("Are you sure you want to delete this entry?"),
   p(class = "text-muted", "This action cannot be undone.")
 )
+
+# Preferences Modal
+preferences_modal_ui <- function(current_prefs = NULL) {
+  modalDialog(
+    title = span(icon("cog"), "Preferences"),
+    size = "m",
+    easyClose = TRUE,
+    footer = tagList(
+      modalButton("Cancel"),
+      actionButton("save_preferences", "Save", class = "btn-primary")
+    ),
+
+    h5("Home Location", class = "mb-3"),
+    p(class = "text-muted small mb-3",
+      "Set your home zip code to see state-specific native and invasive species information."),
+
+    textInput("pref_zipcode", "Zip Code",
+              value = current_prefs$home_zipcode %||% "",
+              placeholder = "Enter 5-digit zip code"),
+
+    # Preview of location from zipcode
+    uiOutput("pref_location_preview"),
+
+    hr(),
+
+    # Current settings display
+    if (!is.null(current_prefs) && !is.null(current_prefs$home_state)) {
+      div(class = "alert alert-info small",
+          icon("info-circle"),
+          sprintf(" Currently set to: %s, %s",
+                  current_prefs$home_city %||% "Unknown",
+                  current_prefs$home_state))
+    } else {
+      div(class = "alert alert-secondary small",
+          icon("info-circle"),
+          " No home location set. Native status will show North America-level data.")
+    },
+
+    # Clear preferences link
+    if (!is.null(current_prefs) && !is.null(current_prefs$home_state)) {
+      actionLink("clear_preferences", "Clear my location", class = "text-danger small")
+    }
+  )
+}
 
 # Custom branded sign-in page
 custom_sign_in_ui <- tagList(
@@ -400,6 +452,93 @@ server_inner <- function(input, output, session) {
 
  data_changed <- reactiveVal(0)
 
+ # --- User Preferences ---
+ prefs_changed <- reactiveVal(0)
+
+ user_prefs <- reactive({
+   prefs_changed()  # Invalidate when preferences change
+   u <- current_user()
+   if (is.null(u)) return(NULL)
+   db_get_user_prefs(u$user_uid, pool)
+ })
+
+ # Open preferences modal
+ observeEvent(input$open_preferences, {
+   current <- user_prefs()
+   showModal(preferences_modal_ui(current))
+ })
+
+ # Preview location from zipcode
+ output$pref_location_preview <- renderUI({
+   zip <- input$pref_zipcode
+   if (is.null(zip) || !nzchar(zip) || nchar(gsub("[^0-9]", "", zip)) < 5) {
+     return(NULL)
+   }
+
+   loc <- lookup_zipcode(zip, zipcode_db)
+   if (is.null(loc)) {
+     return(div(class = "text-danger small mt-2",
+                icon("exclamation-triangle"), " Zip code not found"))
+   }
+
+   div(class = "text-success small mt-2",
+       icon("check-circle"),
+       sprintf(" %s, %s", loc$city, loc$state))
+ })
+
+ # Save preferences
+ observeEvent(input$save_preferences, {
+   u <- current_user()
+   if (is.null(u)) {
+     showNotification("Please sign in to save preferences.", type = "error")
+     return()
+   }
+
+   zip <- input$pref_zipcode
+   if (is.null(zip) || !nzchar(zip)) {
+     showNotification("Please enter a zip code.", type = "warning")
+     return()
+   }
+
+   loc <- lookup_zipcode(zip, zipcode_db)
+   if (is.null(loc)) {
+     showNotification("Zip code not found. Please enter a valid US zip code.", type = "error")
+     return()
+   }
+
+   # Save to database
+   success <- db_set_user_prefs(
+     user_id = u$user_uid,
+     zipcode = zip,
+     city = loc$city,
+     state = loc$state,
+     lat = loc$latitude,
+     lon = loc$longitude,
+     pool = pool
+   )
+
+   if (success) {
+     removeModal()
+     prefs_changed(prefs_changed() + 1)
+     showNotification(sprintf("Location set to %s, %s", loc$city, loc$state), type = "message")
+   } else {
+     showNotification("Failed to save preferences. Please try again.", type = "error")
+   }
+ })
+
+ # Clear preferences
+ observeEvent(input$clear_preferences, {
+   u <- current_user()
+   if (is.null(u)) return()
+
+   success <- db_clear_user_prefs(u$user_uid, pool)
+   if (success) {
+     removeModal()
+     prefs_changed(prefs_changed() + 1)
+     showNotification("Location cleared.", type = "message")
+   }
+ })
+
  # --- Module servers ---
  helpServer("help")
  welcomeServer("welcome", pool, data_changed)
@@ -424,11 +563,12 @@ server_inner <- function(input, output, session) {
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
                  current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit,
-                 BETA_FEATURES)
+                 BETA_FEATURES, user_prefs)
 
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,
-               edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic)
+               edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
+               user_prefs)
 
 # Help links from welcome page - navigate to Field Guide
 observeEvent(input$help_link_soil, {

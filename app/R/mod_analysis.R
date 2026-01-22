@@ -21,10 +21,10 @@ analysisUI <- function(id) {
                          openOnFocus = FALSE, closeAfterSelect = TRUE, selectOnTab = TRUE,
                          placeholder = 'Type a species name...'
                        )),
+        uiOutput(ns("common_name_display")),
         hr(),
         uiOutput(ns("species_summary")),
         uiOutput(ns("reference_badges")),
-        uiOutput(ns("native_status_badge")),
         hr(),
 
         # --- Filter Controls ---
@@ -142,7 +142,8 @@ analysisUI <- function(id) {
 # ---------------------------
 
 analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
-                           edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic) {
+                           edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
+                           user_prefs = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -235,87 +236,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
             chip("USDA", symbol, href = usda_url(symbol)),
             chip("pH", if (!is.na(ph_min) && !is.na(ph_max)) sprintf("%.1f-%.1f", ph_min, ph_max) else NA),
             chip("Shade", safe_val(tr$shade_tolerance)),
-            chip("Drought", safe_val(tr$drought_tolerance))
+            chip("Drought Tol.", safe_val(tr$drought_tolerance))
         )
-      )
-    })
-
-    # --- Native status badge (dev only) ---
-    output$native_status_badge <- renderUI({
-      if (is_prod || is.null(state_grid)) return(NULL)
-
-      sp <- input$analysis_species %||% ""
-      if (!nzchar(sp)) return(NULL)
-
-      dat <- db_get_species_data(sp)
-      if (nrow(dat) == 0) return(NULL)
-
-      valid_coords <- dat %>%
-        filter(!is.na(location_lat) & !is.na(location_long))
-
-      if (nrow(valid_coords) == 0) return(NULL)
-
-      user_states <- get_states_from_coords(
-        valid_coords$location_lat,
-        valid_coords$location_long,
-        state_grid
-      )
-
-      if (length(user_states) == 0) return(NULL)
-
-      status <- get_native_status_summary(sp, user_states, pool)
-
-      badge_class <- switch(status$summary,
-        "native" = "bg-success",
-        "introduced" = "bg-warning text-dark",
-        "mixed" = "bg-info text-dark",
-        "bg-secondary"
-      )
-
-      badge_icon <- switch(status$summary,
-        "native" = icon("check-circle"),
-        "introduced" = icon("exclamation-triangle"),
-        "mixed" = icon("info-circle"),
-        icon("question-circle")
-      )
-
-      badge_text <- switch(status$summary,
-        "native" = "Native to your area",
-        "introduced" = "Introduced in your area",
-        "mixed" = "Mixed native status",
-        "Native status unknown"
-      )
-
-      detail_text <- NULL
-      if (status$summary == "mixed" && (length(status$native_states) > 0 || length(status$introduced_states) > 0)) {
-        parts <- c()
-        if (length(status$native_states) > 0) {
-          parts <- c(parts, paste0("Native: ", paste(status$native_states, collapse = ", ")))
-        }
-        if (length(status$introduced_states) > 0) {
-          parts <- c(parts, paste0("Introduced: ", paste(status$introduced_states, collapse = ", ")))
-        }
-        detail_text <- paste(parts, collapse = " | ")
-      }
-
-      div(
-        class = "native-status-section mt-2 p-2 rounded",
-        style = switch(status$summary,
-          "native" = "background-color: #f0fdf4; border: 1px solid #86efac;",
-          "introduced" = "background-color: #fefce8; border: 1px solid #fde047;",
-          "mixed" = "background-color: #ecfeff; border: 1px solid #67e8f9;",
-          "background-color: #f3f4f6; border: 1px solid #d1d5db;"
-        ),
-        div(
-          class = "d-flex align-items-center gap-2",
-          tags$span(
-            class = paste("badge", badge_class),
-            badge_icon, " ", badge_text
-          )
-        ),
-        if (!is.null(detail_text)) {
-          div(class = "small text-muted mt-1", detail_text)
-        }
       )
     })
 
@@ -337,6 +259,23 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         div(class = "text-info small mt-2",
             icon("info-circle"), " No samples yet. Showing reference data only.")
       }
+    })
+
+    # --- Common name display ---
+    output$common_name_display <- renderUI({
+      sp <- input$analysis_species %||% ""
+      if (!nzchar(sp)) return(NULL)
+
+      # Try to get common name from USDA data
+      common_name <- get_usda_common_name(sp, pool)
+
+      if (is.null(common_name) || !nzchar(common_name)) return(NULL)
+
+      div(
+        class = "text-muted small mt-1 mb-2",
+        style = "font-style: italic;",
+        tools::toTitleCase(common_name)
+      )
     })
 
     # --- Species summary sidebar ---
@@ -654,7 +593,119 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         success_rate <- NA
       }
 
+      # Get user preferences for state-specific lookups
+      prefs <- if (is.reactive(user_prefs)) user_prefs() else user_prefs
+      user_state <- prefs$home_state
+
+      # Get native status - state-specific if user has set preferences, otherwise North America level
+      if (!is.null(user_state) && nzchar(user_state)) {
+        # User has preferences set - try state-specific lookup
+        native_info <- get_native_status_for_user(input$analysis_species, prefs, pool)
+      } else {
+        # No preferences - use North America level
+        native_info <- get_native_status_na(input$analysis_species, pool)
+        native_info$state_name <- NULL
+      }
+
+      # Build tooltip text for native status
+      native_tooltip <- if (!is.null(native_info$tooltip) && nzchar(native_info$tooltip)) {
+        native_info$tooltip
+      } else {
+        switch(native_info$status,
+          "native" = paste0("This species is native to ", native_info$state_name %||% "North America", "."),
+          "native_na" = "This species is native to North America (state-specific data not available).",
+          "introduced" = paste0("This species was introduced to ", native_info$state_name %||% "North America", "."),
+          "introduced_na" = "This species was introduced to North America from elsewhere.",
+          "both" = "This species is native to some areas and introduced to others.",
+          "no_prefs" = "Set your home location in Preferences (gear icon) to see state-specific native status.",
+          "Native status information not available."
+        )
+      }
+
+      # Get invasive/noxious status
+      invasive_info <- get_invasive_status(input$analysis_species, user_state, pool)
+
+      # Build invasive badge
+      invasive_badge <- NULL
+      if (invasive_info$is_federal || invasive_info$in_user_state %||% FALSE) {
+        # Invasive/noxious in user's state or federal list
+        invasive_tooltip <- if (invasive_info$is_federal) {
+          "This species is on the Federal Noxious Weed List."
+        } else {
+          paste0("This species is listed as ", invasive_info$user_state_designation, " in ", native_info$state_name %||% user_state, ".")
+        }
+        invasive_badge <- div(
+          class = "mb-2",
+          tooltip(
+            tags$span(
+              class = "badge bg-danger",
+              style = "font-size: 0.9rem; cursor: help;",
+              icon("exclamation-triangle"),
+              if (invasive_info$is_federal) " Federal Noxious Weed" else paste0(" ", invasive_info$user_state_designation %||% "Invasive")
+            ),
+            invasive_tooltip,
+            placement = "right"
+          )
+        )
+      } else if (isTRUE(invasive_info$in_other_states)) {
+        # Invasive in other states but not user's state
+        states_text <- if (length(invasive_info$states_listed) <= 3) {
+          paste(invasive_info$states_listed, collapse = ", ")
+        } else {
+          paste0(paste(invasive_info$states_listed[1:3], collapse = ", "), ", +", length(invasive_info$states_listed) - 3, " more")
+        }
+        invasive_badge <- div(
+          class = "mb-2",
+          tooltip(
+            tags$span(
+              class = "badge bg-warning text-dark",
+              style = "font-size: 0.85rem; cursor: help;",
+              icon("info-circle"), " Invasive in other US states"
+            ),
+            paste0("Listed as invasive/noxious in: ", states_text),
+            placement = "right"
+          )
+        )
+      }
+
+      # Determine native badge appearance based on status
+      native_badge_class <- switch(native_info$status,
+        "native" = "bg-success",
+        "native_na" = "bg-success",
+        "introduced" = "bg-warning text-dark",
+        "introduced_na" = "bg-warning text-dark",
+        "both" = "bg-info text-dark",
+        "no_prefs" = "bg-secondary",
+        "bg-secondary"
+      )
+
+      native_badge_text <- switch(native_info$status,
+        "native" = tagList(icon("leaf"), paste0(" Native to ", native_info$state_name %||% "your area")),
+        "native_na" = tagList(icon("leaf"), " Native to N. America"),
+        "introduced" = tagList(icon("plane-arrival"), paste0(" Introduced in ", native_info$state_name %||% "your area")),
+        "introduced_na" = tagList(icon("plane-arrival"), " Introduced"),
+        "both" = tagList(icon("exchange-alt"), " Native & Introduced"),
+        "no_prefs" = tagList(icon("cog"), " Set location for native status"),
+        tagList(icon("question-circle"), " Status Unknown")
+      )
+
       tagList(
+        # Native/Introduced status badge at top of Summary
+        div(
+          class = "mb-3",
+          tooltip(
+            tags$span(
+              class = paste("badge", native_badge_class),
+              style = "font-size: 0.95rem; cursor: help;",
+              native_badge_text
+            ),
+            native_tooltip,
+            placement = "right"
+          ),
+          # Invasive badge (if applicable)
+          invasive_badge
+        ),
+
         layout_column_wrap(
           width = 1/4,
           card(
