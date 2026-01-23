@@ -35,12 +35,10 @@ welcomeUI <- function(id) {
               )
           ),
           div(class = "text-center",
-              h1(class = "welcome-brand mb-1",
-                 span(class = "brand-name-edaphic", "edaphic"),
-                 " ",
-                 span(class = "brand-name-flora", "flora")),
-              p(class = "text-muted mb-0", style = "font-size: 0.95rem;",
-                "A community database for soil conditions and plant species")
+              tags$img(src = "readme_header.svg",
+                       alt = "edaphic flora",
+                       class = "welcome-brand-logo",
+                       style = "max-width: 100%; width: 600px; height: auto;")
           )
         ),
         card_body(
