@@ -403,6 +403,20 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                        type = "message", duration = 4)
     })
 
+    # --- Auto-fill location from saved preferences ---
+    # When user has saved prefs and zipcode field is empty, auto-fill
+    observe({
+      prefs <- if (is.reactive(user_prefs)) user_prefs() else user_prefs
+      if (is.null(prefs) || is.null(prefs$home_zipcode) || !nzchar(prefs$home_zipcode)) return()
+
+      # Only auto-fill if zipcode is currently empty
+      current_zip <- isolate(input$zipcode)
+      if (!is.null(current_zip) && nzchar(current_zip)) return()
+
+      # Fill the location fields
+      updateTextInput(session, "zipcode", value = prefs$home_zipcode)
+    })
+
     # --- Use Saved Location Section ---
     output$use_saved_location_section <- renderUI({
       # Get user preferences (reactive if provided, or NULL)

@@ -193,7 +193,24 @@ base_ui <- page_navbar(
      tags$link(rel = "stylesheet",
                href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
      tags$link(rel = "stylesheet",
-               href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap")
+               href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap"),
+     tags$style(HTML("
+       /* Navbar zip code input styling */
+       #nav_zipcode {
+         width: 75px !important;
+         text-align: center;
+         font-weight: 500;
+         padding: 0.25rem 0.5rem;
+         font-size: 0.9rem;
+       }
+       #nav_zipcode::placeholder {
+         color: #999;
+       }
+       /* Remove the form-group margin in navbar */
+       .navbar .form-group {
+         margin-bottom: 0 !important;
+       }
+     "))
    )
  ),
 
@@ -226,13 +243,16 @@ base_ui <- page_navbar(
  if (is_dev) nav_item(
    tags$span(class = "badge bg-warning text-dark me-2", "DEV")
  ),
- # Preferences gear icon
+ # Zip code input for home location
  nav_item(
-   actionLink("open_preferences", NULL,
-              icon = icon("cog"),
-              class = "nav-link text-muted",
-              title = "Preferences",
-              style = "font-size: 1.1rem; padding: 0.5rem;")
+   div(class = "d-flex align-items-center me-2",
+       style = "background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 6px;",
+       tags$span("Your Zip:", class = "text-light me-2", style = "font-weight: 500;"),
+       div(style = "display: inline-block; width: 80px;",
+           textInput("nav_zipcode", NULL, value = "", width = "100%",
+                     placeholder = "-----")),
+       uiOutput("nav_location_badge", inline = TRUE)
+   )
  ),
  nav_item(
    tags$span(class = "navbar-text me-3", textOutput("user_display", inline = TRUE))
@@ -300,50 +320,6 @@ delete_modal_ui <- modalDialog(
   p("Are you sure you want to delete this entry?"),
   p(class = "text-muted", "This action cannot be undone.")
 )
-
-# Preferences Modal
-preferences_modal_ui <- function(current_prefs = NULL) {
-  modalDialog(
-    title = span(icon("cog"), "Preferences"),
-    size = "m",
-    easyClose = TRUE,
-    footer = tagList(
-      modalButton("Cancel"),
-      actionButton("save_preferences", "Save", class = "btn-primary")
-    ),
-
-    h5("Home Location", class = "mb-3"),
-    p(class = "text-muted small mb-3",
-      "Set your home zip code to see state-specific native and invasive species information."),
-
-    textInput("pref_zipcode", "Zip Code",
-              value = current_prefs$home_zipcode %||% "",
-              placeholder = "Enter 5-digit zip code"),
-
-    # Preview of location from zipcode
-    uiOutput("pref_location_preview"),
-
-    hr(),
-
-    # Current settings display
-    if (!is.null(current_prefs) && !is.null(current_prefs$home_state)) {
-      div(class = "alert alert-info small",
-          icon("info-circle"),
-          sprintf(" Currently set to: %s, %s",
-                  current_prefs$home_city %||% "Unknown",
-                  current_prefs$home_state))
-    } else {
-      div(class = "alert alert-secondary small",
-          icon("info-circle"),
-          " No home location set. Native status will show North America-level data.")
-    },
-
-    # Clear preferences link
-    if (!is.null(current_prefs) && !is.null(current_prefs$home_state)) {
-      actionLink("clear_preferences", "Clear my location", class = "text-danger small")
-    }
-  )
-}
 
 # Custom branded sign-in page
 custom_sign_in_ui <- tagList(
@@ -462,47 +438,45 @@ server_inner <- function(input, output, session) {
    db_get_user_prefs(u$user_uid, pool)
  })
 
- # Open preferences modal
- observeEvent(input$open_preferences, {
-   current <- user_prefs()
-   showModal(preferences_modal_ui(current))
+ # Pre-populate zip code from saved preferences
+ observe({
+   prefs <- user_prefs()
+   if (!is.null(prefs) && !is.null(prefs$home_zipcode) && nzchar(prefs$home_zipcode)) {
+     updateTextInput(session, "nav_zipcode", value = prefs$home_zipcode)
+   }
  })
 
- # Preview location from zipcode
- output$pref_location_preview <- renderUI({
-   zip <- input$pref_zipcode
-   if (is.null(zip) || !nzchar(zip) || nchar(gsub("[^0-9]", "", zip)) < 5) {
-     return(NULL)
+ # Location badge showing city/state
+ output$nav_location_badge <- renderUI({
+   zip <- input$nav_zipcode
+   if (is.null(zip) || nchar(gsub("[^0-9]", "", zip)) < 5) {
+     return(tags$span(class = "text-muted ms-2 small", "for local species info"))
    }
 
    loc <- lookup_zipcode(zip, zipcode_db)
    if (is.null(loc)) {
-     return(div(class = "text-danger small mt-2",
-                icon("exclamation-triangle"), " Zip code not found"))
+     return(tags$span(class = "badge bg-danger ms-2", "Invalid zip"))
    }
 
-   div(class = "text-success small mt-2",
-       icon("check-circle"),
-       sprintf(" %s, %s", loc$city, loc$state))
+   tags$span(class = "badge bg-success ms-2",
+             style = "font-size: 0.85rem;",
+             sprintf("%s, %s", loc$city, loc$state))
  })
 
- # Save preferences
- observeEvent(input$save_preferences, {
+ # Save zip code when 5 digits entered
+ observeEvent(input$nav_zipcode, {
+   zip <- input$nav_zipcode
+   if (is.null(zip) || nchar(gsub("[^0-9]", "", zip)) != 5) return()
+
    u <- current_user()
    if (is.null(u)) {
-     showNotification("Please sign in to save preferences.", type = "error")
-     return()
-   }
-
-   zip <- input$pref_zipcode
-   if (is.null(zip) || !nzchar(zip)) {
-     showNotification("Please enter a zip code.", type = "warning")
+     showNotification("Sign in to save your location", type = "warning", duration = 3)
      return()
    }
 
    loc <- lookup_zipcode(zip, zipcode_db)
    if (is.null(loc)) {
-     showNotification("Zip code not found. Please enter a valid US zip code.", type = "error")
+     showNotification("Zip code not found", type = "error", duration = 3)
      return()
    }
 
@@ -518,26 +492,12 @@ server_inner <- function(input, output, session) {
    )
 
    if (success) {
-     removeModal()
      prefs_changed(prefs_changed() + 1)
-     showNotification(sprintf("Location set to %s, %s", loc$city, loc$state), type = "message")
+     showNotification(sprintf("Location set to %s, %s", loc$city, loc$state), type = "message", duration = 3)
    } else {
-     showNotification("Failed to save preferences. Please try again.", type = "error")
+     showNotification("Failed to save location", type = "error", duration = 3)
    }
- })
-
- # Clear preferences
- observeEvent(input$clear_preferences, {
-   u <- current_user()
-   if (is.null(u)) return()
-
-   success <- db_clear_user_prefs(u$user_uid, pool)
-   if (success) {
-     removeModal()
-     prefs_changed(prefs_changed() + 1)
-     showNotification("Location cleared.", type = "message")
-   }
- })
+ }, ignoreInit = TRUE)
 
  # --- Module servers ---
  helpServer("help")

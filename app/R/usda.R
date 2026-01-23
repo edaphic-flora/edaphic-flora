@@ -377,8 +377,13 @@ parse_native_status_na <- function(native_status_str) {
   }
 
   # Check for native and introduced markers
-  has_native <- grepl("N, Native|, Native$|^Native", native_status_str, ignore.case = FALSE)
-  has_introduced <- grepl("I, Introduced|, Introduced$|^Introduced", native_status_str, ignore.case = FALSE)
+
+  # Format can be: "L48, N, Native" or "L48, I, Introduced" or "L48, N, I, Native, Introduced"
+  # Look for ", N," or ", N$" (N as standalone code) AND "Native" anywhere
+  has_native <- (grepl(", N,", native_status_str) || grepl(", N$", native_status_str)) &&
+                grepl("Native", native_status_str, fixed = TRUE)
+  has_introduced <- (grepl(", I,", native_status_str) || grepl(", I$", native_status_str)) &&
+                    grepl("Introduced", native_status_str, fixed = TRUE)
 
   # Extract region codes (uppercase 2-3 letter codes at start or after comma)
   # Known regions: L48, AK, HI, CAN, PR, VI, GL, SPM, PB
@@ -814,6 +819,16 @@ get_native_status_for_user <- function(gs_name, user_prefs, pool) {
         state_code = state_code,
         state_name = state_name,
         tooltip = paste0("Introduced to North America (not native to ", state_name, ")")
+      ))
+    } else if (na_status$status == "both") {
+      # For L48 states, "both" means native to continental US but introduced elsewhere (e.g., Hawaii)
+      # Show as "Native to N. America" for practical purposes
+      # AK/HI users will get state-specific data from ref_state_distribution instead
+      return(list(
+        status = "native_na",
+        state_code = state_code,
+        state_name = state_name,
+        tooltip = "Native to North America (introduced to some territories)"
       ))
     } else {
       return(list(
