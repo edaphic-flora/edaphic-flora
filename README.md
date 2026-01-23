@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="app/www/logo.svg" alt="edaphic flora" width="120">
+  <img src="app/www/readme_header.svg" alt="edaphic flora" width="400">
 </p>
-
-<h1 align="center">edaphic flora</h1>
 
 <p align="center">
   <strong>A community-driven soil database for native plant enthusiasts</strong>
