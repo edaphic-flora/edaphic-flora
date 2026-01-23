@@ -37,7 +37,7 @@
     </g>
 
     <!-- "flora" at same scale, positioned after edaphic -->
-    <g transform="translate(132, 58) scale(0.20)" fill="#7A9A86">
+    <g transform="translate(132, 0) scale(0.20)" fill="#7A9A86">
       <!-- f -->
       <path d="M15.782 382V309.33H0V293.915H15.782V253.542H31.931V293.915H50V309.33H31.931V382H15.782Z"/>
       <!-- l -->
