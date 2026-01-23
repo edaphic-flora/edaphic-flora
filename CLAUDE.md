@@ -98,13 +98,53 @@ FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID
 ADMIN_EMAILS=admin@example.com
 ```
 
-## Brand Colors
+## Branding Guidelines
 
-| Color | Hex | Usage |
-|-------|-----|-------|
-| Sage | #7A9A86 | Primary accent, buttons |
-| Charcoal | #373D3C | Navbar, headings |
-| Limestone | #F7F4E8 | Light backgrounds |
+Reference: `branding/Branding Overview.docx`
+
+### Brand Essence
+- **Mission**: "Science-based care for native landscapes."
+- **Tagline**: "For the birds, the bees, and the dirt bros."
+- **Keywords**: Scientific, Organic, Local, Modern, Sustainable
+- **The Vibe**: Intersection of "peer-reviewed data" and "running barefoot through the tall grass." Sophisticated, muddy, and unapologetically nerdy about soil.
+
+### Color Palette
+
+| Role | Name | Hex | Usage |
+|------|------|-----|-------|
+| Primary | Native Sage | #7A9A86 | Primary accent, buttons, success states |
+| Accent | Horizon Gold | #D39B35 | CTAs, warning states, highlights |
+| Canvas | Limestone | #F7F4E8 | Backgrounds (avoid pure white #FFFFFF) |
+| Text | Charcoal | #373D3C | Body text, navbar, headings |
+
+**Accessibility Rules:**
+- Charcoal on Limestone = high contrast (good)
+- White text ONLY on Charcoal backgrounds
+- White text on Sage or Gold = too low contrast (avoid)
+
+### Typography (Brand Standard)
+
+| Role | Font | Usage |
+|------|------|-------|
+| Brand Voice | Baumans | Logo only, very short marketing phrases (3-5 words max) |
+| Manager | Montserrat SemiBold | Headings (H1-H3), nav, buttons |
+| Narrative | Rokkitt Light | Body text, captions, sub-logos |
+| Data | JetBrains Mono | Species names, numeric values, code |
+
+The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (data/species names) per brand guidelines.
+
+### Design Rules
+
+1. **No "Radioactive" Greens**: Nature is sage, olive, moss, brown. Keep saturation muted and natural.
+2. **Embrace the Brown**: Dormant grasses, dried seed heads, autumn colors are beautiful. Gardens aren't green 365 days.
+3. **Macro is King**: Show texture - pollen on stamens, soil crumb structure, root systems. "Close-up of a worm" energy.
+4. **Humans are Secondary**: If people appear, they're working (dirty hands, muddy boots). Plants are the main character.
+5. **No Generic Stock Photos**: Avoid anything that looks like it belongs on a bag of fertilizer.
+
+### Logo Usage
+- **Safe space**: Leave padding around logo (use leaf element as spacing guide)
+- **Variations**: Dark version for light backgrounds, light version for dark backgrounds
+- Logo files in `branding/` folder (SVG and PNG formats)
 
 ## Key Features Status
 

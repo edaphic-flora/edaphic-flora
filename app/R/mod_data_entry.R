@@ -18,6 +18,9 @@ dataEntryUI <- function(id) {
         width = 380,
         bg = "#f8f9fa",
 
+        # Form progress indicator
+        uiOutput(ns("form_progress_ui")),
+
         # Soil Report Upload Section (conditional on API key availability)
         uiOutput(ns("pdf_upload_section")),
 
@@ -237,6 +240,34 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
     # State for batch plant upload
     plant_list_data <- reactiveVal(NULL)  # Parsed plant list from CSV upload
+
+    # --- Form Progress Indicator ---
+    output$form_progress_ui <- renderUI({
+      # Calculate completion based on key fields
+      species_filled <- length(input$species) > 0 || (!is.null(plant_list_data()) && nrow(plant_list_data()$valid) > 0)
+      ph_filled <- !is.null(input$ph) && !is.na(input$ph)
+      om_filled <- !is.null(input$organic_matter) && !is.na(input$organic_matter)
+      texture_filled <- (input$texture_input_type == "class" && !is.null(input$texture_class) && nzchar(input$texture_class)) ||
+                       (input$texture_input_type == "pct" && !is.null(input$sand) && !is.na(input$sand))
+      location_filled <- !is.null(input$zipcode) && nchar(gsub("[^0-9]", "", input$zipcode)) == 5
+
+      sections_complete <- sum(c(species_filled, ph_filled || om_filled, texture_filled, location_filled))
+      total_sections <- 4
+      progress_pct <- round(sections_complete / total_sections * 100)
+
+      # Only show if at least one field is filled
+      if (progress_pct == 0) return(NULL)
+
+      div(class = "mb-3",
+          div(class = "d-flex justify-content-between align-items-center mb-1",
+              tags$small(class = "text-muted", icon("tasks"), " Form Progress"),
+              tags$small(class = "text-muted fw-bold", sprintf("%d of %d sections", sections_complete, total_sections))
+          ),
+          div(class = "form-progress",
+              div(class = "form-progress-fill", style = sprintf("width: %d%%;", progress_pct))
+          )
+      )
+    })
 
     # --- PDF Upload Section (conditional on API key) ---
     output$pdf_upload_section <- renderUI({
@@ -958,10 +989,23 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       dat <- db_get_all_samples(limit = 50)  # Limit at SQL level for performance
       if (nrow(dat) == 0) return(NULL)
 
+      # Helper to format outcome as badge
+      format_outcome_badge <- function(outcome) {
+        if (is.na(outcome) || outcome == "") return("")
+        badge_class <- switch(outcome,
+          "Thriving" = "outcome-thriving",
+          "Established" = "outcome-established",
+          "Struggling" = "outcome-struggling",
+          "Failed/Died" = "outcome-failed",
+          ""
+        )
+        sprintf('<span class="outcome-badge %s">%s</span>', badge_class, outcome)
+      }
+
       display <- dat %>%
         select(id, species, outcome, ph, organic_matter, texture_class, date, created_by) %>%
         mutate(date = as.character(date),
-               outcome = ifelse(is.na(outcome), "", outcome))
+               outcome = sapply(outcome, format_outcome_badge))
 
       # Add action buttons for user's own entries (or all entries for admin)
       # Note: Using global (non-namespaced) input IDs for edit/delete
@@ -1075,10 +1119,23 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                          rownames = FALSE))
       }
 
+      # Helper to format outcome as badge
+      format_outcome <- function(outcome) {
+        if (is.na(outcome) || outcome == "") return("-")
+        badge_class <- switch(outcome,
+          "Thriving" = "outcome-thriving",
+          "Established" = "outcome-established",
+          "Struggling" = "outcome-struggling",
+          "Failed/Died" = "outcome-failed",
+          ""
+        )
+        sprintf('<span class="outcome-badge %s">%s</span>', badge_class, outcome)
+      }
+
       display <- entries %>%
         mutate(
           Date = format(date, "%Y-%m-%d"),
-          Outcome = ifelse(is.na(outcome), "-", outcome),
+          Outcome = sapply(outcome, format_outcome),
           pH = ifelse(is.na(ph), "-", as.character(round(ph, 1))),
           OM = ifelse(is.na(organic_matter), "-", paste0(round(organic_matter, 1), "%")),
           Texture = ifelse(is.na(texture_class), "-", texture_class),

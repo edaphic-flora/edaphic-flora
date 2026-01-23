@@ -69,12 +69,14 @@ analysisUI <- function(id) {
         uiOutput(ns("download_species_ui"))
       ),
 
-      navset_card_tab(
-        id = ns("analysis_tabs"),
-        full_screen = TRUE,
+      div(
+        class = "analysis-tabs-container",
+        navset_card_tab(
+          id = ns("analysis_tabs"),
+          full_screen = TRUE,
 
-        nav_panel(
-          title = "Summary",
+          nav_panel(
+            title = "Summary",
           icon = icon("table"),
           uiOutput(ns("summary_ui"))
         ),
@@ -133,6 +135,7 @@ analysisUI <- function(id) {
           uiOutput(ns("traits_ui"))
         )
       )
+      )  # Close analysis-tabs-container div
     )
   )
 }
@@ -2158,7 +2161,25 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       if (nrow(dat) == 0) return(NULL)
-      datatable(dat, options = list(scrollX = TRUE, pageLength = 15))
+
+      # Format outcome as badge
+      if ("outcome" %in% names(dat)) {
+        dat$outcome <- sapply(dat$outcome, function(o) {
+          if (is.na(o) || o == "") return("-")
+          badge_class <- switch(o,
+            "Thriving" = "outcome-thriving",
+            "Established" = "outcome-established",
+            "Struggling" = "outcome-struggling",
+            "Failed/Died" = "outcome-failed",
+            ""
+          )
+          sprintf('<span class="outcome-badge %s">%s</span>', badge_class, o)
+        })
+      }
+
+      datatable(dat,
+                options = list(scrollX = TRUE, pageLength = 15),
+                escape = FALSE)  # Allow HTML rendering
     })
 
     # ---------------------------
