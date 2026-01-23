@@ -192,8 +192,9 @@ base_ui <- page_navbar(
      tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
      tags$link(rel = "stylesheet",
                href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+     # Brand fonts: Baumans (logo), Montserrat (headings), Rokkitt (body) - loaded via bslib but backup here
      tags$link(rel = "stylesheet",
-               href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap"),
+               href = "https://fonts.googleapis.com/css2?family=Baumans&family=Montserrat:wght@400;500;600;700&family=Rokkitt:wght@300;400;500;600&display=swap"),
      tags$style(HTML("
        /* Navbar zip code input styling */
        #nav_zipcode {
@@ -324,6 +325,9 @@ delete_modal_ui <- modalDialog(
 # Custom branded sign-in page
 custom_sign_in_ui <- tagList(
   tags$head(
+    # Import Google Fonts for sign-in page (Brand Standard: Montserrat + Rokkitt)
+    tags$link(rel = "stylesheet",
+              href = "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Rokkitt:wght@300;400;500&display=swap"),
     tags$style(HTML("
       .sign-in-container {
         min-height: 100vh;
@@ -331,47 +335,115 @@ custom_sign_in_ui <- tagList(
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #f5f5dc 0%, #e8e4d4 100%);
+        background: linear-gradient(135deg, #F7F4E8 0%, #f0ede3 100%);
         padding: 20px;
+        position: relative;
+      }
+      /* Subtle grain texture */
+      .sign-in-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E\");
+        opacity: 0.03;
+        pointer-events: none;
       }
       .sign-in-logo {
-        max-width: 200px;
-        margin-bottom: 20px;
+        max-width: 220px;
+        margin-bottom: 24px;
+        filter: drop-shadow(0 2px 8px rgba(122, 154, 134, 0.2));
+        animation: fadeInUp 0.6s ease;
       }
       .sign-in-welcome {
-        color: #2c3e50;
-        font-size: 1.5rem;
-        margin-bottom: 10px;
+        font-family: 'Montserrat', sans-serif;
+        color: #373D3C;
+        font-size: 1.75rem;
+        margin-bottom: 8px;
         font-weight: 600;
+        letter-spacing: 0.5px;
+        animation: fadeInUp 0.6s ease 0.1s backwards;
       }
       .sign-in-tagline {
-        color: #666;
+        font-family: 'Rokkitt', Georgia, serif;
+        font-weight: 300;
+        color: #8B9A8E;
         font-size: 1rem;
-        margin-bottom: 30px;
+        margin-bottom: 32px;
+        animation: fadeInUp 0.6s ease 0.2s backwards;
       }
       .sign-in-box {
         background: white;
-        padding: 30px;
-        border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        max-width: 400px;
+        padding: 36px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(55, 61, 60, 0.12);
+        max-width: 420px;
         width: 100%;
+        border-top: 4px solid #7A9A86;
+        animation: fadeInUp 0.6s ease 0.3s backwards;
+        position: relative;
+        z-index: 1;
       }
       .sign-in-box h1 {
-        color: #27ae60 !important;
-        font-size: 1.75rem;
+        font-family: 'Montserrat', sans-serif !important;
+        color: #7A9A86 !important;
+        font-size: 1.5rem;
+      }
+      .sign-in-box .btn-primary {
+        background: linear-gradient(135deg, #7A9A86 0%, #6A8A76 100%) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.75rem 1.5rem !important;
+        font-family: 'Montserrat', sans-serif !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+      }
+      .sign-in-box .btn-primary:hover {
+        background: linear-gradient(135deg, #6A8A76 0%, #5D7A6A 100%) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(122, 154, 134, 0.3);
+      }
+      .sign-in-box input {
+        font-family: 'Rokkitt', serif !important;
+        font-weight: 300 !important;
+        border-radius: 8px !important;
+        border: 1px solid #d1d5db !important;
+        padding: 0.75rem 1rem !important;
+      }
+      .sign-in-box input:focus {
+        border-color: #7A9A86 !important;
+        box-shadow: 0 0 0 3px rgba(122, 154, 134, 0.15) !important;
       }
       .sign-in-footer {
-        margin-top: 30px;
-        color: #888;
+        margin-top: 32px;
+        color: #8B9A8E;
         font-size: 0.85rem;
+        font-family: 'Rokkitt', serif;
+        font-weight: 300;
+        animation: fadeInUp 0.6s ease 0.4s backwards;
+        position: relative;
+        z-index: 1;
       }
       .sign-in-footer a {
-        color: #27ae60;
+        color: #7A9A86;
         text-decoration: none;
+        transition: color 0.2s ease;
       }
       .sign-in-footer a:hover {
+        color: #5D7A6A;
         text-decoration: underline;
+      }
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
     "))
   ),
@@ -381,7 +453,7 @@ custom_sign_in_ui <- tagList(
     p(class = "sign-in-tagline", "Record and analyze soil conditions for plant species"),
     div(class = "sign-in-box",
       polished::sign_in_ui_default(
-        color = "#27ae60",
+        color = "#7A9A86",
         company_name = "edaphic flora",
         logo_top = NULL,
         logo_bottom = NULL
