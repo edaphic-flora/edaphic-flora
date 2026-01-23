@@ -617,13 +617,32 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           "introduced" = paste0("This species was introduced to ", native_info$state_name %||% "North America", "."),
           "introduced_na" = "This species was introduced to North America from elsewhere.",
           "both" = "This species is native to some areas and introduced to others.",
-          "no_prefs" = "Set your home location in Preferences (gear icon) to see state-specific native status.",
+          "no_prefs" = "Enter your zip code in the top-right to see state-specific native status.",
           "Native status information not available."
         )
       }
 
       # Get invasive/noxious status
       invasive_info <- get_invasive_status(input$analysis_species, user_state, pool)
+
+      # State invasive list URL (National Invasive Species Info Center)
+      state_invasive_url <- if (!is.null(user_state) && nzchar(user_state)) {
+        # Map state code to state name for URL
+        state_names <- c(
+          AL = "alabama", AK = "alaska", AZ = "arizona", AR = "arkansas", CA = "california",
+          CO = "colorado", CT = "connecticut", DE = "delaware", FL = "florida", GA = "georgia",
+          HI = "hawaii", ID = "idaho", IL = "illinois", IN = "indiana", IA = "iowa",
+          KS = "kansas", KY = "kentucky", LA = "louisiana", ME = "maine", MD = "maryland",
+          MA = "massachusetts", MI = "michigan", MN = "minnesota", MS = "mississippi", MO = "missouri",
+          MT = "montana", NE = "nebraska", NV = "nevada", NH = "new-hampshire", NJ = "new-jersey",
+          NM = "new-mexico", NY = "new-york", NC = "north-carolina", ND = "north-dakota", OH = "ohio",
+          OK = "oklahoma", OR = "oregon", PA = "pennsylvania", RI = "rhode-island", SC = "south-carolina",
+          SD = "south-dakota", TN = "tennessee", TX = "texas", UT = "utah", VT = "vermont",
+          VA = "virginia", WA = "washington", WV = "west-virginia", WI = "wisconsin", WY = "wyoming"
+        )
+        state_slug <- state_names[toupper(user_state)]
+        if (!is.na(state_slug)) paste0("https://www.invasivespeciesinfo.gov/us/", state_slug) else NULL
+      } else NULL
 
       # Build invasive badge
       invasive_badge <- NULL
@@ -632,19 +651,31 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         invasive_tooltip <- if (invasive_info$is_federal) {
           "This species is on the Federal Noxious Weed List."
         } else {
-          paste0("This species is listed as ", invasive_info$user_state_designation, " in ", native_info$state_name %||% user_state, ".")
+          paste0("Listed as ", invasive_info$user_state_designation, " in ", native_info$state_name %||% user_state, ". Click for state invasive species info.")
         }
         invasive_badge <- div(
-          class = "mb-2",
+          class = "d-inline-block",
           tooltip(
-            tags$span(
-              class = "badge bg-danger",
-              style = "font-size: 0.9rem; cursor: help;",
-              icon("exclamation-triangle"),
-              if (invasive_info$is_federal) " Federal Noxious Weed" else paste0(" ", invasive_info$user_state_designation %||% "Invasive")
-            ),
+            if (!is.null(state_invasive_url) && !invasive_info$is_federal) {
+              tags$a(
+                href = state_invasive_url,
+                target = "_blank",
+                class = "badge bg-danger text-white text-decoration-none",
+                style = "font-size: 0.9em; padding: 0.5em 0.75em;",
+                icon("exclamation-triangle", class = "me-1"),
+                invasive_info$user_state_designation %||% "Invasive",
+                icon("up-right-from-square", class = "ms-1")
+              )
+            } else {
+              tags$span(
+                class = "badge bg-danger",
+                style = "font-size: 0.9em; padding: 0.5em 0.75em;",
+                icon("exclamation-triangle", class = "me-1"),
+                if (invasive_info$is_federal) "Federal Noxious Weed" else (invasive_info$user_state_designation %||% "Invasive")
+              )
+            },
             invasive_tooltip,
-            placement = "right"
+            placement = "bottom"
           )
         )
       } else if (isTRUE(invasive_info$in_other_states)) {
@@ -655,15 +686,15 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           paste0(paste(invasive_info$states_listed[1:3], collapse = ", "), ", +", length(invasive_info$states_listed) - 3, " more")
         }
         invasive_badge <- div(
-          class = "mb-2",
+          class = "d-inline-block",
           tooltip(
             tags$span(
-              class = "badge bg-warning text-dark",
-              style = "font-size: 0.85rem; cursor: help;",
-              icon("info-circle"), " Invasive in other US states"
+              class = "badge text-dark",
+              style = "font-size: 0.85em; padding: 0.4em 0.65em; background-color: #f0ad4e;",
+              icon("info-circle", class = "me-1"), "Invasive elsewhere"
             ),
             paste0("Listed as invasive/noxious in: ", states_text),
-            placement = "right"
+            placement = "bottom"
           )
         )
       }
@@ -672,35 +703,42 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       native_badge_class <- switch(native_info$status,
         "native" = "bg-success",
         "native_na" = "bg-success",
-        "introduced" = "bg-warning text-dark",
-        "introduced_na" = "bg-warning text-dark",
+        "introduced" = "text-dark",
+        "introduced_na" = "text-dark",
         "both" = "bg-info text-dark",
         "no_prefs" = "bg-secondary",
         "bg-secondary"
       )
 
+      native_badge_style <- switch(native_info$status,
+        "introduced" = "background-color: #f0ad4e;",
+        "introduced_na" = "background-color: #f0ad4e;",
+        ""
+      )
+
       native_badge_text <- switch(native_info$status,
-        "native" = tagList(icon("leaf"), paste0(" Native to ", native_info$state_name %||% "your area")),
-        "native_na" = tagList(icon("leaf"), " Native to N. America"),
-        "introduced" = tagList(icon("plane-arrival"), paste0(" Introduced in ", native_info$state_name %||% "your area")),
-        "introduced_na" = tagList(icon("plane-arrival"), " Introduced"),
-        "both" = tagList(icon("exchange-alt"), " Native & Introduced"),
-        "no_prefs" = tagList(icon("cog"), " Set location for native status"),
-        tagList(icon("question-circle"), " Status Unknown")
+        "native" = tagList(icon("leaf", class = "me-1"), paste0("Native to ", native_info$state_name %||% "your area")),
+        "native_na" = tagList(icon("leaf", class = "me-1"), "Native to N. America"),
+        "introduced" = tagList(icon("plane-arrival", class = "me-1"), paste0("Introduced to ", native_info$state_name %||% "your area")),
+        "introduced_na" = tagList(icon("plane-arrival", class = "me-1"), "Introduced"),
+        "both" = tagList(icon("exchange-alt", class = "me-1"), "Native & Introduced"),
+        "no_prefs" = tagList(icon("map-marker-alt", class = "me-1"), "Enter zip for local status"),
+        tagList(icon("question-circle", class = "me-1"), "Status Unknown")
       )
 
       tagList(
-        # Native/Introduced status badge at top of Summary
+        # Status badges in a horizontal row with proper spacing
         div(
-          class = "mb-3",
+          class = "d-flex flex-wrap gap-2 align-items-center mb-3",
+          # Native/Introduced badge
           tooltip(
             tags$span(
               class = paste("badge", native_badge_class),
-              style = "font-size: 0.95rem; cursor: help;",
+              style = paste0("font-size: 0.9em; padding: 0.5em 0.75em;", native_badge_style),
               native_badge_text
             ),
             native_tooltip,
-            placement = "right"
+            placement = "bottom"
           ),
           # Invasive badge (if applicable)
           invasive_badge
