@@ -628,23 +628,62 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       # Get invasive/noxious status
       invasive_info <- get_invasive_status(input$analysis_species, user_state, pool)
 
-      # State invasive list URL (National Invasive Species Info Center)
+      # State invasive list URL (authoritative state sources)
       state_invasive_url <- if (!is.null(user_state) && nzchar(user_state)) {
-        # Map state code to state name for URL
-        state_names <- c(
-          AL = "alabama", AK = "alaska", AZ = "arizona", AR = "arkansas", CA = "california",
-          CO = "colorado", CT = "connecticut", DE = "delaware", FL = "florida", GA = "georgia",
-          HI = "hawaii", ID = "idaho", IL = "illinois", IN = "indiana", IA = "iowa",
-          KS = "kansas", KY = "kentucky", LA = "louisiana", ME = "maine", MD = "maryland",
-          MA = "massachusetts", MI = "michigan", MN = "minnesota", MS = "mississippi", MO = "missouri",
-          MT = "montana", NE = "nebraska", NV = "nevada", NH = "new-hampshire", NJ = "new-jersey",
-          NM = "new-mexico", NY = "new-york", NC = "north-carolina", ND = "north-dakota", OH = "ohio",
-          OK = "oklahoma", OR = "oregon", PA = "pennsylvania", RI = "rhode-island", SC = "south-carolina",
-          SD = "south-dakota", TN = "tennessee", TX = "texas", UT = "utah", VT = "vermont",
-          VA = "virginia", WA = "washington", WV = "west-virginia", WI = "wisconsin", WY = "wyoming"
+        # Map state code to authoritative invasive species URL
+        state_urls <- c(
+          AL = "https://www.se-eppc.org/alabama/",
+          AK = "https://www.adfg.alaska.gov/index.cfm?adfg=invasive.main",
+          AZ = "https://www.swvma.org/arizona-invasive-plant-list/",
+          AR = "https://www.se-eppc.org/states/AR.cfm",
+          CA = "https://www.cal-ipc.org/plants/inventory/",
+          CO = "https://cwma.org/weed-information/",
+          CT = "https://cipwg.uconn.edu/invasive-plant-list/",
+          DE = "https://delawareinvasives.net/invasive-plants/",
+          FL = "https://www.floridainvasives.org/",
+          GA = "https://www.gaeppc.org/list/",
+          HI = "https://dlnr.hawaii.gov/hisc/",
+          ID = "https://agri.idaho.gov/main/plants/noxious-weeds/",
+          IL = "https://www.invasive.org/species/list.cfm?id=152",
+          IN = "https://www.entm.purdue.edu/iisc/invasiveplants.html",
+          IA = "https://www.iowadnr.gov/Conservation/Forestry/Forest-Health/Invasive-Plants",
+          KS = "https://agriculture.ks.gov/divisions-programs/plant-protect-weed-control/noxious-weed-control-program",
+          KY = "https://www.se-eppc.org/ky/",
+          LA = "https://www.wlf.louisiana.gov/page/aquatic-invasive-species",
+          ME = "https://www.maine.gov/dacf/mnap/features/invasive_plants/invasives.htm",
+          MD = "https://dnr.maryland.gov/wildlife/Pages/plants_wildlife/InvasiveSpecies.aspx",
+          MA = "https://www.massnrc.org/mipag/",
+          MI = "https://www.michigan.gov/invasives",
+          MN = "https://www.dnr.state.mn.us/invasives/terrestrialplants/index.html",
+          MS = "https://www.se-eppc.org/mississippi/",
+          MO = "https://www.moinvasives.org/species/",
+          MT = "https://agr.mt.gov/Noxious-Weeds",
+          NE = "https://nda.nebraska.gov/plant/noxious_weeds/index.html",
+          NV = "https://agri.nv.gov/Plant/Noxious_Weeds/Noxious_Weed_List/",
+          NH = "https://www.agriculture.nh.gov/divisions/plant-industry/invasive-species.htm",
+          NJ = "https://www.nj.gov/dep/njisc/",
+          NM = "https://nmdaweb.nmsu.edu/animal-and-plant-protection/noxious-weed-information.html",
+          NY = "https://www.nynhp.org/invasives/species-tiers-table/",
+          NC = "https://ncwildflower.org/invasive-exotic-species/",
+          ND = "https://www.nd.gov/ndda/plant-industries/noxious-weeds",
+          OH = "https://www.oipc.info/",
+          OK = "https://www.okinvasives.org/ok-invasive-plant-list",
+          OR = "https://www.oregon.gov/oda/programs/weeds/oregonnoxiousweeds/pages/aboutoregonweeds.aspx",
+          PA = "https://www.dcnr.pa.gov/Conservation/WildPlants/InvasivePlants/Pages/default.aspx",
+          RI = "https://rinhs.org/invasive-species/",
+          SC = "https://www.se-eppc.org/southcarolina/",
+          SD = "https://danr.sd.gov/Conservation/Forestry/FHI/InvasivePlants.aspx",
+          TN = "https://www.tneppc.org/invasive-plants",
+          TX = "https://www.texasinvasives.org/plant_database/",
+          UT = "https://ag.utah.gov/farmers/plants-industry/noxious-weed-program/",
+          VT = "https://www.vtinvasives.org/invasive/plants",
+          VA = "https://www.dcr.virginia.gov/natural-heritage/invsppdflist",
+          WA = "https://www.nwcb.wa.gov/noxious-weed-list",
+          WV = "https://wvnps.org/invasive-plant-species/",
+          WI = "https://dnr.wisconsin.gov/topic/Invasives/species.html",
+          WY = "https://wyoweed.org/weeds/"
         )
-        state_slug <- state_names[toupper(user_state)]
-        if (!is.na(state_slug)) paste0("https://www.invasivespeciesinfo.gov/us/", state_slug) else NULL
+        state_urls[toupper(user_state)]
       } else NULL
 
       # Build invasive badge
