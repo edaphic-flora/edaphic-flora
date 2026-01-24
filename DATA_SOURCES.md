@@ -53,6 +53,36 @@ EPA ecoregion shapefiles are public domain federal data.
 
 Census geographic data is public domain.
 
+## Invasive Species Data
+
+### State Invasive Species Lists
+
+- **Source**: State invasive species councils, departments of agriculture, and natural resource agencies
+- **Provider**: Various (50 states)
+- **License**: Public Domain (state government works) or as specified by each state
+- **Files**: `data/state_invasive_for_import.csv`, database table `ref_noxious_invasive`
+
+Data compiled from official state sources including state Exotic Pest Plant Councils (EPPCs), state departments of agriculture, and invasive species councils. Individual state sources are documented in `scripts/fetch_state_invasive_lists.R`.
+
+### Invasive Plant Atlas
+
+- **Source**: Invasive Plant Atlas of the United States
+- **Provider**: University of Georgia Center for Invasive Species and Ecosystem Health
+- **License**: Educational/research use
+- **URL**: https://www.invasiveplantatlas.org/
+
+Supplementary invasive species distribution data used to enhance state-level coverage.
+
+## Geocoding
+
+- **Source**: OpenStreetMap via Nominatim
+- **Provider**: OpenStreetMap contributors
+- **License**: [ODbL 1.0](https://opendatacommons.org/licenses/odbl/)
+- **URL**: https://www.openstreetmap.org/
+- **R Package**: `tidygeocoder` (used for address/coordinate lookups)
+
+Geocoding services are provided by Nominatim using OpenStreetMap data. OpenStreetMap data is available under the Open Database License (ODbL).
+
 ---
 
 ## License Compatibility Note
