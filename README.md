@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Status-Alpha-D39B35" alt="Status: Alpha">
   <a href="https://buymeacoffee.com/toddtesterman"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-7A9A86?style=flat&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me A Coffee"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-7A9A86.svg" alt="License: AGPL v3"></a>
 </p>
@@ -16,6 +17,10 @@
 edaphic flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource to help people understand what soil conditions different species actually thrive in—not just what's listed in general references.
 
 > *"Edaphic" means relating to the soil, especially as it affects living organisms.*
+
+## Project Status
+
+**Alpha Release** — Currently in invite-only testing with select users. Core features are functional, but the application is under active development. Interested in early access? Contact edaphicflora@gmail.com.
 
 ## Features
 
