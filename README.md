@@ -186,8 +186,13 @@ For commercial licensing inquiries, contact: edaphicflora@gmail.com
 
 - [World Checklist of Vascular Plants (WCVP)](https://wcvp.science.kew.org/) for species taxonomy
 - [USDA PLANTS Database](https://plants.usda.gov/) for species characteristics
+- [National Wetland Plant List (NWPL)](https://wetland-plants.usace.army.mil/) for wetland indicators
 - [EPA Ecoregions](https://www.epa.gov/eco-research/ecoregions) for geographic classification
+- [Invasive Plant Atlas](https://www.invasiveplantatlas.org/) for invasive species data
+- [OpenStreetMap](https://www.openstreetmap.org/) for geocoding services
 - [Polished](https://polished.tech/) for authentication infrastructure
+
+See [DATA_SOURCES.md](DATA_SOURCES.md) for complete attribution and license details.
 
 ## Support the Project
 
