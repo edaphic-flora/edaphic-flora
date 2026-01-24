@@ -10,6 +10,7 @@
 # Environment files with secrets (use .renviron.example as template)
 .Renviron
 app/.Renviron
+passwords.txt
 
 # Claude Code files (local development only)
 .claude/
