@@ -104,7 +104,7 @@ Reference: `branding/Branding Overview.docx`
 
 ### Brand Essence
 - **Mission**: "Real soil data for real growing conditions."
-- **Tagline**: "For the birds, the bees, and the soil beneath your feet."
+- **Tagline**: "Better data from the ground up."
 - **Audience**: Gardeners, researchers, restorationists, land managers, educators, and anyone who cares about what's happening underground.
 - **Keywords**: Scientific, Organic, Local, Modern, Sustainable
 - **The Vibe**: Intersection of "peer-reviewed data" and "running barefoot through the tall grass." Sophisticated, muddy, and unapologetically nerdy about soil.
