@@ -79,8 +79,8 @@ edaphic flora is an open-source R Shiny application for recording and analyzing 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/todd-testerman/EdaphicFlora.git
-   cd EdaphicFlora
+   git clone https://github.com/edaphic-flora/edaphic-flora.git
+   cd edaphic-flora
    ```
 
 2. Restore R dependencies:
@@ -120,7 +120,7 @@ edaphic flora is an open-source R Shiny application for recording and analyzing 
 ## Project Structure
 
 ```
-EdaphicFlora/
+edaphic-flora/
 ├── app/
 │   ├── app.R                 # Main Shiny application
 │   ├── R/
