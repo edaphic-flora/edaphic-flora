@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>A community-driven soil database for gardeners, researchers, and land managers</strong>
+  <strong>Better data from the ground up.</strong>
 </p>
 
 <p align="center">
