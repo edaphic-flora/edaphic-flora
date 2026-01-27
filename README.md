@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>A community-driven soil database for native plant enthusiasts</strong>
+  <strong>A community-driven soil database for gardeners, researchers, and land managers</strong>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 
 ---
 
-edaphic flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource to help people understand what soil conditions different species actually thrive in—not just what's listed in general references.
+edaphic flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource for gardeners, researchers, restorationists, and land managers to understand what soil conditions different species actually thrive in—not just what's listed in general references.
 
 > *"Edaphic" means relating to the soil, especially as it affects living organisms.*
 
