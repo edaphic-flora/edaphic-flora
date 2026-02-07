@@ -12,126 +12,124 @@ dataEntryUI <- function(id) {
   nav_panel(
     title = "Data Entry",
     icon = icon("plus-circle"),
-    layout_sidebar(
-      sidebar = sidebar(
-        title = "Add Soil Sample",
-        width = 380,
-        bg = "#f8f9fa",
+    div(class = "container-fluid", style = "max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem;",
 
-        # Wizard step indicator
-        uiOutput(ns("wizard_steps_ui")),
-
-        # Wizard content (step-specific form content)
-        uiOutput(ns("wizard_content")),
-
-        # Wizard navigation buttons (static to avoid renderUI click-counter reset)
-        shinyjs::useShinyjs(),
-        div(class = "d-flex justify-content-between mt-3",
-            div(id = ns("wizard_back_container"), style = "display:none;",
-                actionButton(ns("wizard_back"), "Back", class = "btn-outline-secondary",
-                             icon = icon("arrow-left"))),
-            div(id = ns("wizard_next_container"), style = "display:none;",
-                actionButton(ns("wizard_next"), "Next", class = "btn-primary",
-                             icon = icon("arrow-right")))
-        ),
-
-        # --- Hidden form fields (always in DOM so values persist across steps) ---
-        # These are the actual inputs that hold form state. They're in hidden divs
-        # and their values are synced to/from the wizard step UIs via server logic.
-        div(style = "display: none;",
-          # Soil Properties
-          numericInput(ns("ph"), "pH", value = NA, min = 0, max = 14, step = 0.1),
-          numericInput(ns("organic_matter"), "OM", value = NA, min = 0, max = 100, step = 0.1),
-          selectInput(ns("organic_matter_class"), "OM Class",
-                      choices = c("", "Very Low", "Low", "Medium Low", "Medium",
-                                  "Medium High", "High", "Very High")),
-          numericInput(ns("cec"), "CEC", value = NA, min = 0, step = 0.1),
-          numericInput(ns("soluble_salts"), "Salts", value = NA, min = 0),
-          # Macronutrients
-          numericInput(ns("nitrate"), "N", value = NA, min = 0),
-          numericInput(ns("ammonium"), "NH4", value = NA, min = 0),
-          numericInput(ns("phosphorus"), "P", value = NA, min = 0),
-          numericInput(ns("potassium"), "K", value = NA, min = 0),
-          numericInput(ns("calcium"), "Ca", value = NA, min = 0),
-          numericInput(ns("magnesium"), "Mg", value = NA, min = 0),
-          numericInput(ns("sulfur"), "S", value = NA, min = 0),
-          # Micronutrients
-          numericInput(ns("iron"), "Fe", value = NA, min = 0),
-          numericInput(ns("manganese"), "Mn", value = NA, min = 0),
-          numericInput(ns("zinc"), "Zn", value = NA, min = 0),
-          numericInput(ns("copper"), "Cu", value = NA, min = 0),
-          numericInput(ns("boron"), "B", value = NA, min = 0, step = 0.1),
-          # Texture
-          radioButtons(ns("texture_input_type"), "Texture", choices = c("pct", "class"), selected = "class"),
-          numericInput(ns("sand"), "Sand", value = 33, min = 0, max = 100),
-          numericInput(ns("silt"), "Silt", value = 33, min = 0, max = 100),
-          numericInput(ns("clay"), "Clay", value = 34, min = 0, max = 100),
-          selectInput(ns("texture_class"), "Texture Class", choices = NULL),
-          # Location
-          textInput(ns("street"), "Street", ""),
-          textInput(ns("zipcode"), "Zip", ""),
-          textInput(ns("city"), "City", ""),
-          selectInput(ns("state"), "State", choices = state.name, selected = "New York"),
-          numericInput(ns("latitude"), "Lat", value = NA, min = -90, max = 90, step = 0.0001),
-          numericInput(ns("longitude"), "Lon", value = NA, min = -180, max = 180, step = 0.0001),
-          # Additional
-          dateInput(ns("date"), "Date", value = Sys.Date()),
-          textAreaInput(ns("notes"), "Notes", "", height = "80px")
-        )
+      # --- "View my entries" link (top-right) ---
+      div(class = "d-flex justify-content-end mb-2",
+          actionLink(ns("show_my_data"),
+                     span(icon("table"), " View my entries",
+                          textOutput(ns("entry_count"), inline = TRUE)),
+                     class = "text-muted small")
       ),
 
-      # Main content - tabbed view with Recent and All Data
-      navset_card_tab(
-        id = ns("data_view_tabs"),
+      # --- Wizard Section (full width, primary focus) ---
+      div(class = "card mb-4",
+          div(class = "card-body",
+              h5("Add Soil Sample", class = "card-title mb-3",
+                 style = "font-family: 'Montserrat', sans-serif; color: #373D3C;"),
 
-        # Recent Entries tab
-        nav_panel(
-          title = span(icon("clock"), " Recent"),
-          value = "recent",
-          card_body(
-            class = "p-0",
-            div(class = "d-flex justify-content-between align-items-center p-2 border-bottom",
-                span(class = "text-muted small", "Your 10 most recent entries"),
-                span(class = "badge bg-secondary", textOutput(ns("entry_count"), inline = TRUE))
-            ),
-            DTOutput(ns("recent_entries"))
+              # Wizard step indicator
+              uiOutput(ns("wizard_steps_ui")),
+
+              # Wizard content (step-specific form content)
+              uiOutput(ns("wizard_content")),
+
+              # Wizard navigation buttons (static to avoid renderUI click-counter reset)
+              shinyjs::useShinyjs(),
+              div(class = "d-flex justify-content-between mt-3",
+                  div(id = ns("wizard_back_container"), style = "display:none;",
+                      actionButton(ns("wizard_back"), "Back", class = "btn-outline-secondary",
+                                   icon = icon("arrow-left"))),
+                  div(id = ns("wizard_next_container"), style = "display:none;",
+                      actionButton(ns("wizard_next"), "Next", class = "btn-primary",
+                                   icon = icon("arrow-right")))
+              )
+          ),
+
+          # --- Hidden form fields (always in DOM so values persist across steps) ---
+          # These are the actual inputs that hold form state. They're in hidden divs
+          # and their values are synced to/from the wizard step UIs via server logic.
+          div(style = "display: none;",
+            # Soil Properties
+            numericInput(ns("ph"), "pH", value = NA, min = 0, max = 14, step = 0.1),
+            numericInput(ns("organic_matter"), "OM", value = NA, min = 0, max = 100, step = 0.1),
+            selectInput(ns("organic_matter_class"), "OM Class",
+                        choices = c("", "Very Low", "Low", "Medium Low", "Medium",
+                                    "Medium High", "High", "Very High")),
+            numericInput(ns("cec"), "CEC", value = NA, min = 0, step = 0.1),
+            numericInput(ns("soluble_salts"), "Salts", value = NA, min = 0),
+            # Macronutrients
+            numericInput(ns("nitrate"), "N", value = NA, min = 0),
+            numericInput(ns("ammonium"), "NH4", value = NA, min = 0),
+            numericInput(ns("phosphorus"), "P", value = NA, min = 0),
+            numericInput(ns("potassium"), "K", value = NA, min = 0),
+            numericInput(ns("calcium"), "Ca", value = NA, min = 0),
+            numericInput(ns("magnesium"), "Mg", value = NA, min = 0),
+            numericInput(ns("sulfur"), "S", value = NA, min = 0),
+            # Micronutrients
+            numericInput(ns("iron"), "Fe", value = NA, min = 0),
+            numericInput(ns("manganese"), "Mn", value = NA, min = 0),
+            numericInput(ns("zinc"), "Zn", value = NA, min = 0),
+            numericInput(ns("copper"), "Cu", value = NA, min = 0),
+            numericInput(ns("boron"), "B", value = NA, min = 0, step = 0.1),
+            # Texture
+            radioButtons(ns("texture_input_type"), "Texture", choices = c("pct", "class"), selected = "class"),
+            numericInput(ns("sand"), "Sand", value = 33, min = 0, max = 100),
+            numericInput(ns("silt"), "Silt", value = 33, min = 0, max = 100),
+            numericInput(ns("clay"), "Clay", value = 34, min = 0, max = 100),
+            selectInput(ns("texture_class"), "Texture Class", choices = NULL),
+            # Location
+            textInput(ns("street"), "Street", ""),
+            textInput(ns("zipcode"), "Zip", ""),
+            textInput(ns("city"), "City", ""),
+            selectInput(ns("state"), "State", choices = state.name, selected = "New York"),
+            numericInput(ns("latitude"), "Lat", value = NA, min = -90, max = 90, step = 0.0001),
+            numericInput(ns("longitude"), "Lon", value = NA, min = -180, max = 180, step = 0.0001),
+            # Additional
+            dateInput(ns("date"), "Date", value = Sys.Date()),
+            textAreaInput(ns("notes"), "Notes", "", height = "80px")
           )
-        ),
+      ),
 
-        # My Data tab
-        nav_panel(
-          title = span(icon("database"), " My Data"),
-          value = "all_data",
-          card_body(
-            class = "p-0",
-            # Stats and filters row
-            div(class = "p-3 bg-light border-bottom",
-                layout_column_wrap(
-                  width = 1/4,
-                  fill = FALSE,
-                  # Stats
-                  uiOutput(ns("my_data_stats")),
-                  # Species filter
-                  textInput(ns("filter_species"), NULL,
-                            placeholder = "Search species..."),
-                  # Outcome filter
-                  selectInput(ns("filter_outcome"), NULL,
-                              choices = c("All Outcomes" = "",
-                                          "Thriving", "Established",
-                                          "Struggling", "Failed/Died")),
-                  # Actions
-                  div(class = "d-flex gap-2 align-items-end",
-                      actionButton(ns("clear_my_filters"), "Clear",
-                                   class = "btn-outline-secondary btn-sm"),
-                      downloadButton(ns("export_my_data"), "Export CSV",
-                                     class = "btn-success btn-sm")
-                  )
-                )
+      # --- My Data Section (hidden by default, shown via link or after submit) ---
+      shinyjs::hidden(
+        div(id = ns("my_data_section"),
+          div(class = "card",
+            div(class = "card-header d-flex justify-content-between align-items-center",
+                span(icon("database"), " My Data"),
+                actionLink(ns("hide_my_data"), span(icon("times"), " Close"),
+                           class = "text-muted small")
             ),
-            # Bulk action bar (shown when rows selected)
-            uiOutput(ns("bulk_action_bar")),
-            # Full data table
-            DTOutput(ns("all_entries_table"))
+            div(class = "card-body p-0",
+              # Stats and filters row
+              div(class = "p-3 bg-light border-bottom",
+                  layout_column_wrap(
+                    width = 1/4,
+                    fill = FALSE,
+                    # Stats
+                    uiOutput(ns("my_data_stats")),
+                    # Species filter
+                    textInput(ns("filter_species"), NULL,
+                              placeholder = "Search species..."),
+                    # Outcome filter
+                    selectInput(ns("filter_outcome"), NULL,
+                                choices = c("All Outcomes" = "",
+                                            "Thriving", "Established",
+                                            "Struggling", "Failed/Died")),
+                    # Actions
+                    div(class = "d-flex gap-2 align-items-end",
+                        actionButton(ns("clear_my_filters"), "Clear",
+                                     class = "btn-outline-secondary btn-sm"),
+                        downloadButton(ns("export_my_data"), "Export CSV",
+                                       class = "btn-success btn-sm")
+                    )
+                  )
+              ),
+              # Bulk action bar (shown when rows selected)
+              uiOutput(ns("bulk_action_bar")),
+              # Full data table
+              DTOutput(ns("all_entries_table"))
+            )
           )
         )
       )
@@ -147,7 +145,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                             current_user, is_admin, data_changed, lookup_ecoregion,
                             pdf_extract_limit, beta_features = list(), user_prefs = NULL,
                             species_search_index = NULL, common_name_db = NULL,
-                            experience_level = NULL) {
+                            experience_level = NULL, show_my_data_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -1286,68 +1284,31 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       )
     })
 
-    # --- Entry count ---
+    # --- Entry count (user's own entries) ---
     output$entry_count <- renderText({
       data_changed()
-      n <- tryCatch({
-        res <- dbGetQuery(pool, "SELECT COUNT(*) as n FROM soil_samples")
-        res$n[1]
-      }, error = function(e) 0)
-      paste(n, "total")
-    })
-
-    # --- Recent entries table ---
-    output$recent_entries <- renderDT({
-      data_changed()
       u <- current_user()
-      user_id <- if (!is.null(u)) u$user_uid else ""
-      admin_user <- is_admin()
-
-      dat <- db_get_all_samples(limit = 50)  # Limit at SQL level for performance
-      if (nrow(dat) == 0) return(NULL)
-
-      # Helper to format outcome as badge
-      format_outcome_badge <- function(outcome) {
-        if (is.na(outcome) || outcome == "") return("")
-        badge_class <- switch(outcome,
-          "Thriving" = "outcome-thriving",
-          "Established" = "outcome-established",
-          "Struggling" = "outcome-struggling",
-          "Failed/Died" = "outcome-failed",
-          ""
-        )
-        sprintf('<span class="outcome-badge %s">%s</span>', badge_class, outcome)
-      }
-
-      display <- dat %>%
-        select(id, species, outcome, ph, organic_matter, texture_class, date, created_by) %>%
-        mutate(date = as.character(date),
-               outcome = sapply(outcome, format_outcome_badge))
-
-      # Add action buttons for user's own entries (or all entries for admin)
-      # Note: Using global (non-namespaced) input IDs for edit/delete
-      # These are handled by the edit/delete handlers in app.R
-      display$actions <- sapply(seq_len(nrow(display)), function(i) {
-        is_owner <- !is.na(display$created_by[i]) && display$created_by[i] == user_id
-        if (is_owner || admin_user) {
-          sprintf(
-            "<button class=\"btn btn-sm btn-outline-primary me-1\" title=\"Edit entry %d\" aria-label=\"Edit entry %d\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" title=\"Delete entry %d\" aria-label=\"Delete entry %d\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
-            display$id[i], display$id[i], display$id[i], display$id[i], display$id[i], display$id[i]
-          )
-        } else {
-          ""
-        }
-      })
-
-      # Remove created_by from display
-      display <- display %>% select(-created_by)
-
-      datatable(display,
-                options = list(pageLength = 10, dom = 'tip', scrollX = TRUE),
-                rownames = FALSE,
-                escape = FALSE,  # Allow HTML in actions column
-                colnames = c("ID", "Species", "Outcome", "pH", "OM %", "Texture", "Date", "Actions"))
+      if (is.null(u)) return("")
+      entries <- all_user_entries()
+      n <- nrow(entries)
+      if (n == 0) "" else paste0("(", n, ")")
     })
+
+    # --- Toggle My Data section ---
+    observeEvent(input$show_my_data, {
+      shinyjs::toggle("my_data_section")
+    })
+
+    observeEvent(input$hide_my_data, {
+      shinyjs::hide("my_data_section")
+    })
+
+    # External trigger from navbar "My Data" link
+    if (!is.null(show_my_data_trigger)) {
+      observeEvent(show_my_data_trigger(), {
+        shinyjs::show("my_data_section")
+      }, ignoreInit = TRUE)
+    }
 
     # --- All My Data (full user data with filters) ---
 
@@ -1971,6 +1932,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           type = "message", duration = 3
         )
         data_changed(data_changed() + 1)
+
+        # Show My Data section so user can see their new entry
+        shinyjs::show("my_data_section")
 
         # Reset form - clear both batch and manual selections
         if (has_batch) {

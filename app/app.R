@@ -230,6 +230,80 @@ base_ui <- page_navbar(
        /* Hide admin tab by default, show for admins via JS */
        .navbar .nav-item:has(a[data-value='Admin']) { display: none; }
        .navbar .nav-item:has(a[data-value='Admin']).admin-visible { display: list-item; }
+
+       /* User dropdown panel */
+       .user-dropdown-menu {
+         min-width: 300px;
+         background: #F7F4E8;
+         border: 1px solid #e8e4d8;
+         border-radius: 8px;
+         box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+         padding: 0;
+       }
+       .user-dropdown-menu .dropdown-item {
+         padding: 0.75rem 1rem;
+         font-family: 'Montserrat', sans-serif;
+         font-weight: 600;
+         font-size: 0.9rem;
+         color: #373D3C;
+       }
+       .user-dropdown-menu .dropdown-item:hover,
+       .user-dropdown-menu .dropdown-item:focus {
+         background-color: rgba(122, 154, 134, 0.1);
+       }
+       .user-dropdown-menu .dropdown-item .fa {
+         color: #7A9A86;
+         width: 1.25em;
+         text-align: center;
+       }
+       .user-dropdown-menu .dropdown-divider {
+         border-color: #e8e4d8;
+         margin: 0;
+       }
+       .user-dropdown-menu .dropdown-section {
+         padding: 0.75rem 1rem;
+       }
+       .user-dropdown-menu .dropdown-section-label {
+         font-family: 'Montserrat', sans-serif;
+         font-weight: 600;
+         font-size: 0.9rem;
+         color: #373D3C;
+         margin-bottom: 0.15rem;
+       }
+       .user-dropdown-menu .dropdown-section-desc {
+         font-family: 'Rokkitt', serif;
+         font-size: 0.8rem;
+         color: #8a8a8a;
+         line-height: 1.3;
+       }
+       .navbar .user-dropdown .dropdown-toggle {
+         background: none;
+         border: none;
+         color: #fff;
+         font-family: 'Montserrat', sans-serif;
+         font-size: 0.85rem;
+         font-weight: 500;
+         padding: 0.25rem 0.5rem;
+         display: flex;
+         align-items: center;
+         gap: 0.5em;
+       }
+       .navbar .user-dropdown .dropdown-toggle:hover,
+       .navbar .user-dropdown .dropdown-toggle:focus {
+         color: #D39B35;
+         text-decoration: none;
+         box-shadow: none;
+       }
+       .navbar .user-dropdown .dropdown-toggle::after {
+         margin-left: 0.5em;
+         vertical-align: middle;
+       }
+       .user-dropdown-menu .form-group { margin-bottom: 0 !important; }
+       .user-dropdown-menu #nav_zipcode {
+         background: #fff;
+         border: 1px solid #ccc;
+         border-radius: 4px;
+       }
      ")),
      tags$script(HTML("
        // Pro toggle: bind to Shiny input and handle server-sent updates
@@ -256,6 +330,11 @@ base_ui <- page_navbar(
          e.preventDefault();
          Shiny.setInputValue('brand_click', Math.random(), {priority: 'event'});
        });
+       // Close user dropdown via server message
+       Shiny.addCustomMessageHandler('closeUserDropdown', function(msg) {
+         var dd = document.querySelector('.navbar .dropdown-toggle');
+         if (dd) { bootstrap.Dropdown.getOrCreateInstance(dd).hide(); }
+       });
      "))
    )
  ),
@@ -269,111 +348,6 @@ base_ui <- page_navbar(
  # ========== ANALYSIS TAB ==========
  analysisUI("analysis"),
 
- # ========== ROADMAP TAB ==========
- nav_panel(
-   title = "Roadmap",
-   icon = icon("map"),
-   div(class = "container-fluid", style = "max-width: 800px; padding: 2rem 1rem;",
-       div(style = "text-align: center; margin-bottom: 2rem;",
-           tags$i(class = "fa fa-map", style = "font-size: 2.5rem; color: #7A9A86; opacity: 0.6; margin-bottom: 0.75rem;"),
-           h4("Roadmap", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;"),
-           p(style = "font-family: 'Rokkitt', serif; color: #5F7268; max-width: 500px; margin: 0 auto;",
-             "Planned and in-progress features for Edaphic Flora.")
-       ),
-
-       # Find Plants
-       div(class = "card mb-3",
-           div(class = "card-body d-flex align-items-start",
-               tags$i(class = "fa fa-seedling me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
-               div(
-                 div(class = "d-flex align-items-center mb-1",
-                     h6("Find Plants", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
-                     tags$span(class = "badge", style = "background: #D39B35; color: #fff; font-size: 0.7rem;", "Needs Data")
-                 ),
-                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
-                   "Personalized plant recommendations based on your soil data. ",
-                   "Activates once we reach 10+ samples per species. Engine built, waiting for data threshold.")
-               )
-           )
-       ),
-
-       # Batch Plant Upload
-       div(class = "card mb-3",
-           div(class = "card-body d-flex align-items-start",
-               tags$i(class = "fa fa-upload me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
-               div(
-                 div(class = "d-flex align-items-center mb-1",
-                     h6("Batch Plant Upload", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
-                     tags$span(class = "badge", style = "background: #7A9A86; color: #fff; font-size: 0.7rem;", "In Progress")
-                 ),
-                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
-                   "CSV upload for bulk plant entry. Currently in development, gated behind a beta feature flag.")
-               )
-           )
-       ),
-
-       # Outcome Reminders
-       div(class = "card mb-3",
-           div(class = "card-body d-flex align-items-start",
-               tags$i(class = "fa fa-bell me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
-               div(
-                 div(class = "d-flex align-items-center mb-1",
-                     h6("Outcome Reminders", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
-                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Planned")
-                 ),
-                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
-                   "Email reminders to update how your plants are doing. Track outcomes over time.")
-               )
-           )
-       ),
-
-       # Sign Out
-       div(class = "card mb-3",
-           div(class = "card-body d-flex align-items-start",
-               tags$i(class = "fa fa-sign-out-alt me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
-               div(
-                 div(class = "d-flex align-items-center mb-1",
-                     h6("Sign Out", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
-                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Investigating")
-                 ),
-                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
-                   "Sign-out is currently not functional due to a Polished authentication endpoint issue.")
-               )
-           )
-       ),
-
-       # State-Level Native Status
-       div(class = "card mb-3",
-           div(class = "card-body d-flex align-items-start",
-               tags$i(class = "fa fa-map-marker-alt me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
-               div(
-                 div(class = "d-flex align-items-center mb-1",
-                     h6("State-Level Native Status", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
-                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Planned")
-                 ),
-                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
-                   "True state-level native/introduced data beyond the current North America level. Pending BONAP data permission.")
-               )
-           )
-       ),
-
-       # Mobile Responsive
-       div(class = "card mb-3",
-           div(class = "card-body d-flex align-items-start",
-               tags$i(class = "fa fa-mobile-alt me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
-               div(
-                 div(class = "d-flex align-items-center mb-1",
-                     h6("Mobile Responsive Layout", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
-                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Planned")
-                 ),
-                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
-                   "Currently desktop-optimized. Mobile and tablet layouts are planned for a future release.")
-               )
-           )
-       )
-   )
- ),
-
  # ========== DATA MANAGEMENT TAB ==========
  dataManagementUI("data_mgmt"),
 
@@ -383,37 +357,165 @@ base_ui <- page_navbar(
  # ========== HELP MENU ==========
  helpUI("help"),
 
+ # ========== ROADMAP TAB ==========
+ nav_panel(
+   title = "Roadmap",
+   icon = icon("rocket"),
+   div(class = "container-fluid", style = "max-width: 800px; padding: 2rem 1rem;",
+
+       # Hero header
+       div(style = "text-align: center; margin-bottom: 2.5rem;",
+           tags$i(class = "fa fa-rocket", style = "font-size: 2.5rem; color: #D39B35; margin-bottom: 0.75rem;"),
+           h4("What's Coming", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;"),
+           p(style = "font-family: 'Rokkitt', serif; color: #5F7268; max-width: 520px; margin: 0 auto; font-size: 1.05rem;",
+             "Edaphic Flora is growing. Here's a look at what we're building next ",
+             "to make soil data more useful, more personal, and more powerful.")
+       ),
+
+       # --- Coming Soon section ---
+       h6(style = "font-family: 'Montserrat', sans-serif; color: #D39B35; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem;",
+          tags$i(class = "fa fa-bolt me-1"), "Coming Soon"),
+
+       # Find Plants
+       div(class = "card mb-3", style = "border-left: 3px solid #D39B35;",
+           div(class = "card-body",
+               div(class = "d-flex align-items-center mb-2",
+                   tags$i(class = "fa fa-seedling me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
+                   h6("Find Plants for Your Soil", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
+               ),
+               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
+                 "Enter your soil test and get species recommendations ranked by how well they match your conditions. ",
+                 "The engine is built and ready \u2014 it activates as our community adds more samples.")
+           )
+       ),
+
+       # Batch Plant Upload
+       div(class = "card mb-3", style = "border-left: 3px solid #D39B35;",
+           div(class = "card-body",
+               div(class = "d-flex align-items-center mb-2",
+                   tags$i(class = "fa fa-upload me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
+                   h6("Batch Plant Upload", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
+               ),
+               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
+                 "Record an entire garden bed at once. Upload a CSV of species growing in the same soil ",
+                 "and log them all in a single step.")
+           )
+       ),
+
+       # --- On the Horizon section ---
+       h6(style = "font-family: 'Montserrat', sans-serif; color: #7A9A86; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2rem; margin-bottom: 1rem;",
+          tags$i(class = "fa fa-binoculars me-1"), "On the Horizon"),
+
+       # Outcome Reminders
+       div(class = "card mb-3", style = "border-left: 3px solid #7A9A86;",
+           div(class = "card-body",
+               div(class = "d-flex align-items-center mb-2",
+                   tags$i(class = "fa fa-bell me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
+                   h6("Outcome Reminders", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
+               ),
+               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
+                 "Get a friendly nudge to check in on your plants. Update whether they're thriving, struggling, ",
+                 "or didn't make it \u2014 the data gets better with every update.")
+           )
+       ),
+
+       # State-Level Native Status
+       div(class = "card mb-3", style = "border-left: 3px solid #7A9A86;",
+           div(class = "card-body",
+               div(class = "d-flex align-items-center mb-2",
+                   tags$i(class = "fa fa-map-marker-alt me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
+                   h6("State-Level Native Status", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
+               ),
+               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
+                 "Know exactly which species are native to ", tags$em("your"), " state, not just the continent. ",
+                 "We're working to bring truly local native/introduced data to every entry.")
+           )
+       ),
+
+       # Mobile Layout
+       div(class = "card mb-3", style = "border-left: 3px solid #7A9A86;",
+           div(class = "card-body",
+               div(class = "d-flex align-items-center mb-2",
+                   tags$i(class = "fa fa-mobile-alt me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
+                   h6("Mobile-Friendly Layout", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
+               ),
+               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
+                 "Log soil samples from the field on your phone. A responsive layout is coming so you can ",
+                 "record data wherever the dirt is.")
+           )
+       ),
+
+       # --- CTA footer ---
+       div(style = "text-align: center; margin-top: 2.5rem; padding: 1.5rem; background: #F7F4E8; border-radius: 8px;",
+           p(style = "font-family: 'Rokkitt', serif; color: #5F7268; font-size: 1rem; margin-bottom: 0.25rem;",
+             "Every soil sample you add helps unlock new features and better recommendations."),
+           p(style = "font-family: 'Montserrat', sans-serif; color: #D39B35; font-weight: 600; font-size: 0.95rem; margin-bottom: 0;",
+             "Better data from the ground up.")
+       )
+   )
+ ),
+
  # ========== NAV SPACER & USER INFO ==========
  nav_spacer(),
  # Dev environment indicator
  if (is_dev) nav_item(
    tags$span(class = "badge bg-warning text-dark me-2", "DEV")
  ),
- # Pro mode toggle
+ # User dropdown menu
  nav_item(
-   div(class = "d-flex align-items-center me-2",
-       style = "background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 6px;",
-       tags$span(class = "text-light me-2", style = "font-weight: 500; font-size: 0.85rem;",
-                 "Pro"),
-       div(class = "form-check form-switch mb-0",
-           style = "padding-left: 2.5em;",
-           tags$input(type = "checkbox", class = "form-check-input", id = "pro_mode_toggle",
-                      role = "switch", style = "cursor: pointer;"))
+   div(class = "dropdown user-dropdown",
+     tags$button(
+       class = "btn dropdown-toggle",
+       type = "button",
+       `data-bs-toggle` = "dropdown",
+       `data-bs-auto-close` = "outside",
+       `aria-expanded` = "false",
+       tags$i(class = "fa fa-user-circle"),
+       textOutput("user_display", inline = TRUE)
+     ),
+     tags$ul(class = "dropdown-menu dropdown-menu-end user-dropdown-menu",
+       # My Data link
+       tags$li(
+         actionLink("goto_my_data", NULL,
+           class = "dropdown-item",
+           tags$i(class = "fa fa-chart-bar me-2"),
+           "My Data",
+           tags$i(class = "fa fa-arrow-right",
+                  style = "float: right; margin-top: 3px; font-size: 0.8rem; color: #8a8a8a;")
+         )
+       ),
+       tags$li(tags$hr(class = "dropdown-divider")),
+       # Pro Mode toggle section
+       tags$li(
+         div(class = "dropdown-section",
+           div(class = "d-flex align-items-center justify-content-between",
+             tags$span(class = "dropdown-section-label", "Pro Mode"),
+             div(class = "form-check form-switch mb-0",
+               style = "padding-left: 2.5em;",
+               tags$input(type = "checkbox", class = "form-check-input", id = "pro_mode_toggle",
+                          role = "switch", style = "cursor: pointer;"))
+           ),
+           div(class = "dropdown-section-desc",
+             "Show all advanced soil fields during data entry")
+         )
+       ),
+       tags$li(tags$hr(class = "dropdown-divider")),
+       # Home Location section
+       tags$li(
+         div(class = "dropdown-section",
+           div(class = "dropdown-section-label", "Home Location"),
+           div(class = "d-flex align-items-center mt-1",
+             div(style = "width: 80px;",
+               textInput("nav_zipcode", NULL, value = "", width = "100%",
+                         placeholder = "-----")),
+             uiOutput("nav_location_badge", inline = TRUE)
+           ),
+           div(class = "dropdown-section-desc",
+             "For native & invasive species info in your area")
+         )
+       )
+     )
    )
- ),
- # Zip code input for home location
- nav_item(
-   div(class = "d-flex align-items-center me-2",
-       style = "background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 6px;",
-       tags$span("Your Zip:", class = "text-light me-2", style = "font-weight: 500;"),
-       div(style = "display: inline-block; width: 80px;",
-           textInput("nav_zipcode", NULL, value = "", width = "100%",
-                     placeholder = "-----")),
-       uiOutput("nav_location_badge", inline = TRUE)
-   )
- ),
- nav_item(
-   tags$span(class = "navbar-text me-3", textOutput("user_display", inline = TRUE))
  )
  # NOTE: Sign out button removed - Polished sign-out endpoint not working locally
  # Future improvement: investigate polished::sign_out_button() or custom sign-out handling
@@ -656,6 +758,7 @@ server_inner <- function(input, output, session) {
  })
 
  data_changed <- reactiveVal(0)
+ show_my_data_trigger <- reactiveVal(0)
 
  # Show/hide admin tab based on admin status
  observe({
@@ -782,7 +885,7 @@ server_inner <- function(input, output, session) {
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
                  current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit,
                  BETA_FEATURES, user_prefs, species_search_index, common_name_db,
-                 experience_level)
+                 experience_level, show_my_data_trigger)
 
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,
@@ -792,6 +895,13 @@ analysisServer("analysis", pool, data_changed, state_grid, is_prod,
 # Brand click → navigate to Welcome page
  observeEvent(input$brand_click, {
    nav_select("main_nav", "Welcome")
+ }, ignoreInit = TRUE)
+
+ # "My Data" link in user dropdown → navigate to Data Entry and show data table
+ observeEvent(input$goto_my_data, {
+   nav_select("main_nav", "Data Entry")
+   show_my_data_trigger(show_my_data_trigger() + 1)
+   session$sendCustomMessage("closeUserDropdown", TRUE)
  }, ignoreInit = TRUE)
 
 # Help links from welcome page - navigate to Field Guide with anchor scroll
