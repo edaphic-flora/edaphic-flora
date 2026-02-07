@@ -304,6 +304,17 @@ base_ui <- page_navbar(
          border: 1px solid #ccc;
          border-radius: 4px;
        }
+       /* DT Show entries dropdown spacing fix */
+       .dataTables_length select {
+         padding-right: 1.75rem !important;
+         -webkit-appearance: none;
+         -moz-appearance: none;
+         appearance: none;
+         background-image: url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3e%3cpath fill=%27none%27 stroke=%27%23343a40%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%272%27 d=%27m2 5 6 6 6-6%27/%3e%3c/svg%3e');
+         background-repeat: no-repeat;
+         background-position: right 0.5rem center;
+         background-size: 12px;
+       }
      ")),
      tags$script(HTML("
        // Pro toggle: bind to Shiny input and handle server-sent updates
@@ -368,7 +379,7 @@ base_ui <- page_navbar(
            tags$i(class = "fa fa-rocket", style = "font-size: 2.5rem; color: #D39B35; margin-bottom: 0.75rem;"),
            h4("What's Coming", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;"),
            p(style = "font-family: 'Rokkitt', serif; color: #5F7268; max-width: 520px; margin: 0 auto; font-size: 1.05rem;",
-             "Edaphic Flora is growing. Here's a look at what we're building next ",
+             "edaphic flora is growing. Here's a look at what we're building next ",
              "to make soil data more useful, more personal, and more powerful.")
        ),
 
@@ -386,19 +397,6 @@ base_ui <- page_navbar(
                p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
                  "Enter your soil test and get species recommendations ranked by how well they match your conditions. ",
                  "The engine is built and ready \u2014 it activates as our community adds more samples.")
-           )
-       ),
-
-       # Batch Plant Upload
-       div(class = "card mb-3", style = "border-left: 3px solid #D39B35;",
-           div(class = "card-body",
-               div(class = "d-flex align-items-center mb-2",
-                   tags$i(class = "fa fa-upload me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
-                   h6("Batch Plant Upload", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
-               ),
-               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
-                 "Record an entire garden bed at once. Upload a CSV of species growing in the same soil ",
-                 "and log them all in a single step.")
            )
        ),
 

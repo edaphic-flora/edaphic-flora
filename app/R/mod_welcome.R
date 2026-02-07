@@ -79,6 +79,8 @@ welcomeUI <- function(id) {
               h4(class = "mt-2", "Getting Started"),
               p(class = "mb-1", "Head to the ", tags$strong("Data Entry"), " tab to submit your first soil sample. ",
                 "Use the ", tags$strong("Analysis"), " tab to explore existing data."),
+              p(class = "mb-1 text-muted", style = "font-size: 0.93rem;",
+                "Click your name in the top right to set your home location and preferences."),
 
               # Help links - NOT namespaced so main app observers can handle navigation
               div(class = "mt-2 p-2 border rounded",
