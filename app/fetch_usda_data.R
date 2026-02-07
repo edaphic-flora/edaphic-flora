@@ -267,6 +267,7 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
   duration <- safe_scalar(profile$data$Duration)
   growth_habit <- safe_scalar(profile$data$GrowthHabits)
   native_status <- safe_scalar(profile$data$NativeStatus)
+  common_name <- safe_scalar(profile$data$CommonName)
 
   # 2. Fetch characteristics
   if (!isTRUE(profile$cached)) Sys.sleep(0.3)  # Rate limiting only for fresh requests
@@ -284,6 +285,7 @@ fetch_single_species <- function(symbol, taxon_id, cache_dir, con) {
   char_data$duration <- duration
   char_data$growth_habit <- growth_habit
   char_data$native_status <- native_status
+  char_data$common_name <- common_name
 
   # Determine status based on what data we got
   has_any_data <- length(char_data) > 0 || !is.na(duration) || !is.na(native_status)
@@ -327,9 +329,9 @@ record_attempt <- function(con, taxon_id, symbol, char_data, status) {
           taxon_id, usda_symbol, duration, growth_habit, native_status,
           soil_ph_min, soil_ph_max, precip_min_in, precip_max_in, temp_min_f,
           shade_tolerance, drought_tolerance, salinity_tolerance, moisture_use, bloom_period,
-          fetch_status, fetch_attempted_at
+          common_name, fetch_status, fetch_attempted_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
       ", params = list(
         as.integer(taxon_id),
         to_db(symbol),
@@ -346,6 +348,7 @@ record_attempt <- function(con, taxon_id, symbol, char_data, status) {
         to_db(char_data$salinity_tolerance),
         to_db(char_data$moisture_use),
         to_db(char_data$bloom_period),
+        to_db(char_data$common_name),
         to_db(status)
       ))
     } else {
@@ -356,7 +359,7 @@ record_attempt <- function(con, taxon_id, symbol, char_data, status) {
 
       for (col in c("soil_ph_min", "soil_ph_max", "precip_min_in", "precip_max_in", "temp_min_f",
                     "shade_tolerance", "drought_tolerance", "salinity_tolerance", "moisture_use",
-                    "bloom_period", "duration", "growth_habit", "native_status")) {
+                    "bloom_period", "duration", "growth_habit", "native_status", "common_name")) {
         val <- char_data[[col]]
         db_val <- to_db(val, numeric = col %in% c("soil_ph_min", "soil_ph_max", "precip_min_in", "precip_max_in", "temp_min_f"))
         if (!is.na(db_val)) {
