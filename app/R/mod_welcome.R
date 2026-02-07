@@ -172,12 +172,21 @@ welcomeServer <- function(id, pool, data_changed) {
             div(class = "stat-label", icon(icon_name), " ", label))
       }
 
-      # 2x2 grid layout for stats with staggered reveal
-      div(class = "row g-0 border-bottom pb-2 mb-2 stagger-reveal",
-        div(class = "col-6 border-end border-bottom", stat_box(stats$samples, "Samples", "flask")),
-        div(class = "col-6 border-bottom", stat_box(stats$species, "Species", "seedling")),
-        div(class = "col-6 border-end", stat_box(stats$users, "Contributors", "users")),
-        div(class = "col-6", stat_box(stats$ecoregions, "Ecoregions", "map"))
+      # Check site-wide threshold
+      meets_site <- stats$samples >= MIN_TOTAL_SAMPLES_FOR_SITE_STATS
+
+      tagList(
+        # 2x2 grid layout for stats with staggered reveal
+        div(class = "row g-0 border-bottom pb-2 mb-2 stagger-reveal",
+          div(class = "col-6 border-end border-bottom", stat_box(stats$samples, "Samples", "flask")),
+          div(class = "col-6 border-bottom", stat_box(stats$species, "Species", "seedling")),
+          div(class = "col-6 border-end", stat_box(stats$users, "Contributors", "users")),
+          div(class = "col-6", stat_box(stats$ecoregions, "Ecoregions", "map"))
+        ),
+        # Show seed database banner when below site threshold
+        if (!meets_site) {
+          seed_database_ui(stats$samples)
+        }
       )
     })
 

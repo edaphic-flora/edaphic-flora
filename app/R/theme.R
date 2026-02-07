@@ -1008,5 +1008,113 @@ edaphic_css <- function() {
       font-size: 0.7rem;
       padding: 0.3em 0.6em;
     }
+
+    /* Early Access banner */
+    .early-access-banner {
+      background: linear-gradient(135deg, rgba(211, 155, 53, 0.08) 0%, rgba(211, 155, 53, 0.04) 100%);
+      border: 1px solid rgba(211, 155, 53, 0.3);
+      border-left: 4px solid #D39B35;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .early-access-banner .progress {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(211, 155, 53, 0.15);
+    }
+
+    .early-access-banner .progress-bar {
+      background: linear-gradient(90deg, #D39B35 0%, #B8841E 100%);
+      border-radius: 3px;
+    }
+
+    /* Seed database banner (welcome page) */
+    .seed-database-banner {
+      background: linear-gradient(135deg, rgba(122, 154, 134, 0.08) 0%, rgba(122, 154, 134, 0.04) 100%);
+      border: 1px solid rgba(122, 154, 134, 0.3);
+      border-left: 4px solid #7A9A86;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+    }
+
+    .seed-database-banner .progress {
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(122, 154, 134, 0.15);
+    }
+
+    .seed-database-banner .progress-bar {
+      background: linear-gradient(90deg, #7A9A86 0%, #5D7A6A 100%);
+      border-radius: 4px;
+    }
   "))
+}
+
+# ---------------------------
+# Reusable UI Components
+# ---------------------------
+
+#' Early Access Data banner with progress bar
+#' @param n_samples Current number of samples
+#' @param n_contributors Current number of contributors
+#' @param min_samples Required samples threshold
+#' @param min_contributors Required contributors threshold
+#' @return Shiny UI tag
+early_access_ui <- function(n_samples, n_contributors,
+                            min_samples = MIN_SAMPLES_FOR_PUBLIC_STATS,
+                            min_contributors = MIN_CONTRIBUTORS_FOR_PUBLIC_STATS) {
+  sample_pct <- min(100, round(n_samples / min_samples * 100))
+  contrib_pct <- min(100, round(n_contributors / min_contributors * 100))
+
+  div(class = "early-access-banner",
+      div(class = "d-flex align-items-center mb-2",
+          tags$i(class = "fa fa-flask me-2", style = "color: #D39B35;"),
+          tags$strong("Early Access Data", style = "color: #8B6B3A; font-family: 'Montserrat', sans-serif; font-size: 0.85rem;")
+      ),
+      tags$small(class = "text-muted d-block mb-1",
+                 sprintf("This species needs more data for reliable statistics. Help by contributing samples!")),
+      div(class = "d-flex align-items-center mb-1",
+          tags$small(class = "text-muted me-2", style = "min-width: 80px;",
+                     sprintf("Samples: %d/%d", n_samples, min_samples)),
+          div(class = "progress flex-grow-1",
+              div(class = "progress-bar", role = "progressbar",
+                  style = sprintf("width: %d%%;", sample_pct),
+                  `aria-valuenow` = n_samples, `aria-valuemin` = 0, `aria-valuemax` = min_samples))
+      ),
+      div(class = "d-flex align-items-center",
+          tags$small(class = "text-muted me-2", style = "min-width: 80px;",
+                     sprintf("People: %d/%d", n_contributors, min_contributors)),
+          div(class = "progress flex-grow-1",
+              div(class = "progress-bar", role = "progressbar",
+                  style = sprintf("width: %d%%;", contrib_pct),
+                  `aria-valuenow` = n_contributors, `aria-valuemin` = 0, `aria-valuemax` = min_contributors))
+      )
+  )
+}
+
+#' Seed the database banner for welcome page
+#' @param total_samples Current total samples in database
+#' @param min_total Required total threshold
+#' @return Shiny UI tag
+seed_database_ui <- function(total_samples, min_total = MIN_TOTAL_SAMPLES_FOR_SITE_STATS) {
+  pct <- min(100, round(total_samples / min_total * 100))
+
+  div(class = "seed-database-banner",
+      div(class = "d-flex align-items-center mb-2",
+          tags$i(class = "fa fa-seedling me-2", style = "color: #7A9A86;"),
+          tags$strong("Help Us Seed the Database", style = "color: #4A6B5A; font-family: 'Montserrat', sans-serif; font-size: 0.85rem;")
+      ),
+      tags$small(class = "text-muted d-block mb-1",
+                 "Every soil sample helps build better plant recommendations."),
+      div(class = "d-flex align-items-center",
+          tags$small(class = "text-muted me-2", style = "min-width: 80px;",
+                     sprintf("%d/%d samples", total_samples, min_total)),
+          div(class = "progress flex-grow-1",
+              div(class = "progress-bar", role = "progressbar",
+                  style = sprintf("width: %d%%;", pct),
+                  `aria-valuenow` = total_samples, `aria-valuemin` = 0, `aria-valuemax` = min_total))
+      )
+  )
 }
