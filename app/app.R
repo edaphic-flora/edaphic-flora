@@ -29,6 +29,7 @@ library(polished)
 library(plotly)
 library(leaflet)
 library(shinycssloaders)
+library(shinyjs)
 
 # --- Load modules
 source("R/db.R")
@@ -245,9 +246,7 @@ base_ui <- page_navbar(
  # ========== ANALYSIS TAB ==========
  analysisUI("analysis"),
 
-# ========== FIND PLANTS TAB ==========
-# HIDDEN FOR INITIAL RELEASE: Requires 10+ samples per species for meaningful recommendations
-# Uncomment when database has sufficient data:
+# ========== FIND PLANTS TAB (hidden until data threshold met) ==========
 # findPlantsUI("find_plants"),
 
  # ========== DATA MANAGEMENT TAB ==========
@@ -637,20 +636,17 @@ server_inner <- function(input, output, session) {
  adminServer("admin", pool, is_admin, current_user, data_changed)
  dataManagementServer("data_mgmt", pool, current_user, data_changed, soil_data_template)
 
- # --- Find Plants module ---
- # HIDDEN FOR INITIAL RELEASE: Requires 10+ samples per species for meaningful recommendations
- # Uncomment when database has sufficient data:
- # pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "3"))
- # find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
- #                                      pdf_extract_limit)
- #
- # # Handle FAQ link from Find Plants module
- # observeEvent(find_plants_faq(), {
- #   nav_select("main_nav", "FAQ")
- # }, ignoreInit = TRUE)
-
  # PDF extraction daily limit for non-admin users (hardcoded for free tier)
  pdf_extract_limit <- 3L
+
+ # --- Find Plants module (hidden until data threshold met) ---
+# find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
+#                                      pdf_extract_limit, common_name_db)
+#
+# # Handle FAQ link from Find Plants module
+# observeEvent(find_plants_faq(), {
+#   nav_select("main_nav", "FAQ")
+# }, ignoreInit = TRUE)
 
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
