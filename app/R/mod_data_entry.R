@@ -228,7 +228,8 @@ dataEntryUI <- function(id) {
 
 dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_classes,
                             current_user, is_admin, data_changed, lookup_ecoregion,
-                            pdf_extract_limit, beta_features = list(), user_prefs = NULL) {
+                            pdf_extract_limit, beta_features = list(), user_prefs = NULL,
+                            species_search_index = NULL, common_name_db = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -706,14 +707,21 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       pld <- plant_list_data()
       has_batch <- !is.null(pld) && nrow(pld$valid) > 0
 
+      # Use search index with common names if available, else fall back to plain species list
+      choices <- if (!is.null(species_search_index) && length(species_search_index) > 0) {
+        species_search_index
+      } else {
+        sort(species_db$taxon_name)
+      }
+
       updateSelectizeInput(session, "species",
-                           choices = sort(species_db$taxon_name),
+                           choices = choices,
                            selected = character(0),
                            server = TRUE,
                            options = list(
                              maxItems = 20,
                              maxOptions = 100,
-                             placeholder = if (has_batch) "Type to add more species..." else "Type to search species..."
+                             placeholder = if (has_batch) "Type common or Latin name..." else "Type common or Latin name..."
                            ))
     })
 

@@ -9,6 +9,11 @@ library(sf)
 # Tolerance for texture classification (allows for small rounding errors)
 TEXTURE_TOLERANCE <- 0.1
 
+# Stats gating thresholds
+MIN_SAMPLES_FOR_PUBLIC_STATS <- 5L
+MIN_CONTRIBUTORS_FOR_PUBLIC_STATS <- 2L
+MIN_TOTAL_SAMPLES_FOR_SITE_STATS <- 20L
+
 # ---------------------------
 # Ecoregion Lookup
 # ---------------------------

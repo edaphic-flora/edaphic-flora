@@ -177,6 +177,70 @@ lookup_zipcode <- function(zipcode, zipcode_db) {
 }
 
 # ---------------------------
+# Common Name Search Index
+# ---------------------------
+
+#' Load common name index from ref_usda_traits
+#' @param pool Database connection pool
+#' @return Data frame with scientific_name and common_name columns
+load_common_name_index <- function(pool) {
+  tryCatch({
+    res <- DBI::dbGetQuery(pool, "
+      SELECT t.scientific_name, r.common_name
+      FROM ref_taxon t
+      JOIN ref_usda_traits r ON r.taxon_id = t.id
+      WHERE r.common_name IS NOT NULL AND r.common_name != ''
+    ")
+    if (nrow(res) > 0) {
+      message(sprintf("Loaded %d common name mappings", nrow(res)))
+      res
+    } else {
+      message("No common names found in database")
+      data.frame(scientific_name = character(), common_name = character(), stringsAsFactors = FALSE)
+    }
+  }, error = function(e) {
+    message("Error loading common name index: ", e$message)
+    data.frame(scientific_name = character(), common_name = character(), stringsAsFactors = FALSE)
+  })
+}
+
+#' Build unified species search index with common names
+#' Labels show "Common Name (Scientific Name)", values are Latin names.
+#' Selectize searches labels, stores values.
+#' @param species_db Species database (data frame with taxon_name column)
+#' @param common_name_db Common name index (from load_common_name_index)
+#' @return Named character vector: names=labels, values=scientific names
+build_species_search_index <- function(species_db, common_name_db) {
+  # Start with all species from WCVP
+  all_species <- sort(unique(species_db$taxon_name))
+
+  # Build a lookup from scientific name -> common name
+  cn_lookup <- stats::setNames(common_name_db$common_name, common_name_db$scientific_name)
+
+  # For species with common names, build "Common Name (Scientific Name)" labels
+  # For species without, just use the scientific name as label
+  labels <- vapply(all_species, function(sp) {
+    # Try exact match first
+    cn <- cn_lookup[sp]
+    if (!is.na(cn) && nzchar(cn)) {
+      paste0(tools::toTitleCase(tolower(cn)), " (", sp, ")")
+    } else {
+      # Try genus-species match (first two words)
+      gs <- paste(head(strsplit(sp, " ")[[1]], 2), collapse = " ")
+      cn2 <- cn_lookup[gs]
+      if (!is.na(cn2) && nzchar(cn2)) {
+        paste0(tools::toTitleCase(tolower(cn2)), " (", sp, ")")
+      } else {
+        sp
+      }
+    }
+  }, character(1), USE.NAMES = FALSE)
+
+  # Named vector: names are display labels, values are scientific names
+  stats::setNames(all_species, labels)
+}
+
+# ---------------------------
 # Soil Texture Classes
 # ---------------------------
 

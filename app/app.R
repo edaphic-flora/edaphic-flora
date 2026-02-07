@@ -53,6 +53,13 @@ onStop(function() poolClose(pool))
 species_db <- load_species_db()
 zipcode_db <- tryCatch(load_zipcode_db(), error = function(e) NULL)
 
+# Common name search index (from ref_usda_traits)
+common_name_db <- tryCatch(load_common_name_index(pool), error = function(e) {
+  message("Warning: Could not load common names: ", e$message)
+  data.frame(scientific_name = character(), common_name = character(), stringsAsFactors = FALSE)
+})
+species_search_index <- build_species_search_index(species_db, common_name_db)
+
 # Ecoregions: use full shapefile in dev, lightweight grid lookup in prod
 is_prod <- Sys.getenv("ENV", "dev") != "dev"
 eco_sf <- NULL
@@ -595,12 +602,12 @@ server_inner <- function(input, output, session) {
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
                  current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit,
-                 BETA_FEATURES, user_prefs)
+                 BETA_FEATURES, user_prefs, species_search_index, common_name_db)
 
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,
                edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
-               user_prefs)
+               user_prefs, species_search_index, common_name_db)
 
 # Help links from welcome page - navigate to Field Guide
 observeEvent(input$help_link_soil, {
@@ -645,7 +652,7 @@ observeEvent(input$help_link_soil, {
    updateNumericInput(session, "edit_id", value = entry$id[1])
    # For server-side selectize, must provide choices with selected value
    updateSelectizeInput(session, "edit_species",
-                        choices = sort(species_db$taxon_name),
+                        choices = species_search_index,
                         selected = entry$species[1],
                         server = TRUE)
    updateTextInput(session, "edit_cultivar", value = entry$cultivar[1] %||% "")

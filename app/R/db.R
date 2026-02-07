@@ -538,3 +538,78 @@ db_clear_user_prefs <- function(user_id, pool = NULL) {
     FALSE
   })
 }
+
+# ---------------------------
+# Stats Gating
+# ---------------------------
+
+#' Check if a species meets the threshold for public stats display
+#' @param species Species name
+#' @param pool Database connection pool
+#' @return List with meets_threshold, n_samples, n_contributors, status_label
+db_check_species_stats_threshold <- function(species, pool) {
+  if (is.null(species) || !nzchar(species)) {
+    return(list(meets_threshold = FALSE, n_samples = 0L, n_contributors = 0L,
+                status_label = "No species selected"))
+  }
+
+  tryCatch({
+    result <- dbGetQuery(pool, "
+      SELECT COUNT(*)::int AS n_samples,
+             COUNT(DISTINCT created_by)::int AS n_contributors
+      FROM soil_samples
+      WHERE species = $1
+    ", params = list(species))
+
+    n_samples <- result$n_samples[1]
+    n_contributors <- result$n_contributors[1]
+
+    meets <- n_samples >= MIN_SAMPLES_FOR_PUBLIC_STATS &&
+             n_contributors >= MIN_CONTRIBUTORS_FOR_PUBLIC_STATS
+
+    label <- if (meets) {
+      "Community Data"
+    } else {
+      sprintf("Early Access (%d/%d samples, %d/%d contributors)",
+              n_samples, MIN_SAMPLES_FOR_PUBLIC_STATS,
+              n_contributors, MIN_CONTRIBUTORS_FOR_PUBLIC_STATS)
+    }
+
+    list(
+      meets_threshold = meets,
+      n_samples = n_samples,
+      n_contributors = n_contributors,
+      status_label = label
+    )
+  }, error = function(e) {
+    message("Error checking species stats threshold: ", e$message)
+    list(meets_threshold = FALSE, n_samples = 0L, n_contributors = 0L,
+         status_label = "Error checking stats")
+  })
+}
+
+#' Get site-wide statistics for gating welcome page stats
+#' @param pool Database connection pool
+#' @return List with total_samples, total_species, total_contributors, meets_site_threshold
+db_get_site_stats <- function(pool) {
+  tryCatch({
+    result <- dbGetQuery(pool, "
+      SELECT COUNT(*)::int AS total_samples,
+             COUNT(DISTINCT species)::int AS total_species,
+             COUNT(DISTINCT created_by)::int AS total_contributors
+      FROM soil_samples
+    ")
+
+    total <- result$total_samples[1]
+    list(
+      total_samples = total,
+      total_species = result$total_species[1],
+      total_contributors = result$total_contributors[1],
+      meets_site_threshold = total >= MIN_TOTAL_SAMPLES_FOR_SITE_STATS
+    )
+  }, error = function(e) {
+    message("Error getting site stats: ", e$message)
+    list(total_samples = 0L, total_species = 0L, total_contributors = 0L,
+         meets_site_threshold = FALSE)
+  })
+}
