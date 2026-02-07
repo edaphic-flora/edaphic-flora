@@ -8,9 +8,8 @@
 welcomeUI <- function(id) {
   ns <- NS(id)
 
-  nav_panel(
-    title = "Welcome",
-    icon = icon("home"),
+  nav_panel_hidden(
+    value = "Welcome",
     layout_columns(
       col_widths = c(8, 4),
 
@@ -18,21 +17,13 @@ welcomeUI <- function(id) {
       card(
         card_header(
           class = "bg-transparent border-0 pt-2 welcome-hero",
-          # Alpha feedback banner - compact
-          div(class = "alert alert-warning mb-3 mx-3", style = "font-size: 0.9rem;",
-              div(class = "d-flex align-items-start",
-                  icon("flask", class = "me-2 mt-1", style = "font-size: 1.25rem; color: #7A9A86;"),
-                  div(
-                    tags$strong("Welcome to the Alpha!", class = "d-block"),
-                    "You're among the first to test edaphic flora. Please report bugs or share feedback.",
-                    tags$small(class = "d-block text-muted", icon("desktop"), " Desktop optimized."),
-                    div(class = "mt-1",
-                        tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Alpha%20Feedback",
-                               class = "btn btn-sm",
-                               style = "background-color: #D39B35; color: #373D3C; font-weight: 600; padding: 0.2rem 0.5rem;",
-                               icon("envelope"), " Send Feedback"))
-                  )
-              )
+          # Alpha banner - slim single line
+          div(class = "alert alert-warning mb-2 mx-3 py-1 px-3", style = "font-size: 0.85rem;",
+              icon("flask", class = "me-1", style = "color: #7A9A86;"),
+              tags$strong("Alpha"), " \u2014 desktop optimized. ",
+              tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Alpha%20Feedback",
+                     style = "color: #7A9A86; font-weight: 500;",
+                     "Send feedback", icon("envelope", class = "ms-1 fa-xs"))
           ),
           div(class = "text-center",
               tags$img(src = "readme_header.svg",
@@ -53,37 +44,33 @@ welcomeUI <- function(id) {
               div(class = "row g-2 mb-3 stagger-reveal",
                 # Step 1
                 div(class = "col-md-6 col-lg-3",
-                    div(class = "text-center p-2 h-100",
-                        style = "background: linear-gradient(135deg, rgba(122,154,134,0.1) 0%, rgba(122,154,134,0.05) 100%); border-radius: 10px;",
+                    div(class = "text-center p-2 h-100 step-card",
                         icon("flask", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(style = "font-family: 'Montserrat', sans-serif; font-size: 0.9rem; font-weight: 600;", "1. Submit Data"),
+                        div(class = "step-card-title", "1. Submit Data"),
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Enter soil test results")
                     )
                 ),
                 # Step 2
                 div(class = "col-md-6 col-lg-3",
-                    div(class = "text-center p-2 h-100",
-                        style = "background: linear-gradient(135deg, rgba(122,154,134,0.1) 0%, rgba(122,154,134,0.05) 100%); border-radius: 10px;",
+                    div(class = "text-center p-2 h-100 step-card",
                         icon("map-marker-alt", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(style = "font-family: 'Montserrat', sans-serif; font-size: 0.9rem; font-weight: 600;", "2. Add Location"),
+                        div(class = "step-card-title", "2. Add Location"),
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Geocode for ecoregions")
                     )
                 ),
                 # Step 3
                 div(class = "col-md-6 col-lg-3",
-                    div(class = "text-center p-2 h-100",
-                        style = "background: linear-gradient(135deg, rgba(122,154,134,0.1) 0%, rgba(122,154,134,0.05) 100%); border-radius: 10px;",
+                    div(class = "text-center p-2 h-100 step-card",
                         icon("chart-line", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(style = "font-family: 'Montserrat', sans-serif; font-size: 0.9rem; font-weight: 600;", "3. Analyze"),
+                        div(class = "step-card-title", "3. Analyze"),
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "View patterns & profiles")
                     )
                 ),
                 # Step 4
                 div(class = "col-md-6 col-lg-3",
-                    div(class = "text-center p-2 h-100",
-                        style = "background: linear-gradient(135deg, rgba(122,154,134,0.1) 0%, rgba(122,154,134,0.05) 100%); border-radius: 10px;",
+                    div(class = "text-center p-2 h-100 step-card",
                         icon("seedling", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(style = "font-family: 'Montserrat', sans-serif; font-size: 0.9rem; font-weight: 600;", "4. Discover"),
+                        div(class = "step-card-title", "4. Discover"),
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Find plants for your soil")
                     )
                 )
@@ -112,11 +99,6 @@ welcomeUI <- function(id) {
                              tags$strong("Data Usage: "),
                              "All submitted data is shared under CC BY-NC 4.0.")),
 
-              div(class = "mt-2 text-center", style = "font-size: 0.85rem;",
-                  tags$span(class = "text-muted",
-                             "Feedback? Email ",
-                             tags$a(href = "mailto:edaphicflora@gmail.com",
-                                    "edaphicflora@gmail.com")))
           )
         )
       ),

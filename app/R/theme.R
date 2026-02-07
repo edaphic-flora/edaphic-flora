@@ -28,7 +28,7 @@ edaphic_colors <- list(
 # Neutrals
   light = "#F7F4E8",
   dark  = "#373D3C",
-  muted = "#8B9A8E",
+  muted = "#5F7268",
 
 # Soil gradient (for continuous scales)
   soil = c("#DEB887", "#D2691E", "#A0522D", "#8B4513", "#654321"),
@@ -113,8 +113,8 @@ theme_edaphic <- function(base_size = 12, base_family = "Rokkitt") {
       # Panel
       panel.grid.major = element_line(color = "#e0e0e0", linewidth = 0.3),
       panel.grid.minor = element_blank(),
-      panel.background = element_rect(fill = "white", color = NA),
-      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "#F7F4E8", color = NA),
+      plot.background = element_rect(fill = "#F7F4E8", color = NA),
 
       # Facets
       strip.text = element_text(
@@ -236,7 +236,7 @@ edaphic_css <- function() {
       box-shadow: 0 1px 3px rgba(55, 61, 60, 0.08);
       overflow: hidden;
       transition: box-shadow 0.25s ease, transform 0.25s ease;
-      background: #fff;
+      background: #F7F4E8;
     }
 
     .card:hover {
@@ -730,7 +730,7 @@ edaphic_css <- function() {
     .stat-label {
       font-family: 'Montserrat', sans-serif;
       font-size: 0.7rem;
-      color: #8B9A8E;
+      color: #5F7268;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-top: 0.25rem;
@@ -743,7 +743,7 @@ edaphic_css <- function() {
     .empty-state {
       padding: 3rem 2rem;
       text-align: center;
-      color: #8B9A8E;
+      color: #5F7268;
       animation: fadeIn 0.4s ease;
     }
 
@@ -913,7 +913,7 @@ edaphic_css <- function() {
 
     /* Help text styling */
     .text-muted {
-      color: #8B9A8E !important;
+      color: #5F7268 !important;
     }
 
     small.text-muted, .small.text-muted {
@@ -1007,6 +1007,17 @@ edaphic_css <- function() {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.7rem;
       padding: 0.3em 0.6em;
+    }
+
+    /* How it works step cards (welcome page) */
+    .step-card {
+      background: linear-gradient(135deg, rgba(122,154,134,0.1) 0%, rgba(122,154,134,0.05) 100%);
+      border-radius: 10px;
+    }
+    .step-card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
     }
 
     /* Wizard step indicator */

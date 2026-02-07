@@ -24,7 +24,7 @@ helpUI <- function(id) {
           card_body(
             class = "px-md-5",
 
-            h4("Soil Properties"),
+            h4("Soil Properties", id = "guide-soil-properties"),
             tags$dl(class = "row",
               tags$dt(class = "col-sm-3", "Soil pH"),
               tags$dd(class = "col-sm-9", "Measures acidity/alkalinity on a scale of 0-14. Most plants prefer 6.0-7.0. ",
@@ -34,7 +34,7 @@ helpUI <- function(id) {
                       "with good water retention and microbial activity.")
             ),
 
-            h4(class = "mt-4", "Nutrients (ppm)"),
+            h4(class = "mt-4", "Nutrients (ppm)", id = "guide-nutrients"),
             tags$dl(class = "row",
               tags$dt(class = "col-sm-3", "Nitrate (NO\u2083)"),
               tags$dd(class = "col-sm-9", "Primary nitrogen source for plants. Optimal: 25-50 ppm for most crops."),
@@ -59,7 +59,7 @@ helpUI <- function(id) {
             ),
             p("The texture triangle in the Analysis tab shows your samples plotted by their sand/silt/clay percentages."),
 
-            h4(class = "mt-4", "Plant Performance"),
+            h4(class = "mt-4", "Plant Performance", id = "guide-plant-performance"),
             p("Track how plants perform in different conditions to identify optimal growing environments:"),
             tags$dl(class = "row",
               tags$dt(class = "col-sm-3", "Outcome"),
