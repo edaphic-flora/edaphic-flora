@@ -146,7 +146,7 @@ analysisUI <- function(id) {
 
 analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                            edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
-                           user_prefs = NULL) {
+                           user_prefs = NULL, species_search_index = NULL, common_name_db = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -168,14 +168,36 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       current <- isolate(input$analysis_species) %||% ""
 
+      # Build choices with common name labels for species that have data
+      if (!is.null(common_name_db) && nrow(common_name_db) > 0 && length(sp) > 0) {
+        cn_lookup <- stats::setNames(common_name_db$common_name, common_name_db$scientific_name)
+        labels <- vapply(sp, function(s) {
+          cn <- cn_lookup[s]
+          if (!is.na(cn) && nzchar(cn)) {
+            paste0(tools::toTitleCase(tolower(cn)), " (", s, ")")
+          } else {
+            gs <- paste(head(strsplit(s, " ")[[1]], 2), collapse = " ")
+            cn2 <- cn_lookup[gs]
+            if (!is.na(cn2) && nzchar(cn2)) {
+              paste0(tools::toTitleCase(tolower(cn2)), " (", s, ")")
+            } else {
+              s
+            }
+          }
+        }, character(1), USE.NAMES = FALSE)
+        choices <- stats::setNames(sp, labels)
+      } else {
+        choices <- sp
+      }
+
       updateSelectizeInput(session, "analysis_species",
-                           choices = sp,
+                           choices = choices,
                            selected = if (nzchar(current)) current else NULL,
                            server = TRUE,
                            options = list(
                              create = TRUE, persist = FALSE, maxOptions = 50,
                              openOnFocus = FALSE, closeAfterSelect = TRUE, selectOnTab = TRUE,
-                             placeholder = 'Type a species name...'
+                             placeholder = 'Type common or Latin name...'
                            ))
     })
 
@@ -281,6 +303,13 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       )
     })
 
+    # --- Species stats threshold (reactive, used by summary + charts) ---
+    species_stats_check <- reactive({
+      sp <- input$analysis_species %||% ""
+      if (!nzchar(sp)) return(list(meets_threshold = FALSE, n_samples = 0L, n_contributors = 0L, status_label = ""))
+      db_check_species_stats_threshold(sp, pool)
+    })
+
     # --- Species summary sidebar ---
     output$species_summary <- renderUI({
       req(input$analysis_species, input$analysis_species != "")
@@ -288,6 +317,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (nrow(dat) == 0) return(NULL)
 
       n_samples <- nrow(dat)
+      stats_check <- species_stats_check()
 
       success_rate <- NA
       if ("outcome" %in% names(dat) && sum(!is.na(dat$outcome)) > 0) {
@@ -302,24 +332,30 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         sprintf("%.1f - %.1f", min(dat$ph, na.rm = TRUE), max(dat$ph, na.rm = TRUE))
       } else "-"
 
-      div(class = "small",
-        div(class = "d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom",
-          span(class = "fw-bold", style = "color: #7A9A86;", paste(n_samples, "samples")),
-          if (!is.na(success_rate)) {
-            span(class = if (success_rate >= 70) "text-success" else if (success_rate >= 50) "text-warning" else "text-danger",
-                 title = "Success rate: % of samples with Thriving or Established outcomes",
-                 style = "cursor: help; border-bottom: 1px dotted currentColor;",
-                 paste0(success_rate, "% success"))
-          }
-        ),
-        div(class = "text-muted",
-          div(class = "d-flex justify-content-between", span("pH range"), span(ph_range)),
-          div(class = "d-flex justify-content-between", span("Ecoregions"), span(n_ecoregions)),
-          if (sum(!is.na(dat$organic_matter)) > 0) {
-            div(class = "d-flex justify-content-between",
-                span("Avg OM"),
-                span(paste0(round(mean(dat$organic_matter, na.rm = TRUE), 1), "%")))
-          }
+      tagList(
+        # Early access banner when below threshold
+        if (!stats_check$meets_threshold && n_samples > 0) {
+          early_access_ui(stats_check$n_samples, stats_check$n_contributors)
+        },
+        div(class = "small",
+          div(class = "d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom",
+            span(class = "fw-bold", style = "color: #7A9A86;", paste(n_samples, "samples")),
+            if (!is.na(success_rate)) {
+              span(class = if (success_rate >= 70) "text-success" else if (success_rate >= 50) "text-warning" else "text-danger",
+                   title = "Success rate: % of samples with Thriving or Established outcomes",
+                   style = "cursor: help; border-bottom: 1px dotted currentColor;",
+                   paste0(success_rate, "% success"))
+            }
+          ),
+          div(class = "text-muted",
+            div(class = "d-flex justify-content-between", span("pH range"), span(ph_range)),
+            div(class = "d-flex justify-content-between", span("Ecoregions"), span(n_ecoregions)),
+            if (sum(!is.na(dat$organic_matter)) > 0) {
+              div(class = "d-flex justify-content-between",
+                  span("Avg OM"),
+                  span(paste0(round(mean(dat$organic_matter, na.rm = TRUE), 1), "%")))
+            }
+          )
         )
       )
     })
