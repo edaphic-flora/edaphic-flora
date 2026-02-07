@@ -220,5 +220,4 @@ get_ecoregion_at_level <- function(l4_code, l4_name, level) {
   l4_name
 }
 
-#' Null-coalescing for this file
-`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+# Note: %||% operator defined in R/helpers.R (canonical definition)

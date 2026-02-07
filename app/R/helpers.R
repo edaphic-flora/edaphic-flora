@@ -3,6 +3,24 @@
 library(sf)
 
 # ---------------------------
+# Null-coalescing operator (canonical definition)
+# ---------------------------
+# Robust version: handles NULL, empty, all-NA, data frames, lists
+`%||%` <- function(a, b) {
+ if (is.null(a)) return(b)
+ if (is.data.frame(a)) a <- as.list(a[1, , drop = TRUE])
+ if (is.list(a)) a <- unlist(a, use.names = FALSE)
+ if (!length(a) || all(is.na(a))) return(b)
+ if (is.character(a)) {
+   a <- a[!is.na(a) & nzchar(a)]
+   if (!length(a)) return(b)
+   return(paste(unique(a), collapse = ", "))
+ }
+ if (is.numeric(a)) return(a[which(!is.na(a))[1]])
+ a[1]
+}
+
+# ---------------------------
 # Constants
 # ---------------------------
 
@@ -24,6 +42,12 @@ CASUAL_FIELDS <- c("ph", "organic_matter", "organic_matter_class",
                     "nitrate", "phosphorus", "potassium", "texture_class")
 # Enthusiast mode shows all fields (no filtering)
 ENTHUSIAST_FIELDS <- "all"
+
+# ---------------------------
+# Safe aggregation helpers (guard against all-NA vectors)
+# ---------------------------
+safe_min <- function(x) { x <- x[!is.na(x)]; if (length(x) == 0) NA_real_ else min(x) }
+safe_max <- function(x) { x <- x[!is.na(x)]; if (length(x) == 0) NA_real_ else max(x) }
 
 # ---------------------------
 # Ecoregion Lookup
@@ -127,11 +151,11 @@ calc_species_profile <- function(dat) {
   profile <- list(
     n_samples = nrow(dat),
     ph_mean = mean(dat$ph, na.rm = TRUE),
-    ph_min = min(dat$ph, na.rm = TRUE),
-    ph_max = max(dat$ph, na.rm = TRUE),
+    ph_min = safe_min(dat$ph),
+    ph_max = safe_max(dat$ph),
     om_mean = mean(dat$organic_matter, na.rm = TRUE),
-    om_min = min(dat$organic_matter, na.rm = TRUE),
-    om_max = max(dat$organic_matter, na.rm = TRUE)
+    om_min = safe_min(dat$organic_matter),
+    om_max = safe_max(dat$organic_matter)
   )
 
   # Texture - most common class

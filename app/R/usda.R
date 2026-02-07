@@ -46,20 +46,7 @@ usda_cache_stats <- function() {
 # Helper Functions
 # ---------------------------
 
-#' Null-coalescing operator
-`%||%` <- function(a, b) {
- if (is.null(a)) return(b)
- if (is.data.frame(a)) a <- as.list(a[1, , drop = TRUE])
- if (is.list(a)) a <- unlist(a, use.names = FALSE)
- if (!length(a) || all(is.na(a))) return(b)
- if (is.character(a)) {
-   a <- a[!is.na(a) & nzchar(a)]
-   if (!length(a)) return(b)
-   return(paste(unique(a), collapse = ", "))
- }
- if (is.numeric(a)) return(a[which(!is.na(a))[1]])
- a[1]
-}
+# Note: %||% operator defined in R/helpers.R (canonical definition)
 
 #' Extract canonical genus-species name from full taxon name
 canonical_gs <- function(name) {
@@ -182,28 +169,7 @@ get_usda_characteristics_for_name <- function(gs_name, pool) {
 
    if (nrow(result) > 0) return(result)
 
-   # Fallback to ref_usda_characteristics (legacy table)
-   result2 <- DBI::dbGetQuery(pool, "
-     SELECT
-       c.taxon_id,
-       t.usda_symbol,
-       t.scientific_name,
-       c.ph_min AS soil_ph_min,
-       c.ph_max AS soil_ph_max,
-       c.salinity_tolerance,
-       c.shade_tolerance,
-       c.drought_tolerance,
-       c.precipitation_min_mm,
-       c.precipitation_max_mm,
-       c.min_temp_c
-     FROM ref_usda_characteristics c
-     JOIN ref_taxon t ON t.id = c.taxon_id
-     WHERE c.taxon_id = $1
-     LIMIT 1",
-     params = list(row$taxon_id))
-
-   if (nrow(result2) == 0) return(NULL)
-   result2
+   NULL
  }, error = function(e) {
    message("get_usda_characteristics_for_name error: ", e$message)
    NULL
