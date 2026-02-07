@@ -14,6 +14,13 @@ MIN_SAMPLES_FOR_PUBLIC_STATS <- 5L
 MIN_CONTRIBUTORS_FOR_PUBLIC_STATS <- 2L
 MIN_TOTAL_SAMPLES_FOR_SITE_STATS <- 20L
 
+# Experience mode field definitions
+# Casual mode shows these fields only; everything else is hidden
+CASUAL_FIELDS <- c("ph", "organic_matter", "organic_matter_class",
+                    "nitrate", "phosphorus", "potassium", "texture_class")
+# Enthusiast mode shows all fields (no filtering)
+ENTHUSIAST_FIELDS <- "all"
+
 # ---------------------------
 # Ecoregion Lookup
 # ---------------------------
