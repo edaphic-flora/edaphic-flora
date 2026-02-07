@@ -94,6 +94,7 @@ dataEntryUI <- function(id) {
       # --- My Data Section (hidden by default, shown via link or after submit) ---
       shinyjs::hidden(
         div(id = ns("my_data_section"),
+            style = "margin-left: -1rem; margin-right: -1rem; max-width: none;",
           div(class = "card",
             div(class = "card-header d-flex justify-content-between align-items-center",
                 span(icon("database"), " My Data"),
@@ -1429,7 +1430,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           pH = ifelse(is.na(ph), "-", as.character(round(ph, 1))),
           OM = ifelse(is.na(organic_matter), "-", paste0(round(organic_matter, 1), "%")),
           Texture = ifelse(is.na(texture_class), "-", texture_class),
-          Cultivar = ifelse(is.na(cultivar) | cultivar == "", "-", cultivar),
+          Cultivar = ifelse(is.na(cultivar) | cultivar == "", "-",
+                           sprintf("<strong>%s</strong>", htmltools::htmlEscape(cultivar))),
           species = sapply(species, function(sp) {
             if (is.na(sp) || sp == "") "-" else sprintf("<em>%s</em>", htmltools::htmlEscape(sp))
           })
@@ -1474,9 +1476,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         options = list(
           pageLength = 25,
           lengthMenu = c(10, 25, 50, 100),
+          scrollX = TRUE,
           order = list(list(date_col_idx, 'desc')),
           columnDefs = list(
-            list(visible = FALSE, targets = 0)  # Hide ID column
+            list(visible = FALSE, targets = 0),  # Hide ID column
+            list(className = "text-nowrap", targets = "_all")
           )
         ),
         rownames = FALSE,
