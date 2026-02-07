@@ -1410,7 +1410,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         sprintf('<span class="outcome-badge %s">%s</span>', badge_class, outcome)
       }
 
-      # Format species with italics; casual users get "Common Name (Scientific)"
+      # Italicize species names; casual users get a separate Common Name column
       is_casual <- !is.null(experience_level) && identical(experience_level(), "casual")
       # Build genus-species keyed lookup (common_name_db stores full author citations)
       cn_lookup <- NULL
@@ -1421,17 +1421,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         cn_lookup <- stats::setNames(common_name_db$common_name, gs_keys)
         cn_lookup <- cn_lookup[!duplicated(names(cn_lookup))]
       }
-      format_species <- function(sp) {
-        if (is.na(sp) || sp == "") return("-")
-        italic_name <- sprintf("<em>%s</em>", htmltools::htmlEscape(sp))
-        if (!is.null(cn_lookup)) {
-          cn <- cn_lookup[sp]
-          if (!is.na(cn) && nzchar(cn)) {
-            return(sprintf("%s (%s)", htmltools::htmlEscape(tools::toTitleCase(tolower(cn))), italic_name))
-          }
-        }
-        italic_name
-      }
 
       display <- entries %>%
         mutate(
@@ -1441,8 +1430,19 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           OM = ifelse(is.na(organic_matter), "-", paste0(round(organic_matter, 1), "%")),
           Texture = ifelse(is.na(texture_class), "-", texture_class),
           Cultivar = ifelse(is.na(cultivar) | cultivar == "", "-", cultivar),
-          species = sapply(species, format_species)
+          species = sapply(species, function(sp) {
+            if (is.na(sp) || sp == "") "-" else sprintf("<em>%s</em>", htmltools::htmlEscape(sp))
+          })
         )
+
+      # Add Common Name column for casual users
+      if (!is.null(cn_lookup)) {
+        display$common_name <- vapply(entries$species, function(sp) {
+          if (is.na(sp) || sp == "") return("-")
+          cn <- cn_lookup[sp]
+          if (!is.na(cn) && nzchar(cn)) tools::toTitleCase(tolower(cn)) else "-"
+        }, character(1))
+      }
 
       # Add action buttons
       display$Actions <- sapply(seq_len(nrow(display)), function(i) {
@@ -1457,8 +1457,16 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         }
       })
 
-      display <- display %>%
-        select(ID = id, Species = species, Cultivar, Outcome, pH, OM, Texture, Date, Actions)
+      if (!is.null(cn_lookup)) {
+        display <- display %>%
+          select(ID = id, `Common Name` = common_name, Species = species,
+                 Cultivar, Outcome, pH, OM, Texture, Date, Actions)
+        date_col_idx <- 8
+      } else {
+        display <- display %>%
+          select(ID = id, Species = species, Cultivar, Outcome, pH, OM, Texture, Date, Actions)
+        date_col_idx <- 7
+      }
 
       datatable(
         display,
@@ -1466,7 +1474,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         options = list(
           pageLength = 25,
           lengthMenu = c(10, 25, 50, 100),
-          order = list(list(7, 'desc')),
+          order = list(list(date_col_idx, 'desc')),
           columnDefs = list(
             list(visible = FALSE, targets = 0)  # Hide ID column
           )
