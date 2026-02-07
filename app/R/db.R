@@ -150,6 +150,9 @@ db_migrate <- function() {
       )
     ")
 
+    # Experience level column for user preferences
+    dbExecute(pool, "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS experience_level VARCHAR(20) DEFAULT 'casual'")
+
     # Noxious/invasive species reference table
     dbExecute(pool, "
       CREATE TABLE IF NOT EXISTS ref_noxious_invasive (
@@ -474,7 +477,8 @@ db_get_user_prefs <- function(user_id, pool = NULL) {
 
   tryCatch({
     result <- dbGetQuery(pool, "
-      SELECT home_zipcode, home_state, home_city, home_lat, home_long
+      SELECT home_zipcode, home_state, home_city, home_lat, home_long,
+             COALESCE(experience_level, 'casual') AS experience_level
       FROM user_preferences
       WHERE user_id = $1
     ", params = list(user_id))
@@ -518,6 +522,30 @@ db_set_user_prefs <- function(user_id, zipcode, city = NULL, state = NULL, lat =
     TRUE
   }, error = function(e) {
     message("Error setting user preferences: ", e$message)
+    FALSE
+  })
+}
+
+#' Set experience level for a user
+#' @param user_id Firebase UID
+#' @param level "casual" or "enthusiast"
+#' @param pool Database connection pool (optional, uses global if not provided)
+#' @return TRUE on success, FALSE on failure
+db_set_experience_level <- function(user_id, level = "casual", pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  if (is.null(pool)) pool <- get("pool", envir = globalenv())
+  if (!level %in% c("casual", "enthusiast")) level <- "casual"
+
+  tryCatch({
+    dbExecute(pool, "
+      INSERT INTO user_preferences (user_id, experience_level, updated_at)
+      VALUES ($1, $2, now())
+      ON CONFLICT (user_id)
+      DO UPDATE SET experience_level = EXCLUDED.experience_level, updated_at = now()
+    ", params = list(user_id, level))
+    TRUE
+  }, error = function(e) {
+    message("Error setting experience level: ", e$message)
     FALSE
   })
 }

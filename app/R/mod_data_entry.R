@@ -18,149 +18,58 @@ dataEntryUI <- function(id) {
         width = 380,
         bg = "#f8f9fa",
 
-        # Form progress indicator
-        uiOutput(ns("form_progress_ui")),
+        # Wizard step indicator
+        uiOutput(ns("wizard_steps_ui")),
 
-        # Soil Report Upload Section (conditional on API key availability)
-        uiOutput(ns("pdf_upload_section")),
+        # Wizard content (step-specific form content)
+        uiOutput(ns("wizard_content")),
 
-        # Reuse Previous Soil Data (shown if user has previous entries)
-        uiOutput(ns("reuse_soil_section")),
+        # Wizard navigation buttons
+        uiOutput(ns("wizard_nav_buttons")),
 
-        # Batch Plant Upload (Beta feature)
-        uiOutput(ns("plant_list_upload_section")),
-
-        # Species (always visible - most important)
-        # Hidden when batch upload is active
-        uiOutput(ns("species_input_section")),
-
-        # Per-species metadata (dynamic based on selected species)
-        # Hidden when batch upload is active
-        uiOutput(ns("per_species_fields")),
-
-        # Plant list preview (shown when batch upload is active)
-        uiOutput(ns("plant_list_preview_section")),
-
-        accordion(
-          id = ns("form_sections"),
-          open = "soil_props",
-
+        # --- Hidden form fields (always in DOM so values persist across steps) ---
+        # These are the actual inputs that hold form state. They're in hidden divs
+        # and their values are synced to/from the wizard step UIs via server logic.
+        div(style = "display: none;",
           # Soil Properties
-          accordion_panel(
-            title = "Soil Properties",
-            value = "soil_props",
-            icon = icon("flask"),
-            numericInput(ns("ph"), "Soil pH", value = NA, min = 0, max = 14, step = 0.1),
-            numericInput(ns("organic_matter"), "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1),
-            selectInput(ns("organic_matter_class"), "Organic Matter (Qualitative)",
-                        choices = c("Select if no % available" = "",
-                                    "Very Low" = "Very Low",
-                                    "Low" = "Low",
-                                    "Medium Low" = "Medium Low",
-                                    "Medium" = "Medium",
-                                    "Medium High" = "Medium High",
-                                    "High" = "High",
-                                    "Very High" = "Very High")),
-            numericInput(ns("cec"), "Cation Exchange Capacity (meq/100g)", value = NA, min = 0, step = 0.1),
-            numericInput(ns("soluble_salts"), "Soluble Salts (ppm)", value = NA, min = 0)
-          ),
-
+          numericInput(ns("ph"), "pH", value = NA, min = 0, max = 14, step = 0.1),
+          numericInput(ns("organic_matter"), "OM", value = NA, min = 0, max = 100, step = 0.1),
+          selectInput(ns("organic_matter_class"), "OM Class",
+                      choices = c("" = "", "Very Low", "Low", "Medium Low", "Medium",
+                                  "Medium High", "High", "Very High")),
+          numericInput(ns("cec"), "CEC", value = NA, min = 0, step = 0.1),
+          numericInput(ns("soluble_salts"), "Salts", value = NA, min = 0),
           # Macronutrients
-          accordion_panel(
-            title = "Macronutrients (ppm)",
-            value = "macronutrients",
-            icon = icon("leaf"),
-            layout_column_wrap(
-              width = 1/2,
-              numericInput(ns("nitrate"), "Nitrate (N)", value = NA, min = 0),
-              numericInput(ns("ammonium"), "Ammonium (N)", value = NA, min = 0),
-              numericInput(ns("phosphorus"), "Phosphorus (P)", value = NA, min = 0),
-              numericInput(ns("potassium"), "Potassium (K)", value = NA, min = 0),
-              numericInput(ns("calcium"), "Calcium (Ca)", value = NA, min = 0),
-              numericInput(ns("magnesium"), "Magnesium (Mg)", value = NA, min = 0),
-              numericInput(ns("sulfur"), "Sulfur (S)", value = NA, min = 0)
-            )
-          ),
-
+          numericInput(ns("nitrate"), "N", value = NA, min = 0),
+          numericInput(ns("ammonium"), "NH4", value = NA, min = 0),
+          numericInput(ns("phosphorus"), "P", value = NA, min = 0),
+          numericInput(ns("potassium"), "K", value = NA, min = 0),
+          numericInput(ns("calcium"), "Ca", value = NA, min = 0),
+          numericInput(ns("magnesium"), "Mg", value = NA, min = 0),
+          numericInput(ns("sulfur"), "S", value = NA, min = 0),
           # Micronutrients
-          accordion_panel(
-            title = "Micronutrients (ppm)",
-            value = "micronutrients",
-            icon = icon("seedling"),
-            layout_column_wrap(
-              width = 1/2,
-              numericInput(ns("iron"), "Iron (Fe)", value = NA, min = 0),
-              numericInput(ns("manganese"), "Manganese (Mn)", value = NA, min = 0),
-              numericInput(ns("zinc"), "Zinc (Zn)", value = NA, min = 0),
-              numericInput(ns("copper"), "Copper (Cu)", value = NA, min = 0),
-              numericInput(ns("boron"), "Boron (B)", value = NA, min = 0, step = 0.1)
-            )
-          ),
-
+          numericInput(ns("iron"), "Fe", value = NA, min = 0),
+          numericInput(ns("manganese"), "Mn", value = NA, min = 0),
+          numericInput(ns("zinc"), "Zn", value = NA, min = 0),
+          numericInput(ns("copper"), "Cu", value = NA, min = 0),
+          numericInput(ns("boron"), "B", value = NA, min = 0, step = 0.1),
           # Texture
-          accordion_panel(
-            title = "Soil Texture",
-            value = "texture",
-            icon = icon("mountain"),
-            radioButtons(ns("texture_input_type"), "Input Method:",
-                         choices = c("Percentages" = "pct", "Classification" = "class"),
-                         inline = TRUE),
-            conditionalPanel(
-              condition = sprintf("input['%s'] == 'pct'", ns("texture_input_type")),
-              layout_column_wrap(
-                width = 1/3,
-                numericInput(ns("sand"), "Sand %", value = 33, min = 0, max = 100),
-                numericInput(ns("silt"), "Silt %", value = 33, min = 0, max = 100),
-                numericInput(ns("clay"), "Clay %", value = 34, min = 0, max = 100)
-              ),
-              uiOutput(ns("texture_validation"))
-            ),
-            conditionalPanel(
-              condition = sprintf("input['%s'] == 'class'", ns("texture_input_type")),
-              selectInput(ns("texture_class"), "Texture Class", choices = NULL)  # Populated in server
-            )
-          ),
-
+          radioButtons(ns("texture_input_type"), "Texture", choices = c("pct", "class"), selected = "class"),
+          numericInput(ns("sand"), "Sand", value = 33, min = 0, max = 100),
+          numericInput(ns("silt"), "Silt", value = 33, min = 0, max = 100),
+          numericInput(ns("clay"), "Clay", value = 34, min = 0, max = 100),
+          selectInput(ns("texture_class"), "Texture Class", choices = NULL),
           # Location
-          accordion_panel(
-            title = "Location",
-            value = "location",
-            icon = icon("map-marker-alt"),
-            # Use saved location link (shown if user has preferences)
-            uiOutput(ns("use_saved_location_section")),
-            textInput(ns("street"), "Street Address (optional)", "",
-                      placeholder = "123 Main St"),
-            textInput(ns("zipcode"), "Zip Code", "",
-                      placeholder = "Enter 5-digit zip"),
-            div(class = "small mb-3", uiOutput(ns("location_status"))),
-            layout_column_wrap(
-              width = 1/2,
-              textInput(ns("city"), "City/Town", ""),
-              selectInput(ns("state"), "State", choices = state.name, selected = "New York")
-            ),
-            layout_column_wrap(
-              width = 1/2,
-              numericInput(ns("latitude"), "Latitude", value = NA, min = -90, max = 90, step = 0.0001),
-              numericInput(ns("longitude"), "Longitude", value = NA, min = -180, max = 180, step = 0.0001)
-            ),
-            tags$small(class = "text-muted",
-                       "Coordinates auto-fill from zip code, or enter manually.")
-          ),
-
+          textInput(ns("street"), "Street", ""),
+          textInput(ns("zipcode"), "Zip", ""),
+          textInput(ns("city"), "City", ""),
+          selectInput(ns("state"), "State", choices = state.name, selected = "New York"),
+          numericInput(ns("latitude"), "Lat", value = NA, min = -90, max = 90, step = 0.0001),
+          numericInput(ns("longitude"), "Lon", value = NA, min = -180, max = 180, step = 0.0001),
           # Additional
-          accordion_panel(
-            title = "Additional Info",
-            value = "additional",
-            icon = icon("info-circle"),
-            dateInput(ns("date"), "Sample Date", value = Sys.Date()),
-            textAreaInput(ns("notes"), "Notes", "", height = "80px",
-                          placeholder = "General notes about this soil sample...")
-          )
-        ),
-
-        hr(),
-        actionButton(ns("submit"), "Submit Sample", class = "btn-primary btn-lg w-100",
-                     icon = icon("paper-plane"))
+          dateInput(ns("date"), "Date", value = Sys.Date()),
+          textAreaInput(ns("notes"), "Notes", "", height = "80px")
+        )
       ),
 
       # Main content - tabbed view with Recent and All Data
@@ -229,7 +138,8 @@ dataEntryUI <- function(id) {
 dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_classes,
                             current_user, is_admin, data_changed, lookup_ecoregion,
                             pdf_extract_limit, beta_features = list(), user_prefs = NULL,
-                            species_search_index = NULL, common_name_db = NULL) {
+                            species_search_index = NULL, common_name_db = NULL,
+                            experience_level = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -242,32 +152,363 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     # State for batch plant upload
     plant_list_data <- reactiveVal(NULL)  # Parsed plant list from CSV upload
 
-    # --- Form Progress Indicator ---
-    output$form_progress_ui <- renderUI({
-      # Calculate completion based on key fields
-      species_filled <- length(input$species) > 0 || (!is.null(plant_list_data()) && nrow(plant_list_data()$valid) > 0)
-      ph_filled <- !is.null(input$ph) && !is.na(input$ph)
-      om_filled <- !is.null(input$organic_matter) && !is.na(input$organic_matter)
-      texture_filled <- (input$texture_input_type == "class" && !is.null(input$texture_class) && nzchar(input$texture_class)) ||
-                       (input$texture_input_type == "pct" && !is.null(input$sand) && !is.na(input$sand))
-      location_filled <- !is.null(input$zipcode) && nchar(gsub("[^0-9]", "", input$zipcode)) == 5
+    # Wizard state
+    wizard_step <- reactiveVal(1L)
 
-      sections_complete <- sum(c(species_filled, ph_filled || om_filled, texture_filled, location_filled))
-      total_sections <- 4
-      progress_pct <- round(sections_complete / total_sections * 100)
+    # Get current experience level
+    get_exp_level <- reactive({
+      if (is.reactive(experience_level)) experience_level() else "casual"
+    })
 
-      # Only show if at least one field is filled
-      if (progress_pct == 0) return(NULL)
+    is_casual <- reactive({ get_exp_level() == "casual" })
 
-      div(class = "mb-3",
-          div(class = "d-flex justify-content-between align-items-center mb-1",
-              tags$small(class = "text-muted", icon("tasks"), " Form Progress"),
-              tags$small(class = "text-muted fw-bold", sprintf("%d of %d sections", sections_complete, total_sections))
-          ),
-          div(class = "form-progress",
-              div(class = "form-progress-fill", style = sprintf("width: %d%%;", progress_pct))
+    # --- Wizard Step Indicator ---
+    output$wizard_steps_ui <- renderUI({
+      step <- wizard_step()
+      step_data <- list(
+        list(num = 1, label = "Soil Source"),
+        list(num = 2, label = "Review Data"),
+        list(num = 3, label = "Add Plants")
+      )
+
+      div(class = "wizard-steps mb-3",
+          div(class = "d-flex justify-content-between align-items-center position-relative",
+              style = "padding: 0 10px;",
+              # Connecting line
+              div(style = "position: absolute; top: 14px; left: 30px; right: 30px; height: 2px; background: #e5e7eb; z-index: 0;"),
+              lapply(step_data, function(s) {
+                state <- if (s$num < step) "completed" else if (s$num == step) "active" else "pending"
+                bg <- switch(state,
+                  completed = "background: #7A9A86; color: white;",
+                  active = "background: #D39B35; color: white;",
+                  "background: #e5e7eb; color: #8B9A8E;"
+                )
+                div(class = "text-center", style = "z-index: 1;",
+                    div(style = paste0("width: 28px; height: 28px; border-radius: 50%; ",
+                                       "display: flex; align-items: center; justify-content: center; ",
+                                       "font-family: 'Montserrat', sans-serif; font-size: 0.75rem; ",
+                                       "font-weight: 600; margin: 0 auto; ", bg),
+                        if (state == "completed") icon("check", style = "font-size: 0.7rem;") else s$num),
+                    tags$small(class = "d-block mt-1",
+                               style = paste0("font-family: 'Montserrat', sans-serif; font-size: 0.65rem; ",
+                                              "color: ", if (state == "active") "#D39B35" else "#8B9A8E", ";"),
+                               s$label)
+                )
+              })
           )
       )
+    })
+
+    # --- Wizard Content ---
+    output$wizard_content <- renderUI({
+      step <- wizard_step()
+      casual <- is_casual()
+
+      switch(as.character(step),
+        # Step 1: Soil Source
+        "1" = tagList(
+          h6(class = "fw-bold mb-3", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;",
+             "How would you like to enter soil data?"),
+
+          # Option 1: Upload soil report
+          uiOutput(ns("pdf_upload_section")),
+
+          # Option 2: Reuse previous soil data
+          uiOutput(ns("reuse_soil_section")),
+
+          # Option 3: Enter manually
+          actionButton(ns("enter_manually"), "Enter Manually",
+                       class = "btn-outline-primary w-100 mb-2",
+                       icon = icon("keyboard")),
+
+          tags$small(class = "text-muted d-block text-center",
+                     "You can also skip ahead if you already have data ready.")
+        ),
+
+        # Step 2: Review Soil Data
+        "2" = tagList(
+          h6(class = "fw-bold mb-2", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;",
+             "Review Soil Data"),
+          tags$small(class = "text-muted d-block mb-3",
+                     "Verify and edit the values below."),
+
+          # Soil Properties (always shown)
+          div(class = "mb-3",
+              tags$label(class = "form-label", "Soil pH"),
+              numericInput(ns("ph_step2"), NULL, value = isolate(input$ph), min = 0, max = 14, step = 0.1),
+              tags$label(class = "form-label", "Organic Matter (%)"),
+              numericInput(ns("om_step2"), NULL, value = isolate(input$organic_matter), min = 0, max = 100, step = 0.1),
+              selectInput(ns("om_class_step2"), "Organic Matter (Qualitative)",
+                          choices = c("Select if no % available" = "",
+                                      "Very Low", "Low", "Medium Low", "Medium",
+                                      "Medium High", "High", "Very High"),
+                          selected = isolate(input$organic_matter_class))
+          ),
+
+          # Macronutrients (N/P/K always shown)
+          div(class = "mb-3",
+              tags$label(class = "form-label fw-bold", icon("leaf"), " Key Nutrients (ppm)"),
+              layout_column_wrap(
+                width = 1/3,
+                numericInput(ns("nitrate_step2"), "Nitrate (N)", value = isolate(input$nitrate), min = 0),
+                numericInput(ns("phosphorus_step2"), "Phosphorus (P)", value = isolate(input$phosphorus), min = 0),
+                numericInput(ns("potassium_step2"), "Potassium (K)", value = isolate(input$potassium), min = 0)
+              )
+          ),
+
+          # Advanced fields (hidden in casual mode, expandable)
+          if (casual) {
+            div(
+              id = ns("advanced_fields_wrapper"),
+              tags$details(
+                tags$summary(
+                  style = "cursor: pointer; font-weight: 500; color: #7A9A86; font-size: 0.9rem;",
+                  icon("sliders"), " Advanced Fields"
+                ),
+                div(class = "mt-2",
+                    # CEC + Salts
+                    layout_column_wrap(
+                      width = 1/2,
+                      numericInput(ns("cec_step2"), "CEC (meq/100g)", value = isolate(input$cec), min = 0, step = 0.1),
+                      numericInput(ns("salts_step2"), "Soluble Salts (ppm)", value = isolate(input$soluble_salts), min = 0)
+                    ),
+                    # Additional macros
+                    tags$label(class = "form-label fw-bold mt-2", "More Macronutrients (ppm)"),
+                    layout_column_wrap(
+                      width = 1/2,
+                      numericInput(ns("ammonium_step2"), "Ammonium (N)", value = isolate(input$ammonium), min = 0),
+                      numericInput(ns("calcium_step2"), "Calcium (Ca)", value = isolate(input$calcium), min = 0),
+                      numericInput(ns("magnesium_step2"), "Magnesium (Mg)", value = isolate(input$magnesium), min = 0),
+                      numericInput(ns("sulfur_step2"), "Sulfur (S)", value = isolate(input$sulfur), min = 0)
+                    ),
+                    # Micronutrients
+                    tags$label(class = "form-label fw-bold mt-2", "Micronutrients (ppm)"),
+                    layout_column_wrap(
+                      width = 1/2,
+                      numericInput(ns("iron_step2"), "Iron (Fe)", value = isolate(input$iron), min = 0),
+                      numericInput(ns("manganese_step2"), "Manganese (Mn)", value = isolate(input$manganese), min = 0),
+                      numericInput(ns("zinc_step2"), "Zinc (Zn)", value = isolate(input$zinc), min = 0),
+                      numericInput(ns("copper_step2"), "Copper (Cu)", value = isolate(input$copper), min = 0),
+                      numericInput(ns("boron_step2"), "Boron (B)", value = isolate(input$boron), min = 0, step = 0.1)
+                    ),
+                    # Texture percentages
+                    tags$label(class = "form-label fw-bold mt-2", "Texture Percentages"),
+                    layout_column_wrap(
+                      width = 1/3,
+                      numericInput(ns("sand_step2"), "Sand %", value = isolate(input$sand), min = 0, max = 100),
+                      numericInput(ns("silt_step2"), "Silt %", value = isolate(input$silt), min = 0, max = 100),
+                      numericInput(ns("clay_step2"), "Clay %", value = isolate(input$clay), min = 0, max = 100)
+                    ),
+                    uiOutput(ns("texture_validation"))
+                )
+              )
+            )
+          } else {
+            # Enthusiast mode: show all fields inline
+            tagList(
+              # CEC + Salts
+              layout_column_wrap(
+                width = 1/2,
+                numericInput(ns("cec_step2"), "CEC (meq/100g)", value = isolate(input$cec), min = 0, step = 0.1),
+                numericInput(ns("salts_step2"), "Soluble Salts (ppm)", value = isolate(input$soluble_salts), min = 0)
+              ),
+              # Additional macros
+              tags$label(class = "form-label fw-bold mt-2", icon("leaf"), " More Macronutrients (ppm)"),
+              layout_column_wrap(
+                width = 1/2,
+                numericInput(ns("ammonium_step2"), "Ammonium (N)", value = isolate(input$ammonium), min = 0),
+                numericInput(ns("calcium_step2"), "Calcium (Ca)", value = isolate(input$calcium), min = 0),
+                numericInput(ns("magnesium_step2"), "Magnesium (Mg)", value = isolate(input$magnesium), min = 0),
+                numericInput(ns("sulfur_step2"), "Sulfur (S)", value = isolate(input$sulfur), min = 0)
+              ),
+              # Micronutrients
+              tags$label(class = "form-label fw-bold mt-2", icon("seedling"), " Micronutrients (ppm)"),
+              layout_column_wrap(
+                width = 1/2,
+                numericInput(ns("iron_step2"), "Iron (Fe)", value = isolate(input$iron), min = 0),
+                numericInput(ns("manganese_step2"), "Manganese (Mn)", value = isolate(input$manganese), min = 0),
+                numericInput(ns("zinc_step2"), "Zinc (Zn)", value = isolate(input$zinc), min = 0),
+                numericInput(ns("copper_step2"), "Copper (Cu)", value = isolate(input$copper), min = 0),
+                numericInput(ns("boron_step2"), "Boron (B)", value = isolate(input$boron), min = 0, step = 0.1)
+              ),
+              # Texture percentages
+              tags$label(class = "form-label fw-bold mt-2", icon("mountain"), " Texture Percentages"),
+              layout_column_wrap(
+                width = 1/3,
+                numericInput(ns("sand_step2"), "Sand %", value = isolate(input$sand), min = 0, max = 100),
+                numericInput(ns("silt_step2"), "Silt %", value = isolate(input$silt), min = 0, max = 100),
+                numericInput(ns("clay_step2"), "Clay %", value = isolate(input$clay), min = 0, max = 100)
+              ),
+              uiOutput(ns("texture_validation"))
+            )
+          },
+
+          # Texture class (always visible)
+          div(class = "mb-3",
+              tags$label(class = "form-label", icon("mountain"), " Texture Class"),
+              selectInput(ns("texture_class_step2"), NULL,
+                          choices = NULL,  # Populated in server
+                          selected = isolate(input$texture_class))
+          )
+        ),
+
+        # Step 3: Add Plants + Submit
+        "3" = tagList(
+          h6(class = "fw-bold mb-2", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;",
+             "Add Plants & Submit"),
+          tags$small(class = "text-muted d-block mb-3",
+                     "Select the plants growing in this soil, then submit."),
+
+          # Batch Plant Upload (Beta feature)
+          uiOutput(ns("plant_list_upload_section")),
+
+          # Species selection
+          uiOutput(ns("species_input_section")),
+
+          # Per-species metadata
+          uiOutput(ns("per_species_fields")),
+
+          # Plant list preview
+          uiOutput(ns("plant_list_preview_section")),
+
+          # Location
+          div(class = "mb-3 p-2 border rounded",
+              tags$label(class = "form-label fw-bold", icon("map-marker-alt"), " Location"),
+              uiOutput(ns("use_saved_location_section")),
+              textInput(ns("street_step3"), "Street Address (optional)", value = isolate(input$street),
+                        placeholder = "123 Main St"),
+              textInput(ns("zipcode_step3"), "Zip Code", value = isolate(input$zipcode),
+                        placeholder = "Enter 5-digit zip"),
+              div(class = "small mb-2", uiOutput(ns("location_status"))),
+              layout_column_wrap(
+                width = 1/2,
+                textInput(ns("city_step3"), "City/Town", value = isolate(input$city)),
+                selectInput(ns("state_step3"), "State", choices = state.name,
+                            selected = isolate(input$state))
+              ),
+              layout_column_wrap(
+                width = 1/2,
+                numericInput(ns("lat_step3"), "Latitude", value = isolate(input$latitude),
+                             min = -90, max = 90, step = 0.0001),
+                numericInput(ns("lon_step3"), "Longitude", value = isolate(input$longitude),
+                             min = -180, max = 180, step = 0.0001)
+              ),
+              tags$small(class = "text-muted",
+                         "Coordinates auto-fill from zip code, or enter manually.")
+          ),
+
+          # Additional info
+          div(class = "mb-3",
+              dateInput(ns("date_step3"), "Sample Date", value = isolate(input$date)),
+              textAreaInput(ns("notes_step3"), "Notes", value = isolate(input$notes),
+                            height = "80px", placeholder = "General notes about this soil sample...")
+          ),
+
+          hr(),
+          actionButton(ns("submit"), "Submit Sample", class = "btn-primary btn-lg w-100",
+                       icon = icon("paper-plane"))
+        )
+      )
+    })
+
+    # --- Wizard Navigation Buttons ---
+    output$wizard_nav_buttons <- renderUI({
+      step <- wizard_step()
+
+      div(class = "d-flex justify-content-between mt-3",
+          # Back button (hidden on step 1)
+          if (step > 1) {
+            actionButton(ns("wizard_back"), "Back", class = "btn-outline-secondary",
+                         icon = icon("arrow-left"))
+          } else {
+            div()  # Spacer
+          },
+          # Next button (hidden on step 3 - submit button is in the content)
+          if (step < 3) {
+            actionButton(ns("wizard_next"), "Next", class = "btn-primary",
+                         icon = icon("arrow-right"))
+          } else {
+            div()  # Spacer
+          }
+      )
+    })
+
+    # --- Wizard Navigation Handlers ---
+    observeEvent(input$wizard_next, {
+      current <- wizard_step()
+      if (current < 3) {
+        # Sync step 2 fields to hidden inputs before advancing
+        if (current == 2) sync_step2_to_hidden()
+        wizard_step(current + 1L)
+      }
+    })
+
+    observeEvent(input$wizard_back, {
+      current <- wizard_step()
+      if (current > 1) {
+        # Sync step 3 fields to hidden inputs before going back
+        if (current == 3) sync_step3_to_hidden()
+        # Sync step 2 fields before going back to step 1
+        if (current == 2) sync_step2_to_hidden()
+        wizard_step(current - 1L)
+      }
+    })
+
+    # Enter manually -> go to step 2
+    observeEvent(input$enter_manually, {
+      wizard_step(2L)
+    })
+
+    # --- Sync functions: copy wizard step inputs to hidden form inputs ---
+    sync_step2_to_hidden <- function() {
+      # Soil properties
+      if (!is.null(input$ph_step2)) updateNumericInput(session, "ph", value = input$ph_step2)
+      if (!is.null(input$om_step2)) updateNumericInput(session, "organic_matter", value = input$om_step2)
+      if (!is.null(input$om_class_step2)) updateSelectInput(session, "organic_matter_class", selected = input$om_class_step2)
+      if (!is.null(input$cec_step2)) updateNumericInput(session, "cec", value = input$cec_step2)
+      if (!is.null(input$salts_step2)) updateNumericInput(session, "soluble_salts", value = input$salts_step2)
+      # Macronutrients
+      if (!is.null(input$nitrate_step2)) updateNumericInput(session, "nitrate", value = input$nitrate_step2)
+      if (!is.null(input$ammonium_step2)) updateNumericInput(session, "ammonium", value = input$ammonium_step2)
+      if (!is.null(input$phosphorus_step2)) updateNumericInput(session, "phosphorus", value = input$phosphorus_step2)
+      if (!is.null(input$potassium_step2)) updateNumericInput(session, "potassium", value = input$potassium_step2)
+      if (!is.null(input$calcium_step2)) updateNumericInput(session, "calcium", value = input$calcium_step2)
+      if (!is.null(input$magnesium_step2)) updateNumericInput(session, "magnesium", value = input$magnesium_step2)
+      if (!is.null(input$sulfur_step2)) updateNumericInput(session, "sulfur", value = input$sulfur_step2)
+      # Micronutrients
+      if (!is.null(input$iron_step2)) updateNumericInput(session, "iron", value = input$iron_step2)
+      if (!is.null(input$manganese_step2)) updateNumericInput(session, "manganese", value = input$manganese_step2)
+      if (!is.null(input$zinc_step2)) updateNumericInput(session, "zinc", value = input$zinc_step2)
+      if (!is.null(input$copper_step2)) updateNumericInput(session, "copper", value = input$copper_step2)
+      if (!is.null(input$boron_step2)) updateNumericInput(session, "boron", value = input$boron_step2)
+      # Texture
+      if (!is.null(input$sand_step2)) updateNumericInput(session, "sand", value = input$sand_step2)
+      if (!is.null(input$silt_step2)) updateNumericInput(session, "silt", value = input$silt_step2)
+      if (!is.null(input$clay_step2)) updateNumericInput(session, "clay", value = input$clay_step2)
+      if (!is.null(input$texture_class_step2)) updateSelectInput(session, "texture_class", selected = input$texture_class_step2)
+      # Set texture input type based on whether percentages differ from defaults
+      has_pct <- !is.null(input$sand_step2) && !is.na(input$sand_step2) &&
+                 !(input$sand_step2 == 33 && input$silt_step2 == 33 && input$clay_step2 == 34)
+      updateRadioButtons(session, "texture_input_type", selected = if (has_pct) "pct" else "class")
+    }
+
+    sync_step3_to_hidden <- function() {
+      # Location
+      if (!is.null(input$street_step3)) updateTextInput(session, "street", value = input$street_step3)
+      if (!is.null(input$zipcode_step3)) updateTextInput(session, "zipcode", value = input$zipcode_step3)
+      if (!is.null(input$city_step3)) updateTextInput(session, "city", value = input$city_step3)
+      if (!is.null(input$state_step3)) updateSelectInput(session, "state", selected = input$state_step3)
+      if (!is.null(input$lat_step3)) updateNumericInput(session, "latitude", value = input$lat_step3)
+      if (!is.null(input$lon_step3)) updateNumericInput(session, "longitude", value = input$lon_step3)
+      # Additional
+      if (!is.null(input$date_step3)) updateDateInput(session, "date", value = input$date_step3)
+      if (!is.null(input$notes_step3)) updateTextAreaInput(session, "notes", value = input$notes_step3)
+    }
+
+    # --- Texture class dropdown (step 2) ---
+    observe({
+      updateSelectInput(session, "texture_class_step2", choices = soil_texture_classes$Texture,
+                        selected = isolate(input$texture_class))
     })
 
     # --- PDF Upload Section (conditional on API key) ---
@@ -431,7 +672,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
 
       removeModal()
-      showNotification("Soil data applied! Now select species and submit.",
+      wizard_step(2L)  # Auto-advance to review step
+      showNotification("Soil data applied! Review values below, then continue to add plants.",
                        type = "message", duration = 4)
     })
 
@@ -482,9 +724,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
-      # Fill location fields
+      # Fill location fields (both hidden and step 3 visible)
       updateTextInput(session, "zipcode", value = prefs$home_zipcode)
+      updateTextInput(session, "zipcode_step3", value = prefs$home_zipcode)
       updateTextInput(session, "city", value = prefs$home_city %||% "")
+      updateTextInput(session, "city_step3", value = prefs$home_city %||% "")
 
       # Convert state abbreviation to full name for the select input
       state_abbrevs <- c(
@@ -503,14 +747,17 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       state_full <- state_abbrevs[prefs$home_state] %||% prefs$home_state
       if (!is.null(state_full)) {
         updateSelectInput(session, "state", selected = state_full)
+        updateSelectInput(session, "state_step3", selected = state_full)
       }
 
-      # Fill coordinates
+      # Fill coordinates (both hidden and step 3 visible)
       if (!is.null(prefs$home_lat) && !is.na(prefs$home_lat)) {
         updateNumericInput(session, "latitude", value = round(prefs$home_lat, 6))
+        updateNumericInput(session, "lat_step3", value = round(prefs$home_lat, 6))
       }
       if (!is.null(prefs$home_long) && !is.na(prefs$home_long)) {
         updateNumericInput(session, "longitude", value = round(prefs$home_long, 6))
+        updateNumericInput(session, "lon_step3", value = round(prefs$home_long, 6))
       }
 
       # Update location status
@@ -883,7 +1130,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           )
         }
 
-        showNotification("Data extracted! Please review values before submitting.", type = "message", duration = 5)
+        wizard_step(2L)  # Auto-advance to review step
+        showNotification("Data extracted! Review values below, then continue to add plants.", type = "message", duration = 5)
 
       } else {
         # Log full error for debugging
@@ -1338,10 +1586,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           is_approximate <- TRUE
         }
 
-        # Update coordinates
+        # Update coordinates (both hidden and step 3 visible)
         if (!is.null(final_lat)) {
           updateNumericInput(session, "latitude", value = round(final_lat, 6))
           updateNumericInput(session, "longitude", value = round(final_lon, 6))
+          updateNumericInput(session, "lat_step3", value = round(final_lat, 6))
+          updateNumericInput(session, "lon_step3", value = round(final_lon, 6))
 
           # Lookup ecoregion
           eco <- tryCatch(lookup_ecoregion(final_lat, final_lon),
@@ -1386,6 +1636,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         if (!is.na(zip_result$latitude) && !is.na(zip_result$longitude)) {
           updateNumericInput(session, "latitude", value = round(zip_result$latitude, 6))
           updateNumericInput(session, "longitude", value = round(zip_result$longitude, 6))
+          updateNumericInput(session, "lat_step3", value = round(zip_result$latitude, 6))
+          updateNumericInput(session, "lon_step3", value = round(zip_result$longitude, 6))
 
           output$location_status <- renderUI({
             div(class = "text-success",
@@ -1426,12 +1678,14 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
-      # Auto-fill city and state immediately
+      # Auto-fill city and state immediately (both hidden and step 3 visible)
       state_full <- state.name[match(zip_result$state, state.abb)]
       if (is.na(state_full)) state_full <- zip_result$state
 
       updateTextInput(session, "city", value = zip_result$city)
       updateSelectInput(session, "state", selected = state_full)
+      updateTextInput(session, "city_step3", value = zip_result$city)
+      updateSelectInput(session, "state_step3", selected = state_full)
       cached_zip_result(zip_result)
 
       # Show spinner
@@ -1470,6 +1724,26 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       later::later(function() {
         do_geocode(zip_result, zip_clean, street)
       }, delay = 0.1)
+    }, ignoreInit = TRUE)
+
+    # --- Sync step 3 location inputs to hidden inputs (triggers existing geocoding) ---
+    observeEvent(input$zipcode_step3, {
+      updateTextInput(session, "zipcode", value = input$zipcode_step3)
+    }, ignoreInit = TRUE)
+    observeEvent(input$street_step3, {
+      updateTextInput(session, "street", value = input$street_step3)
+    }, ignoreInit = TRUE)
+    observeEvent(input$city_step3, {
+      updateTextInput(session, "city", value = input$city_step3)
+    }, ignoreInit = TRUE)
+    observeEvent(input$state_step3, {
+      updateSelectInput(session, "state", selected = input$state_step3)
+    }, ignoreInit = TRUE)
+    observeEvent(input$lat_step3, {
+      updateNumericInput(session, "latitude", value = input$lat_step3)
+    }, ignoreInit = TRUE)
+    observeEvent(input$lon_step3, {
+      updateNumericInput(session, "longitude", value = input$lon_step3)
     }, ignoreInit = TRUE)
 
     # --- Submit sample ---
@@ -1644,12 +1918,19 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         if (has_manual) {
           updateSelectizeInput(session, "species", selected = character(0))
         }
+
+        # Reset wizard to step 1
+        wizard_step(1L)
       } else {
         showNotification("Error adding samples. Please try again.", type = "error")
       }
     }
 
     observeEvent(input$submit, {
+      # Sync step 2 and step 3 fields to hidden inputs before validation
+      sync_step2_to_hidden()
+      sync_step3_to_hidden()
+
       u <- current_user()
       if (is.null(u)) {
         showNotification("Please sign in to submit data.", type = "error")

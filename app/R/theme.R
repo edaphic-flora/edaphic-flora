@@ -1009,6 +1009,11 @@ edaphic_css <- function() {
       padding: 0.3em 0.6em;
     }
 
+    /* Wizard step indicator */
+    .wizard-steps {
+      padding: 0 0.25rem;
+    }
+
     /* Early Access banner */
     .early-access-banner {
       background: linear-gradient(135deg, rgba(211, 155, 53, 0.08) 0%, rgba(211, 155, 53, 0.04) 100%);
