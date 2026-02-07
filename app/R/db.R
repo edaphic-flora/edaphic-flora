@@ -641,3 +641,70 @@ db_get_site_stats <- function(pool) {
          meets_site_threshold = FALSE)
   })
 }
+
+# ---------------------------
+# Nearby Samples Query
+# ---------------------------
+
+#' Get soil samples near a given location
+#' Uses bounding box pre-filter in SQL, then Haversine post-filter in R.
+#' @param lat Latitude (degrees)
+#' @param lon Longitude (degrees)
+#' @param radius_miles Search radius in miles (default 10, max 50)
+#' @param pool Database connection pool
+#' @param exclude_user_id Optional user ID to exclude own samples
+#' @return Data frame of matching samples with distance_miles column
+db_get_nearby_samples <- function(lat, lon, radius_miles = DEFAULT_NEIGHBOR_RADIUS_MILES, pool, exclude_user_id = NULL) {
+  if (is.null(lat) || is.null(lon) || is.na(lat) || is.na(lon)) return(data.frame())
+  radius_miles <- min(radius_miles, MAX_NEIGHBOR_RADIUS_MILES)
+
+  # Bounding box approximation: 1 degree latitude ~ 69 miles
+  # 1 degree longitude varies by latitude, using conservative estimate
+  lat_delta <- radius_miles / 69.0
+  lon_delta <- radius_miles / (69.0 * cos(lat * pi / 180))
+
+  lat_min <- lat - lat_delta
+  lat_max <- lat + lat_delta
+  lon_min <- lon - lon_delta
+  lon_max <- lon + lon_delta
+
+  tryCatch({
+    # Bounding box pre-filter in SQL
+    if (!is.null(exclude_user_id) && nzchar(exclude_user_id)) {
+      query <- "
+        SELECT *
+        FROM soil_samples
+        WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
+          AND location_lat BETWEEN $1 AND $2
+          AND location_long BETWEEN $3 AND $4
+          AND (created_by IS NULL OR created_by != $5)
+      "
+      result <- dbGetQuery(pool, query, params = list(lat_min, lat_max, lon_min, lon_max, exclude_user_id))
+    } else {
+      query <- "
+        SELECT *
+        FROM soil_samples
+        WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
+          AND location_lat BETWEEN $1 AND $2
+          AND location_long BETWEEN $3 AND $4
+      "
+      result <- dbGetQuery(pool, query, params = list(lat_min, lat_max, lon_min, lon_max))
+    }
+
+    if (nrow(result) == 0) return(data.frame())
+
+    # Haversine post-filter in R
+    result$distance_miles <- mapply(
+      function(r_lat, r_lon) haversine_miles(lat, lon, r_lat, r_lon),
+      result$location_lat, result$location_long
+    )
+
+    # Filter by actual distance and sort
+    result <- result[result$distance_miles <= radius_miles, ]
+    result <- result[order(result$distance_miles), ]
+    result
+  }, error = function(e) {
+    message("Error getting nearby samples: ", e$message)
+    data.frame()
+  })
+}
