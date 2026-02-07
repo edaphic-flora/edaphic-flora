@@ -14,6 +14,10 @@ MIN_SAMPLES_FOR_PUBLIC_STATS <- 5L
 MIN_CONTRIBUTORS_FOR_PUBLIC_STATS <- 2L
 MIN_TOTAL_SAMPLES_FOR_SITE_STATS <- 20L
 
+# Neighbor soil query radius defaults
+DEFAULT_NEIGHBOR_RADIUS_MILES <- 10
+MAX_NEIGHBOR_RADIUS_MILES <- 50
+
 # Experience mode field definitions
 # Casual mode shows these fields only; everything else is hidden
 CASUAL_FIELDS <- c("ph", "organic_matter", "organic_matter_class",
@@ -350,5 +354,98 @@ parse_plant_list <- function(file_path, species_db, max_rows = 100) {
     valid = df[valid_species_mask, , drop = FALSE],
     invalid = df$species[!valid_species_mask],
     error = NULL
+  )
+}
+
+# ---------------------------
+# Geospatial Utilities
+# ---------------------------
+
+#' Calculate Haversine distance between two points in miles
+#' @param lat1 Latitude of point 1 (degrees)
+#' @param lon1 Longitude of point 1 (degrees)
+#' @param lat2 Latitude of point 2 (degrees)
+#' @param lon2 Longitude of point 2 (degrees)
+#' @return Distance in miles
+haversine_miles <- function(lat1, lon1, lat2, lon2) {
+  R <- 3958.8  # Earth's radius in miles
+  to_rad <- pi / 180
+
+  dlat <- (lat2 - lat1) * to_rad
+  dlon <- (lon2 - lon1) * to_rad
+  lat1_r <- lat1 * to_rad
+  lat2_r <- lat2 * to_rad
+
+  a <- sin(dlat / 2)^2 + cos(lat1_r) * cos(lat2_r) * sin(dlon / 2)^2
+  c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+  R * c
+}
+
+#' Calculate aggregate neighbor soil profile from nearby samples
+#' @param nearby_df Data frame of nearby soil samples (from db_get_nearby_samples)
+#' @return List with has_data, n_samples, n_contributors, soil_profile, successful_plants, status
+calc_neighbor_profile <- function(nearby_df) {
+  if (is.null(nearby_df) || nrow(nearby_df) == 0) {
+    return(list(has_data = FALSE, n_samples = 0L, n_contributors = 0L,
+                soil_profile = NULL, successful_plants = NULL, status = "no_data"))
+  }
+
+  n_samples <- nrow(nearby_df)
+  n_contributors <- length(unique(nearby_df$created_by[!is.na(nearby_df$created_by)]))
+
+  # Check gating thresholds
+  if (n_samples < MIN_SAMPLES_FOR_PUBLIC_STATS || n_contributors < MIN_CONTRIBUTORS_FOR_PUBLIC_STATS) {
+    return(list(has_data = TRUE, n_samples = n_samples, n_contributors = n_contributors,
+                soil_profile = NULL, successful_plants = NULL, status = "early_access"))
+  }
+
+  # Build soil profile using medians for robustness
+  safe_median <- function(x) if (all(is.na(x))) NA_real_ else median(x, na.rm = TRUE)
+
+  soil_profile <- list(
+    ph = safe_median(nearby_df$ph),
+    om = safe_median(nearby_df$organic_matter),
+    nitrate = safe_median(nearby_df$nitrate_ppm),
+    phosphorus = safe_median(nearby_df$phosphorus_ppm),
+    potassium = safe_median(nearby_df$potassium_ppm),
+    calcium = safe_median(nearby_df$calcium_ppm),
+    magnesium = safe_median(nearby_df$magnesium_ppm)
+  )
+
+  # Mode texture class
+  texture_vals <- nearby_df$texture_class[!is.na(nearby_df$texture_class) & nzchar(nearby_df$texture_class)]
+  if (length(texture_vals) > 0) {
+    soil_profile$texture <- names(sort(table(texture_vals), decreasing = TRUE))[1]
+  }
+
+  # Successful plants with outcome counts
+  if ("outcome" %in% names(nearby_df) && "species" %in% names(nearby_df)) {
+    sp_outcomes <- nearby_df[!is.na(nearby_df$species) & !is.na(nearby_df$outcome), c("species", "outcome")]
+    if (nrow(sp_outcomes) > 0) {
+      successful <- sp_outcomes[sp_outcomes$outcome %in% c("Thriving", "Established"), ]
+      if (nrow(successful) > 0) {
+        sp_counts <- sort(table(successful$species), decreasing = TRUE)
+        successful_plants <- data.frame(
+          species = names(sp_counts),
+          success_count = as.integer(sp_counts),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        successful_plants <- data.frame(species = character(), success_count = integer(), stringsAsFactors = FALSE)
+      }
+    } else {
+      successful_plants <- data.frame(species = character(), success_count = integer(), stringsAsFactors = FALSE)
+    }
+  } else {
+    successful_plants <- data.frame(species = character(), success_count = integer(), stringsAsFactors = FALSE)
+  }
+
+  list(
+    has_data = TRUE,
+    n_samples = n_samples,
+    n_contributors = n_contributors,
+    soil_profile = soil_profile,
+    successful_plants = successful_plants,
+    status = "ready"
   )
 }
