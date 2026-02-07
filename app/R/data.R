@@ -211,32 +211,33 @@ load_common_name_index <- function(pool) {
 #' @param common_name_db Common name index (from load_common_name_index)
 #' @return Named character vector: names=labels, values=scientific names
 build_species_search_index <- function(species_db, common_name_db) {
-  # Start with all species from WCVP
   all_species <- sort(unique(species_db$taxon_name))
 
-  # Build a lookup from scientific name -> common name
-  cn_lookup <- stats::setNames(common_name_db$common_name, common_name_db$scientific_name)
+  if (is.null(common_name_db) || nrow(common_name_db) == 0) {
+    return(stats::setNames(all_species, all_species))
+  }
 
-  # For species with common names, build "Common Name (Scientific Name)" labels
-  # For species without, just use the scientific name as label
-  labels <- vapply(all_species, function(sp) {
-    # Try exact match first
-    cn <- cn_lookup[sp]
-    if (!is.na(cn) && nzchar(cn)) {
-      paste0(tools::toTitleCase(tolower(cn)), " (", sp, ")")
-    } else {
-      # Try genus-species match (first two words)
-      gs <- paste(head(strsplit(sp, " ")[[1]], 2), collapse = " ")
-      cn2 <- cn_lookup[gs]
-      if (!is.na(cn2) && nzchar(cn2)) {
-        paste0(tools::toTitleCase(tolower(cn2)), " (", sp, ")")
-      } else {
-        sp
-      }
-    }
-  }, character(1), USE.NAMES = FALSE)
+  # Build lookup: scientific name -> common name (title-cased, pre-computed)
+  cn_names <- tools::toTitleCase(tolower(common_name_db$common_name))
+  cn_lookup <- stats::setNames(cn_names, common_name_db$scientific_name)
 
-  # Named vector: names are display labels, values are scientific names
+  # Vectorized exact match
+  exact_cn <- cn_lookup[all_species]
+
+  # Genus-species fallback for unmatched: extract first two words
+  needs_fallback <- is.na(exact_cn) | !nzchar(exact_cn)
+  if (any(needs_fallback)) {
+    gs <- sub("^(\\S+\\s+\\S+).*", "\\1", all_species[needs_fallback])
+    fallback_cn <- cn_lookup[gs]
+    found <- !is.na(fallback_cn) & nzchar(fallback_cn)
+    exact_cn[needs_fallback][found] <- fallback_cn[found]
+  }
+
+  # Build labels: "Common Name (Scientific Name)" or just scientific name
+  has_cn <- !is.na(exact_cn) & nzchar(exact_cn)
+  labels <- all_species
+  labels[has_cn] <- paste0(exact_cn[has_cn], " (", all_species[has_cn], ")")
+
   stats::setNames(all_species, labels)
 }
 
