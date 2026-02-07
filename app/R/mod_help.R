@@ -24,6 +24,58 @@ helpUI <- function(id) {
           card_body(
             class = "px-md-5",
 
+            h4("How to Get a Soil Test", id = "guide-soil-testing"),
+            p("Edaphic Flora requires data from a certified soil testing laboratory. Lab tests use precise chemical ",
+              "extractions and calibrated instruments that home test kits and DIY probes simply cannot match. ",
+              "Without lab-grade accuracy, comparisons across sites and contributors are unreliable. ",
+              "Most state cooperative extension offices offer free or low-cost soil testing."),
+
+            tags$ol(
+              tags$li(
+                tags$strong("Find a lab"),
+                p(class = "mb-1",
+                  "Your best option is usually your state\u2019s ",
+                  tags$a(href = "https://www.nifa.usda.gov/grants/programs/cooperative-extension-system",
+                         target = "_blank", "cooperative extension service"),
+                  ", which offers subsidized testing tailored to your region. Commercial labs such as ",
+                  tags$a(href = "https://loganlabs.com/", target = "_blank", "Logan Labs"),
+                  " and the ",
+                  tags$a(href = "https://soilhealthlab.cals.cornell.edu/", target = "_blank", "Cornell Soil Health Lab"),
+                  " are also excellent choices.")
+              ),
+              tags$li(
+                tags$strong("Collect your sample"),
+                p(class = "mb-1",
+                  "Take 6\u201310 sub-samples from the area around your plant(s), each from the top 6\u20138 inches of soil. ",
+                  "Mix them thoroughly in a clean bucket to create one composite sample. Avoid sampling right after ",
+                  "fertilizing or heavy rain.")
+              ),
+              tags$li(
+                tags$strong("Prepare and ship"),
+                p(class = "mb-1",
+                  "Air-dry the composite sample (spread it on newspaper for 24\u201348 hours), then bag about 2 cups ",
+                  "and mail it to the lab with their submission form. Most labs return results within 1\u20132 weeks.")
+              ),
+              tags$li(
+                tags$strong("Record your results"),
+                p(class = "mb-1",
+                  "Upload your lab report PDF in the Data Entry tab, or enter the values manually. ",
+                  "The app will extract pH, nutrients, organic matter, and texture data automatically from most lab formats.")
+              )
+            ),
+
+            div(class = "p-3 bg-light rounded border-start border-3",
+                style = "border-color: #7A9A86 !important;",
+                tags$strong(icon("building-columns"), " Find a Lab Near You"),
+                p(class = "text-muted mb-0 mt-1",
+                  "The USDA Cooperative Extension System has offices in nearly every county. ",
+                  tags$a(href = "https://www.nifa.usda.gov/land-grant-colleges-and-universities-partner-website-directory",
+                         target = "_blank", "Find your state\u2019s extension service \u2192"),
+                  " They can recommend labs, help interpret results, and provide local growing advice.")
+            ),
+
+            hr(),
+
             h4("Soil Properties", id = "guide-soil-properties"),
             tags$dl(class = "row",
               tags$dt(class = "col-sm-3", "Soil pH"),
@@ -155,11 +207,11 @@ helpUI <- function(id) {
 
             h5("Where should my soil test come from?"),
             p(class = "text-muted mb-4",
-              "Use results from a professional soil testing lab (",
+              "Use results from a certified soil testing laboratory (",
               tags$a(href = "https://www.nifa.usda.gov/grants/programs/cooperative-extension-system", target = "_blank", "university extension services"),
-              ", commercial labs) or a reliable home soil test kit. For best results, collect samples from the root zone of the plants you're recording. ",
-              "See the ", tags$a(href = "https://soilhealthlab.cals.cornell.edu/", target = "_blank", "Cornell Soil Health Lab"),
-              " for detailed sampling guidance."),
+              ", commercial labs like Logan Labs or Cornell). Home test kits and DIY probes lack the accuracy needed for ",
+              "meaningful cross-site comparisons. For best results, collect samples from the root zone of the plants you're recording. ",
+              "See the Field Guide section above for step-by-step soil sampling guidance."),
 
             h5("Can I submit data for plants that died or failed?"),
             p(class = "text-muted mb-4",
@@ -255,6 +307,75 @@ helpUI <- function(id) {
               tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Feedback", "Send Feedback"),
               span(class = "mx-2", "|"),
               tags$a(href = "https://buymeacoffee.com/toddtesterman", target = "_blank", "Support")
+            )
+          )
+        )
+      )
+    ),
+
+    # Caveats & Limitations
+    nav_panel(
+      title = "Caveats & Limitations",
+      icon = icon("triangle-exclamation"),
+      layout_columns(
+        col_widths = 12,
+        card(
+          card_header(icon("triangle-exclamation"), "Caveats & Limitations"),
+          card_body(
+            class = "px-md-5",
+
+            p(class = "lead",
+              "Edaphic Flora is a tool for exploration, not prescription. It reveals patterns in real-world soil data, ",
+              "but those patterns come with important limitations you should understand before acting on them."),
+
+            h4(class = "mt-4", "Soil Is One Factor Among Many"),
+            p("A plant\u2019s success depends on far more than soil chemistry. Microclimate, drainage, root competition from ",
+              "neighboring plants, maintenance history, pest and disease pressure, mycorrhizal associations, and dozens of ",
+              "other factors all play a role. Two sites with identical soil test results can produce very different outcomes ",
+              "for the same species. Soil data is a valuable piece of the puzzle, but never the whole picture."),
+
+            h4(class = "mt-4", "Sample Size Limitations"),
+            p("Many species in the database have only a handful of soil samples. With small sample sizes, a single unusual ",
+              "observation can skew averages and ranges significantly. Patterns that appear strong with 3\u20135 samples may ",
+              "disappear or reverse with 50. The app flags species with limited data as \u201cEarly Access\u201d and requires ",
+              "minimum sample counts before displaying public statistics, but even these thresholds are conservative. ",
+              "Treat small-sample results as preliminary observations, not established ranges."),
+
+            h4(class = "mt-4", "Geographic and Contributor Bias"),
+            p("Crowdsourced data reflects where contributors live and garden. If most samples for a species come from one ",
+              "region, the data will reflect that region\u2019s soil conditions\u2014not the full range of soils where the species ",
+              "can thrive. A species showing a narrow pH range in the database may simply mean that most contributors ",
+              "garden in similar soils, not that the species has narrow pH tolerance. As the dataset grows and diversifies, ",
+              "these biases will diminish."),
+
+            h4(class = "mt-4", "Temporal Variation"),
+            p("Soil chemistry is not static. pH, nutrient levels, and organic matter fluctuate with the seasons, ",
+              "rainfall patterns, amendment history, and even microbial activity. A soil test captures a snapshot in time. ",
+              "A sample taken in spring after snowmelt may look very different from one taken in late summer. ",
+              "When comparing samples, keep in mind that timing matters."),
+
+            h4(class = "mt-4", "Correlation Is Not Causation"),
+            p("If thriving specimens of a species tend to appear in high-calcium soils, that does not mean calcium is driving ",
+              "success. High-calcium soils are often alkaline, well-drained limestone-derived soils with their own suite of ",
+              "characteristics. The species may be responding to pH, drainage, or soil structure rather than calcium itself. ",
+              "The app shows correlations in the data\u2014interpreting the underlying mechanisms requires agronomic knowledge ",
+              "and, ideally, controlled experiments."),
+
+            h4(class = "mt-4", "Responsible Use"),
+            div(class = "p-3 bg-light rounded border-start border-3",
+                style = "border-color: #D39B35 !important;",
+                tags$ul(class = "mb-0",
+                  tags$li("This tool is ", tags$strong("not a substitute for professional advice"), ". For high-stakes ",
+                          "decisions (restoration projects, commercial plantings, land management), consult a soil scientist, ",
+                          "agronomist, or your local cooperative extension."),
+                  tags$li(class = "mt-2",
+                          tags$strong("Always check invasive species lists"), " before planting. A species that thrives in your soil ",
+                          "conditions may be invasive in your state. The app shows invasive status badges where data is available, ",
+                          "but coverage is not exhaustive."),
+                  tags$li(class = "mt-2",
+                          tags$strong("Prefer native species"), " whenever possible. Native plants support local ecosystems, ",
+                          "pollinators, and wildlife in ways that non-natives cannot replicate.")
+                )
             )
           )
         )

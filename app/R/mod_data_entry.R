@@ -220,22 +220,44 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       switch(as.character(step),
         # Step 1: Soil Source
         "1" = tagList(
-          h6(class = "fw-bold mb-3", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;",
-             "How would you like to enter soil data?"),
+          # Lab test confirmation gate
+          div(class = "mb-3 p-3 border rounded",
+              style = "background-color: #F7F4E8; border-color: #D39B35 !important;",
+              checkboxInput(ns("lab_test_confirm"),
+                            tags$span(style = "font-weight: 600; font-family: 'Montserrat', sans-serif; white-space: nowrap;",
+                                      "I confirm this data comes from a certified soil testing laboratory"),
+                            value = FALSE),
+              tags$small(class = "text-muted d-block mt-1",
+                         "Most state ",
+                         tags$a(href = "https://www.nifa.usda.gov/grants/programs/cooperative-extension-system",
+                                target = "_blank", "cooperative extension"),
+                         " offices offer free or low-cost soil testing. Home test kits lack the accuracy needed for meaningful comparisons. ",
+                         actionLink(ns("link_to_field_guide"), "See our soil testing guide",
+                                    style = "color: #7A9A86; font-weight: 500;"),
+                         ".")
+          ),
 
-          # Option 1: Upload soil report
-          uiOutput(ns("pdf_upload_section")),
+          # Entry options (greyed out until lab test confirmed)
+          div(id = ns("entry_options_wrapper"),
+              style = "opacity: 0.5; pointer-events: none;",
 
-          # Option 2: Reuse previous soil data
-          uiOutput(ns("reuse_soil_section")),
+              h6(class = "fw-bold mb-3", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;",
+                 "How would you like to enter soil data?"),
 
-          # Option 3: Enter manually
-          actionButton(ns("enter_manually"), "Enter Manually",
-                       class = "btn-outline-primary w-100 mb-2",
-                       icon = icon("keyboard")),
+              # Option 1: Upload soil report
+              uiOutput(ns("pdf_upload_section")),
 
-          tags$small(class = "text-muted d-block text-center",
-                     "You can also skip ahead if you already have data ready.")
+              # Option 2: Reuse previous soil data
+              uiOutput(ns("reuse_soil_section")),
+
+              # Option 3: Enter manually
+              actionButton(ns("enter_manually"), "Enter Manually",
+                           class = "btn-outline-primary w-100 mb-2",
+                           icon = icon("keyboard")),
+
+              tags$small(class = "text-muted d-block text-center",
+                         "You can also skip ahead if you already have data ready.")
+          )
         ),
 
         # Step 2: Review Soil Data
@@ -446,6 +468,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     observeEvent(input$wizard_next, {
       current <- wizard_step()
       if (current < 3) {
+        # Guard: require lab test confirmation before leaving step 1
+        if (current == 1 && !isTRUE(input$lab_test_confirm)) {
+          showNotification("Please confirm your data comes from a certified lab.", type = "warning")
+          return()
+        }
         # Sync step 2 fields to hidden inputs before advancing
         if (current == 2) sync_step2_to_hidden()
         wizard_step(current + 1L)
@@ -463,8 +490,36 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
     })
 
+    # --- Lab test confirmation toggle ---
+    observeEvent(input$lab_test_confirm, {
+      confirmed <- isTRUE(input$lab_test_confirm)
+      if (confirmed) {
+        shinyjs::runjs(sprintf(
+          "document.getElementById('%s').style.opacity = '1'; document.getElementById('%s').style.pointerEvents = 'auto';",
+          session$ns("entry_options_wrapper"), session$ns("entry_options_wrapper")
+        ))
+      } else {
+        shinyjs::runjs(sprintf(
+          "document.getElementById('%s').style.opacity = '0.5'; document.getElementById('%s').style.pointerEvents = 'none';",
+          session$ns("entry_options_wrapper"), session$ns("entry_options_wrapper")
+        ))
+      }
+    })
+
+    # Field Guide link handler
+    observeEvent(input$link_to_field_guide, {
+      showNotification(
+        "Check Help > Field Guide for soil testing guidance.",
+        type = "message", duration = 5
+      )
+    })
+
     # Enter manually -> go to step 2
     observeEvent(input$enter_manually, {
+      if (!isTRUE(input$lab_test_confirm)) {
+        showNotification("Please confirm your data comes from a certified lab.", type = "warning")
+        return()
+      }
       wizard_step(2L)
     })
 
@@ -602,6 +657,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
     # Apply selected soil data to form
     observeEvent(input$apply_reuse, {
+      # Guard: require lab test confirmation
+      if (!isTRUE(input$lab_test_confirm)) {
+        showNotification("Please confirm your data comes from a certified lab.", type = "warning")
+        return()
+      }
+
       selected_id <- as.integer(input$reuse_profile_choice)
       soil_data <- db_get_soil_data_by_id(selected_id)
 
@@ -1190,6 +1251,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           )
         }
 
+        # Guard: require lab test confirmation before advancing
+        if (!isTRUE(input$lab_test_confirm)) {
+          showNotification("Please confirm your data comes from a certified lab before continuing.", type = "warning")
+          return()
+        }
         wizard_step(2L)  # Auto-advance to review step
         showNotification("Data extracted! Review values below, then continue to add plants.", type = "message", duration = 5)
 
