@@ -218,6 +218,20 @@ base_ui <- page_navbar(
        .navbar .form-group {
          margin-bottom: 0 !important;
        }
+       /* Pro toggle styling */
+       #pro_mode_toggle:checked {
+         background-color: #D39B35 !important;
+         border-color: #D39B35 !important;
+       }
+     ")),
+     tags$script(HTML("
+       // Pro toggle: bind to Shiny input and handle server-sent updates
+       $(document).on('change', '#pro_mode_toggle', function() {
+         Shiny.setInputValue('pro_mode_toggle', this.checked, {priority: 'event'});
+       });
+       Shiny.addCustomMessageHandler('updateProToggle', function(is_pro) {
+         $('#pro_mode_toggle').prop('checked', is_pro);
+       });
      "))
    )
  ),
@@ -250,6 +264,18 @@ base_ui <- page_navbar(
  # Dev environment indicator
  if (is_dev) nav_item(
    tags$span(class = "badge bg-warning text-dark me-2", "DEV")
+ ),
+ # Pro mode toggle
+ nav_item(
+   div(class = "d-flex align-items-center me-2",
+       style = "background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 6px;",
+       tags$span(class = "text-light me-2", style = "font-weight: 500; font-size: 0.85rem;",
+                 "Pro"),
+       div(class = "form-check form-switch mb-0",
+           style = "padding-left: 2.5em;",
+           tags$input(type = "checkbox", class = "form-check-input", id = "pro_mode_toggle",
+                      role = "switch", style = "cursor: pointer;"))
+   )
  ),
  # Zip code input for home location
  nav_item(
@@ -517,6 +543,33 @@ server_inner <- function(input, output, session) {
    db_get_user_prefs(u$user_uid, pool)
  })
 
+ # --- Experience Level (Pro toggle) ---
+ experience_level <- reactiveVal("casual")
+
+ # Pre-populate Pro toggle from saved preferences
+ observe({
+   prefs <- user_prefs()
+   if (!is.null(prefs) && !is.null(prefs$experience_level)) {
+     experience_level(prefs$experience_level)
+     # Update the toggle switch
+     is_pro <- prefs$experience_level == "enthusiast"
+     session$sendCustomMessage("updateProToggle", is_pro)
+   }
+ })
+
+ # Handle Pro toggle change
+ observeEvent(input$pro_mode_toggle, {
+   is_pro <- isTRUE(input$pro_mode_toggle)
+   new_level <- if (is_pro) "enthusiast" else "casual"
+   experience_level(new_level)
+
+   u <- current_user()
+   if (!is.null(u)) {
+     db_set_experience_level(u$user_uid, new_level, pool)
+     prefs_changed(prefs_changed() + 1)
+   }
+ }, ignoreInit = TRUE)
+
  # Pre-populate zip code from saved preferences
  observe({
    prefs <- user_prefs()
@@ -602,7 +655,8 @@ server_inner <- function(input, output, session) {
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
                  current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit,
-                 BETA_FEATURES, user_prefs, species_search_index, common_name_db)
+                 BETA_FEATURES, user_prefs, species_search_index, common_name_db,
+                 experience_level)
 
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,
