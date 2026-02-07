@@ -94,7 +94,7 @@ dataEntryUI <- function(id) {
       # --- My Data Section (hidden by default, shown via link or after submit) ---
       shinyjs::hidden(
         div(id = ns("my_data_section"),
-            style = "margin-left: -1rem; margin-right: -1rem; max-width: none;",
+            style = "width: 100vw; max-width: 1400px; position: relative; left: 50%; transform: translateX(-50%);",
           div(class = "card",
             div(class = "card-header d-flex justify-content-between align-items-center",
                 span(icon("database"), " My Data"),
