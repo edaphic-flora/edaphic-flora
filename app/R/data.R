@@ -185,11 +185,18 @@ lookup_zipcode <- function(zipcode, zipcode_db) {
 #' @return Data frame with scientific_name and common_name columns
 load_common_name_index <- function(pool) {
   tryCatch({
+    # Use DISTINCT ON genus-species, preferring species-level records over varieties/subspecies
     res <- DBI::dbGetQuery(pool, "
-      SELECT t.scientific_name, r.common_name
-      FROM ref_taxon t
-      JOIN ref_usda_traits r ON r.taxon_id = t.id
-      WHERE r.common_name IS NOT NULL AND r.common_name != ''
+      SELECT DISTINCT ON (genus_species) scientific_name, common_name
+      FROM (
+        SELECT t.scientific_name, r.common_name,
+               split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2) AS genus_species,
+               CASE WHEN t.scientific_name !~ ' (var|ssp|subsp|f)\\.? ' THEN 0 ELSE 1 END AS rank_order
+        FROM ref_taxon t
+        JOIN ref_usda_traits r ON r.taxon_id = t.id
+        WHERE r.common_name IS NOT NULL AND r.common_name != ''
+      ) sub
+      ORDER BY genus_species, rank_order, scientific_name
     ")
     if (nrow(res) > 0) {
       message(sprintf("Loaded %d common name mappings", nrow(res)))
