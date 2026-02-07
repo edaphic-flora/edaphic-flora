@@ -1412,17 +1412,20 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
       # Format species with italics; casual users get "Common Name (Scientific)"
       is_casual <- !is.null(experience_level) && identical(experience_level(), "casual")
+      # Build genus-species keyed lookup (common_name_db stores full author citations)
+      cn_lookup <- NULL
+      if (is_casual && !is.null(common_name_db) && nrow(common_name_db) > 0) {
+        gs_keys <- vapply(strsplit(common_name_db$scientific_name, " "), function(x) {
+          paste(head(x, 2), collapse = " ")
+        }, character(1))
+        cn_lookup <- stats::setNames(common_name_db$common_name, gs_keys)
+        cn_lookup <- cn_lookup[!duplicated(names(cn_lookup))]
+      }
       format_species <- function(sp) {
         if (is.na(sp) || sp == "") return("-")
         italic_name <- sprintf("<em>%s</em>", htmltools::htmlEscape(sp))
-        if (is_casual && !is.null(common_name_db) && nrow(common_name_db) > 0) {
-          idx <- match(sp, common_name_db$scientific_name)
-          cn <- if (!is.na(idx)) common_name_db$common_name[idx] else NA_character_
-          if (is.na(cn) || !nzchar(cn)) {
-            gs <- paste(head(strsplit(sp, " ")[[1]], 2), collapse = " ")
-            idx2 <- match(gs, common_name_db$scientific_name)
-            cn <- if (!is.na(idx2)) common_name_db$common_name[idx2] else NA_character_
-          }
+        if (!is.null(cn_lookup)) {
+          cn <- cn_lookup[sp]
           if (!is.na(cn) && nzchar(cn)) {
             return(sprintf("%s (%s)", htmltools::htmlEscape(tools::toTitleCase(tolower(cn))), italic_name))
           }
