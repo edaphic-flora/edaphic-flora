@@ -1410,6 +1410,26 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         sprintf('<span class="outcome-badge %s">%s</span>', badge_class, outcome)
       }
 
+      # Format species with italics; casual users get "Common Name (Scientific)"
+      is_casual <- !is.null(experience_level) && identical(experience_level(), "casual")
+      format_species <- function(sp) {
+        if (is.na(sp) || sp == "") return("-")
+        italic_name <- sprintf("<em>%s</em>", htmltools::htmlEscape(sp))
+        if (is_casual && !is.null(common_name_db) && nrow(common_name_db) > 0) {
+          idx <- match(sp, common_name_db$scientific_name)
+          cn <- if (!is.na(idx)) common_name_db$common_name[idx] else NA_character_
+          if (is.na(cn) || !nzchar(cn)) {
+            gs <- paste(head(strsplit(sp, " ")[[1]], 2), collapse = " ")
+            idx2 <- match(gs, common_name_db$scientific_name)
+            cn <- if (!is.na(idx2)) common_name_db$common_name[idx2] else NA_character_
+          }
+          if (!is.na(cn) && nzchar(cn)) {
+            return(sprintf("%s (%s)", htmltools::htmlEscape(tools::toTitleCase(tolower(cn))), italic_name))
+          }
+        }
+        italic_name
+      }
+
       display <- entries %>%
         mutate(
           Date = format(date, "%Y-%m-%d"),
@@ -1417,7 +1437,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           pH = ifelse(is.na(ph), "-", as.character(round(ph, 1))),
           OM = ifelse(is.na(organic_matter), "-", paste0(round(organic_matter, 1), "%")),
           Texture = ifelse(is.na(texture_class), "-", texture_class),
-          Cultivar = ifelse(is.na(cultivar) | cultivar == "", "-", cultivar)
+          Cultivar = ifelse(is.na(cultivar) | cultivar == "", "-", cultivar),
+          species = sapply(species, format_species)
         )
 
       # Add action buttons
