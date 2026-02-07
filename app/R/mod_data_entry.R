@@ -24,8 +24,16 @@ dataEntryUI <- function(id) {
         # Wizard content (step-specific form content)
         uiOutput(ns("wizard_content")),
 
-        # Wizard navigation buttons
-        uiOutput(ns("wizard_nav_buttons")),
+        # Wizard navigation buttons (static to avoid renderUI click-counter reset)
+        shinyjs::useShinyjs(),
+        div(class = "d-flex justify-content-between mt-3",
+            div(id = ns("wizard_back_container"), style = "display:none;",
+                actionButton(ns("wizard_back"), "Back", class = "btn-outline-secondary",
+                             icon = icon("arrow-left"))),
+            div(id = ns("wizard_next_container"), style = "display:none;",
+                actionButton(ns("wizard_next"), "Next", class = "btn-primary",
+                             icon = icon("arrow-right")))
+        ),
 
         # --- Hidden form fields (always in DOM so values persist across steps) ---
         # These are the actual inputs that hold form state. They're in hidden divs
@@ -35,7 +43,7 @@ dataEntryUI <- function(id) {
           numericInput(ns("ph"), "pH", value = NA, min = 0, max = 14, step = 0.1),
           numericInput(ns("organic_matter"), "OM", value = NA, min = 0, max = 100, step = 0.1),
           selectInput(ns("organic_matter_class"), "OM Class",
-                      choices = c("" = "", "Very Low", "Low", "Medium Low", "Medium",
+                      choices = c("", "Very Low", "Low", "Medium Low", "Medium",
                                   "Medium High", "High", "Very High")),
           numericInput(ns("cec"), "CEC", value = NA, min = 0, step = 0.1),
           numericInput(ns("soluble_salts"), "Salts", value = NA, min = 0),
@@ -152,6 +160,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     # State for batch plant upload
     plant_list_data <- reactiveVal(NULL)  # Parsed plant list from CSV upload
 
+    # Pending soil data for step 2 (from PDF extraction or soil reuse).
+    # Stores normalized values keyed by hidden input names so the step 2 renderUI
+    # can read them synchronously, avoiding the Shiny flush timing issue where
+    # updateNumericInput messages haven't round-tripped before renderUI fires.
+    pending_soil_data <- reactiveVal(NULL)
+
     # Wizard state
     wizard_step <- reactiveVal(1L)
 
@@ -226,7 +240,18 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         ),
 
         # Step 2: Review Soil Data
-        "2" = tagList(
+        "2" = {
+          # Helper: read from pending_soil_data (PDF/reuse) first, fall back to hidden inputs.
+          # This avoids the Shiny flush timing issue where updateNumericInput messages
+          # haven't round-tripped to the client before this renderUI fires.
+          psd <- isolate(pending_soil_data())
+          sv <- function(name) {
+            val <- psd[[name]]
+            if (!is.null(val) && !is.na(val)) return(val)
+            isolate(input[[name]])
+          }
+
+          tagList(
           h6(class = "fw-bold mb-2", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;",
              "Review Soil Data"),
           tags$small(class = "text-muted d-block mb-3",
@@ -235,14 +260,14 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           # Soil Properties (always shown)
           div(class = "mb-3",
               tags$label(class = "form-label", "Soil pH"),
-              numericInput(ns("ph_step2"), NULL, value = isolate(input$ph), min = 0, max = 14, step = 0.1),
+              numericInput(ns("ph_step2"), NULL, value = sv("ph"), min = 0, max = 14, step = 0.1),
               tags$label(class = "form-label", "Organic Matter (%)"),
-              numericInput(ns("om_step2"), NULL, value = isolate(input$organic_matter), min = 0, max = 100, step = 0.1),
+              numericInput(ns("om_step2"), NULL, value = sv("organic_matter"), min = 0, max = 100, step = 0.1),
               selectInput(ns("om_class_step2"), "Organic Matter (Qualitative)",
                           choices = c("Select if no % available" = "",
                                       "Very Low", "Low", "Medium Low", "Medium",
                                       "Medium High", "High", "Very High"),
-                          selected = isolate(input$organic_matter_class))
+                          selected = sv("organic_matter_class"))
           ),
 
           # Macronutrients (N/P/K always shown)
@@ -250,9 +275,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
               tags$label(class = "form-label fw-bold", icon("leaf"), " Key Nutrients (ppm)"),
               layout_column_wrap(
                 width = 1/3,
-                numericInput(ns("nitrate_step2"), "Nitrate (N)", value = isolate(input$nitrate), min = 0),
-                numericInput(ns("phosphorus_step2"), "Phosphorus (P)", value = isolate(input$phosphorus), min = 0),
-                numericInput(ns("potassium_step2"), "Potassium (K)", value = isolate(input$potassium), min = 0)
+                numericInput(ns("nitrate_step2"), "Nitrate (N)", value = sv("nitrate"), min = 0),
+                numericInput(ns("phosphorus_step2"), "Phosphorus (P)", value = sv("phosphorus"), min = 0),
+                numericInput(ns("potassium_step2"), "Potassium (K)", value = sv("potassium"), min = 0)
               )
           ),
 
@@ -269,35 +294,35 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                     # CEC + Salts
                     layout_column_wrap(
                       width = 1/2,
-                      numericInput(ns("cec_step2"), "CEC (meq/100g)", value = isolate(input$cec), min = 0, step = 0.1),
-                      numericInput(ns("salts_step2"), "Soluble Salts (ppm)", value = isolate(input$soluble_salts), min = 0)
+                      numericInput(ns("cec_step2"), "CEC (meq/100g)", value = sv("cec"), min = 0, step = 0.1),
+                      numericInput(ns("salts_step2"), "Soluble Salts (ppm)", value = sv("soluble_salts"), min = 0)
                     ),
                     # Additional macros
                     tags$label(class = "form-label fw-bold mt-2", "More Macronutrients (ppm)"),
                     layout_column_wrap(
                       width = 1/2,
-                      numericInput(ns("ammonium_step2"), "Ammonium (N)", value = isolate(input$ammonium), min = 0),
-                      numericInput(ns("calcium_step2"), "Calcium (Ca)", value = isolate(input$calcium), min = 0),
-                      numericInput(ns("magnesium_step2"), "Magnesium (Mg)", value = isolate(input$magnesium), min = 0),
-                      numericInput(ns("sulfur_step2"), "Sulfur (S)", value = isolate(input$sulfur), min = 0)
+                      numericInput(ns("ammonium_step2"), "Ammonium (N)", value = sv("ammonium"), min = 0),
+                      numericInput(ns("calcium_step2"), "Calcium (Ca)", value = sv("calcium"), min = 0),
+                      numericInput(ns("magnesium_step2"), "Magnesium (Mg)", value = sv("magnesium"), min = 0),
+                      numericInput(ns("sulfur_step2"), "Sulfur (S)", value = sv("sulfur"), min = 0)
                     ),
                     # Micronutrients
                     tags$label(class = "form-label fw-bold mt-2", "Micronutrients (ppm)"),
                     layout_column_wrap(
                       width = 1/2,
-                      numericInput(ns("iron_step2"), "Iron (Fe)", value = isolate(input$iron), min = 0),
-                      numericInput(ns("manganese_step2"), "Manganese (Mn)", value = isolate(input$manganese), min = 0),
-                      numericInput(ns("zinc_step2"), "Zinc (Zn)", value = isolate(input$zinc), min = 0),
-                      numericInput(ns("copper_step2"), "Copper (Cu)", value = isolate(input$copper), min = 0),
-                      numericInput(ns("boron_step2"), "Boron (B)", value = isolate(input$boron), min = 0, step = 0.1)
+                      numericInput(ns("iron_step2"), "Iron (Fe)", value = sv("iron"), min = 0),
+                      numericInput(ns("manganese_step2"), "Manganese (Mn)", value = sv("manganese"), min = 0),
+                      numericInput(ns("zinc_step2"), "Zinc (Zn)", value = sv("zinc"), min = 0),
+                      numericInput(ns("copper_step2"), "Copper (Cu)", value = sv("copper"), min = 0),
+                      numericInput(ns("boron_step2"), "Boron (B)", value = sv("boron"), min = 0, step = 0.1)
                     ),
                     # Texture percentages
                     tags$label(class = "form-label fw-bold mt-2", "Texture Percentages"),
                     layout_column_wrap(
                       width = 1/3,
-                      numericInput(ns("sand_step2"), "Sand %", value = isolate(input$sand), min = 0, max = 100),
-                      numericInput(ns("silt_step2"), "Silt %", value = isolate(input$silt), min = 0, max = 100),
-                      numericInput(ns("clay_step2"), "Clay %", value = isolate(input$clay), min = 0, max = 100)
+                      numericInput(ns("sand_step2"), "Sand %", value = sv("sand"), min = 0, max = 100),
+                      numericInput(ns("silt_step2"), "Silt %", value = sv("silt"), min = 0, max = 100),
+                      numericInput(ns("clay_step2"), "Clay %", value = sv("clay"), min = 0, max = 100)
                     ),
                     uiOutput(ns("texture_validation"))
                 )
@@ -309,35 +334,35 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
               # CEC + Salts
               layout_column_wrap(
                 width = 1/2,
-                numericInput(ns("cec_step2"), "CEC (meq/100g)", value = isolate(input$cec), min = 0, step = 0.1),
-                numericInput(ns("salts_step2"), "Soluble Salts (ppm)", value = isolate(input$soluble_salts), min = 0)
+                numericInput(ns("cec_step2"), "CEC (meq/100g)", value = sv("cec"), min = 0, step = 0.1),
+                numericInput(ns("salts_step2"), "Soluble Salts (ppm)", value = sv("soluble_salts"), min = 0)
               ),
               # Additional macros
               tags$label(class = "form-label fw-bold mt-2", icon("leaf"), " More Macronutrients (ppm)"),
               layout_column_wrap(
                 width = 1/2,
-                numericInput(ns("ammonium_step2"), "Ammonium (N)", value = isolate(input$ammonium), min = 0),
-                numericInput(ns("calcium_step2"), "Calcium (Ca)", value = isolate(input$calcium), min = 0),
-                numericInput(ns("magnesium_step2"), "Magnesium (Mg)", value = isolate(input$magnesium), min = 0),
-                numericInput(ns("sulfur_step2"), "Sulfur (S)", value = isolate(input$sulfur), min = 0)
+                numericInput(ns("ammonium_step2"), "Ammonium (N)", value = sv("ammonium"), min = 0),
+                numericInput(ns("calcium_step2"), "Calcium (Ca)", value = sv("calcium"), min = 0),
+                numericInput(ns("magnesium_step2"), "Magnesium (Mg)", value = sv("magnesium"), min = 0),
+                numericInput(ns("sulfur_step2"), "Sulfur (S)", value = sv("sulfur"), min = 0)
               ),
               # Micronutrients
               tags$label(class = "form-label fw-bold mt-2", icon("seedling"), " Micronutrients (ppm)"),
               layout_column_wrap(
                 width = 1/2,
-                numericInput(ns("iron_step2"), "Iron (Fe)", value = isolate(input$iron), min = 0),
-                numericInput(ns("manganese_step2"), "Manganese (Mn)", value = isolate(input$manganese), min = 0),
-                numericInput(ns("zinc_step2"), "Zinc (Zn)", value = isolate(input$zinc), min = 0),
-                numericInput(ns("copper_step2"), "Copper (Cu)", value = isolate(input$copper), min = 0),
-                numericInput(ns("boron_step2"), "Boron (B)", value = isolate(input$boron), min = 0, step = 0.1)
+                numericInput(ns("iron_step2"), "Iron (Fe)", value = sv("iron"), min = 0),
+                numericInput(ns("manganese_step2"), "Manganese (Mn)", value = sv("manganese"), min = 0),
+                numericInput(ns("zinc_step2"), "Zinc (Zn)", value = sv("zinc"), min = 0),
+                numericInput(ns("copper_step2"), "Copper (Cu)", value = sv("copper"), min = 0),
+                numericInput(ns("boron_step2"), "Boron (B)", value = sv("boron"), min = 0, step = 0.1)
               ),
               # Texture percentages
               tags$label(class = "form-label fw-bold mt-2", icon("mountain"), " Texture Percentages"),
               layout_column_wrap(
                 width = 1/3,
-                numericInput(ns("sand_step2"), "Sand %", value = isolate(input$sand), min = 0, max = 100),
-                numericInput(ns("silt_step2"), "Silt %", value = isolate(input$silt), min = 0, max = 100),
-                numericInput(ns("clay_step2"), "Clay %", value = isolate(input$clay), min = 0, max = 100)
+                numericInput(ns("sand_step2"), "Sand %", value = sv("sand"), min = 0, max = 100),
+                numericInput(ns("silt_step2"), "Silt %", value = sv("silt"), min = 0, max = 100),
+                numericInput(ns("clay_step2"), "Clay %", value = sv("clay"), min = 0, max = 100)
               ),
               uiOutput(ns("texture_validation"))
             )
@@ -347,10 +372,10 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           div(class = "mb-3",
               tags$label(class = "form-label", icon("mountain"), " Texture Class"),
               selectInput(ns("texture_class_step2"), NULL,
-                          choices = NULL,  # Populated in server
-                          selected = isolate(input$texture_class))
+                          choices = soil_texture_classes$Texture,
+                          selected = sv("texture_class"))
           )
-        ),
+        )},
 
         # Step 3: Add Plants + Submit
         "3" = tagList(
@@ -411,26 +436,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       )
     })
 
-    # --- Wizard Navigation Buttons ---
-    output$wizard_nav_buttons <- renderUI({
+    # --- Wizard Navigation Buttons (show/hide static buttons) ---
+    observe({
       step <- wizard_step()
-
-      div(class = "d-flex justify-content-between mt-3",
-          # Back button (hidden on step 1)
-          if (step > 1) {
-            actionButton(ns("wizard_back"), "Back", class = "btn-outline-secondary",
-                         icon = icon("arrow-left"))
-          } else {
-            div()  # Spacer
-          },
-          # Next button (hidden on step 3 - submit button is in the content)
-          if (step < 3) {
-            actionButton(ns("wizard_next"), "Next", class = "btn-primary",
-                         icon = icon("arrow-right"))
-          } else {
-            div()  # Spacer
-          }
-      )
+      shinyjs::toggle("wizard_back_container", condition = step > 1)
+      shinyjs::toggle("wizard_next_container", condition = step < 3)
     })
 
     # --- Wizard Navigation Handlers ---
@@ -490,6 +500,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       has_pct <- !is.null(input$sand_step2) && !is.na(input$sand_step2) &&
                  !(input$sand_step2 == 33 && input$silt_step2 == 33 && input$clay_step2 == 34)
       updateRadioButtons(session, "texture_input_type", selected = if (has_pct) "pct" else "class")
+      # Clear pending data now that step 2 values are synced to hidden inputs
+      pending_soil_data(NULL)
     }
 
     sync_step3_to_hidden <- function() {
@@ -505,11 +517,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       if (!is.null(input$notes_step3)) updateTextAreaInput(session, "notes", value = input$notes_step3)
     }
 
-    # --- Texture class dropdown (step 2) ---
-    observe({
-      updateSelectInput(session, "texture_class_step2", choices = soil_texture_classes$Texture,
-                        selected = isolate(input$texture_class))
-    })
+    # (Texture class step 2 choices are set directly in the renderUI)
 
     # --- PDF Upload Section (conditional on API key) ---
     output$pdf_upload_section <- renderUI({
@@ -603,7 +611,32 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
-      # Fill form fields
+      # Store normalized values for step 2 renderUI (avoids flush timing issue)
+      pending_soil_data(list(
+        ph = soil_data$ph,
+        organic_matter = soil_data$organic_matter,
+        organic_matter_class = soil_data$organic_matter_class,
+        cec = soil_data$cec_meq,
+        soluble_salts = soil_data$soluble_salts_ppm,
+        nitrate = soil_data$nitrate_ppm,
+        ammonium = soil_data$ammonium_ppm,
+        phosphorus = soil_data$phosphorus_ppm,
+        potassium = soil_data$potassium_ppm,
+        calcium = soil_data$calcium_ppm,
+        magnesium = soil_data$magnesium_ppm,
+        sulfur = soil_data$sulfur_ppm,
+        iron = soil_data$iron_ppm,
+        manganese = soil_data$manganese_ppm,
+        zinc = soil_data$zinc_ppm,
+        copper = soil_data$copper_ppm,
+        boron = soil_data$boron_ppm,
+        sand = soil_data$texture_sand,
+        silt = soil_data$texture_silt,
+        clay = soil_data$texture_clay,
+        texture_class = soil_data$texture_class
+      ))
+
+      # Fill form fields (hidden inputs, for submit handler)
       if (!is.null(soil_data$ph) && !is.na(soil_data$ph)) {
         updateNumericInput(session, "ph", value = soil_data$ph)
       }
@@ -950,9 +983,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
     # --- Species dropdown population ---
     observe({
-      # Re-run when plant_list_data changes (UI re-renders the selectizeInput)
+      step <- wizard_step()
       pld <- plant_list_data()
       has_batch <- !is.null(pld) && nrow(pld$valid) > 0
+
+      # Only send update when step 3 is active (the selectizeInput exists)
+      req(step == 3)
 
       # Use search index with common names if available, else fall back to plain species list
       choices <- if (!is.null(species_search_index) && length(species_search_index) > 0) {
@@ -1055,6 +1091,31 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
         # Populate form fields
         data <- result$data
+
+        # Store normalized values for step 2 renderUI (avoids flush timing issue)
+        pending_soil_data(list(
+          ph = data$ph,
+          organic_matter = data$organic_matter,
+          organic_matter_class = data$organic_matter_class,
+          cec = data$cec_meq,
+          soluble_salts = data$soluble_salts_ppm,
+          nitrate = data$nitrate_ppm,
+          ammonium = data$ammonium_ppm,
+          phosphorus = data$phosphorus_ppm,
+          potassium = data$potassium_ppm,
+          calcium = data$calcium_ppm,
+          magnesium = data$magnesium_ppm,
+          sulfur = data$sulfur_ppm,
+          iron = data$iron_ppm,
+          manganese = data$manganese_ppm,
+          zinc = data$zinc_ppm,
+          copper = data$copper_ppm,
+          boron = data$boron_ppm,
+          sand = data$texture_sand,
+          silt = data$texture_silt,
+          clay = data$texture_clay,
+          texture_class = data$texture_class
+        ))
 
         # Soil Properties
         if (!is.null(data$ph)) updateNumericInput(session, "ph", value = data$ph)
