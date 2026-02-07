@@ -9,7 +9,7 @@ dataManagementUI <- function(id) {
   ns <- NS(id)
 
   nav_panel(
-    title = "Data",
+    title = "Import/Export",
     icon = icon("database"),
     layout_columns(
       col_widths = c(12),

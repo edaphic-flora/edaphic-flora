@@ -84,8 +84,8 @@ adminServer <- function(id, pool, is_admin, current_user, data_changed) {
       # Add action buttons - these trigger global edit_entry/delete_entry inputs
       display$actions <- sapply(display$id, function(entry_id) {
         sprintf(
-          "<button class=\"btn btn-sm btn-outline-primary me-1\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
-          entry_id, entry_id
+          "<button class=\"btn btn-sm btn-outline-primary me-1\" title=\"Edit entry %d\" aria-label=\"Edit entry %d\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" title=\"Delete entry %d\" aria-label=\"Delete entry %d\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
+          entry_id, entry_id, entry_id, entry_id, entry_id, entry_id
         )
       })
 

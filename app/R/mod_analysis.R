@@ -221,9 +221,9 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                  style = "text-decoration: none;",
                  title = paste("View on", lbl, "website"),
                  tags$span(class = "badge bg-light text-dark me-1 mb-1",
-                           style = "font-size: 0.75rem; cursor: pointer; border: 1px solid #27ae60;",
+                           style = "font-size: 0.75rem; cursor: pointer; border: 1px solid #5D7A6A;",
                            sprintf("%s: %s ", lbl, val),
-                           icon("external-link-alt", class = "fa-xs", style = "color: #27ae60;")))
+                           icon("external-link-alt", class = "fa-xs", style = "color: #5D7A6A;")))
         } else {
           badge
         }
@@ -552,7 +552,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
             score <- round(top_matches[sp])
             profile <- all_profiles[[sp]]
 
-            score_color <- if (score >= 80) "#27ae60" else if (score >= 60) "#7A9A86" else if (score >= 40) "#f39c12" else "#95a5a6"
+            score_color <- if (score >= 80) "#5D7A6A" else if (score >= 60) "#7A9A86" else if (score >= 40) "#B8956A" else "#95a5a6"
 
             card(
               class = "mb-2",
@@ -916,8 +916,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (nrow(dat) == 0) return(NULL)
 
       outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-      outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                          "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+      outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                          "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
 
       outcome_html <- if (sum(!is.na(dat$outcome)) > 0) {
         oc <- table(factor(dat$outcome, levels = outcome_order))
@@ -1172,16 +1172,18 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       if (has_outcome) {
         outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-        outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                            "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+        outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                            "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
         dat$outcome <- factor(dat$outcome, levels = outcome_order)
         dat <- dat[order(dat$outcome), ]
+        outcome_shapes <- c("Thriving" = 16, "Established" = 17, "Struggling" = 15, "Failed/Died" = 4)
         p <- p +
-          geom_point(aes(color = outcome,
+          geom_point(aes(color = outcome, shape = outcome,
                          text = paste0("pH: ", ph, "\nOM: ", organic_matter, "%\nOutcome: ", outcome)),
                      size = 3, alpha = 0.8) +
           scale_color_manual(values = outcome_colors, limits = outcome_order, breaks = outcome_order, drop = FALSE, na.value = "#95a5a6") +
-          labs(color = "Outcome")
+          scale_shape_manual(values = outcome_shapes, limits = outcome_order, breaks = outcome_order, drop = FALSE, na.value = 1) +
+          labs(color = "Outcome", shape = "Outcome")
       } else {
         p <- p +
           geom_point(aes(color = texture_class,
@@ -1366,7 +1368,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       plot_ly(z = cor_matrix, x = colnames(cor_matrix), y = rownames(cor_matrix),
               type = "heatmap",
-              colorscale = list(list(0, "#3498db"), list(0.5, "#ffffff"), list(1, "#e74c3c")),
+              colorscale = list(list(0, "#6B8E9F"), list(0.5, "#ffffff"), list(1, "#A66A62")),
               zmin = -1, zmax = 1,
               text = round(cor_matrix, 2), texttemplate = "%{text}",
               hovertemplate = "%{y} vs %{x}<br>r = %{z:.3f}<extra></extra>") %>%
@@ -1413,8 +1415,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       if (has_outcome) {
         outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-        outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                            "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+        outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                            "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
         dat$outcome <- factor(dat$outcome, levels = outcome_order)
         p <- p +
           geom_point(aes(color = outcome), size = 4, alpha = 0.8) +
@@ -1488,10 +1490,10 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
           tags$p(class = "text-muted small mt-2 px-3",
                  icon("info-circle"), " ",
                  "Markers colored by outcome: ",
-                 tags$span(style = "color: #27ae60;", icon("circle"), " Thriving"), " ",
+                 tags$span(style = "color: #5D7A6A;", icon("circle"), " Thriving"), " ",
                  tags$span(style = "color: #7A9A86;", icon("circle"), " Established"), " ",
-                 tags$span(style = "color: #f39c12;", icon("circle"), " Struggling"), " ",
-                 tags$span(style = "color: #e74c3c;", icon("circle"), " Failed/Died"), " ",
+                 tags$span(style = "color: #B8956A;", icon("circle"), " Struggling"), " ",
+                 tags$span(style = "color: #A66A62;", icon("circle"), " Failed/Died"), " ",
                  tags$span(style = "color: #999;", icon("circle"), " No outcome data"))
         } else {
           tags$p(class = "text-muted small mt-2 px-3",
@@ -1508,8 +1510,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       dat <- dat[!is.na(dat$location_lat) & !is.na(dat$location_long), ]
       if (nrow(dat) == 0) return(NULL)
 
-      outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                          "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+      outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                          "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
       has_outcome <- sum(!is.na(dat$outcome)) > 0
 
       dat$popup <- paste0(
@@ -1820,7 +1822,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       p <- ggplot(eco_stats, aes(x = ecoregion_display, y = success_rate, text = paste0("Samples: ", n))) +
         geom_col(aes(fill = success_rate), alpha = 0.85) +
-        scale_fill_gradient(low = "#e74c3c", high = "#27ae60", guide = "none") +
+        scale_fill_gradient(low = "#A66A62", high = "#5D7A6A", guide = "none") +
         coord_flip() +
         labs(x = NULL, y = "Success Rate (%)", title = NULL) +
         theme_edaphic() +
@@ -1962,8 +1964,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (nrow(dat) == 0) return(plotly_empty())
 
       outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-      outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                          "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+      outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                          "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
 
       dat$outcome <- factor(dat$outcome, levels = outcome_order)
 
@@ -1993,8 +1995,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       if (has_outcome) {
         outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-        outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                            "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+        outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                            "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
         dat$outcome <- factor(dat$outcome, levels = outcome_order)
 
         p <- ggplot(dat, aes(x = sun_exposure, fill = outcome)) +
@@ -2028,8 +2030,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       if (has_outcome) {
         outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-        outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                            "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+        outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                            "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
         dat$outcome <- factor(dat$outcome, levels = outcome_order)
 
         p <- ggplot(dat, aes(x = site_hydrology, fill = outcome)) +
@@ -2164,8 +2166,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (nrow(dat) < 3) return(plotly_empty())
 
       outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
-      outcome_colors <- c("Thriving" = "#27ae60", "Established" = "#7A9A86",
-                          "Struggling" = "#f39c12", "Failed/Died" = "#e74c3c")
+      outcome_colors <- c("Thriving" = "#5D7A6A", "Established" = "#7A9A86",
+                          "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
       dat$outcome <- factor(dat$outcome, levels = outcome_order)
 
       param_label <- switch(param,
@@ -2217,7 +2219,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       p <- ggplot(matrix_data, aes(x = site_hydrology, y = sun_exposure, fill = success_rate)) +
         geom_tile(color = "white", size = 1) +
         geom_text(aes(label = label), color = "white", fontface = "bold", size = 3.5) +
-        scale_fill_gradient(low = "#e74c3c", high = "#27ae60", na.value = "#cccccc",
+        scale_fill_gradient(low = "#A66A62", high = "#5D7A6A", na.value = "#cccccc",
                             limits = c(0, 100), name = "Success %") +
         labs(x = "Site Hydrology", y = "Sun Exposure") +
         theme_minimal() +

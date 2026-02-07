@@ -259,9 +259,9 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
           # Soil Properties (always shown)
           div(class = "mb-3",
-              tags$label(class = "form-label", "Soil pH"),
+              tags$label(class = "form-label", `for` = ns("ph_step2"), "Soil pH"),
               numericInput(ns("ph_step2"), NULL, value = sv("ph"), min = 0, max = 14, step = 0.1),
-              tags$label(class = "form-label", "Organic Matter (%)"),
+              tags$label(class = "form-label", `for` = ns("om_step2"), "Organic Matter (%)"),
               numericInput(ns("om_step2"), NULL, value = sv("organic_matter"), min = 0, max = 100, step = 0.1),
               selectInput(ns("om_class_step2"), "Organic Matter (Qualitative)",
                           choices = c("Select if no % available" = "",
@@ -1331,8 +1331,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         is_owner <- !is.na(display$created_by[i]) && display$created_by[i] == user_id
         if (is_owner || admin_user) {
           sprintf(
-            "<button class=\"btn btn-sm btn-outline-primary me-1\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
-            display$id[i], display$id[i]
+            "<button class=\"btn btn-sm btn-outline-primary me-1\" title=\"Edit entry %d\" aria-label=\"Edit entry %d\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" title=\"Delete entry %d\" aria-label=\"Delete entry %d\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
+            display$id[i], display$id[i], display$id[i], display$id[i], display$id[i], display$id[i]
           )
         } else {
           ""
@@ -1464,8 +1464,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         is_owner <- !is.na(display$created_by[i]) && display$created_by[i] == user_id
         if (is_owner || admin_user) {
           sprintf(
-            "<button class=\"btn btn-sm btn-outline-primary me-1\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
-            display$id[i], display$id[i]
+            "<button class=\"btn btn-sm btn-outline-primary me-1\" title=\"Edit entry %d\" aria-label=\"Edit entry %d\" onclick=\"Shiny.setInputValue('edit_entry', %d, {priority: 'event'})\"><i class=\"fa fa-edit\"></i></button><button class=\"btn btn-sm btn-outline-danger\" title=\"Delete entry %d\" aria-label=\"Delete entry %d\" onclick=\"Shiny.setInputValue('delete_entry', %d, {priority: 'event'})\"><i class=\"fa fa-trash\"></i></button>",
+            display$id[i], display$id[i], display$id[i], display$id[i], display$id[i], display$id[i]
           )
         } else {
           ""
