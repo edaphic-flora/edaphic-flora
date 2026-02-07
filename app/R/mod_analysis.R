@@ -170,19 +170,18 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       # Build choices with common name labels for species that have data
       if (!is.null(common_name_db) && nrow(common_name_db) > 0 && length(sp) > 0) {
-        cn_lookup <- stats::setNames(common_name_db$common_name, common_name_db$scientific_name)
+        # Key lookup by genus-species (first 2 words) since DB stores full author citations
+        gs_keys <- vapply(strsplit(common_name_db$scientific_name, " "), function(x) {
+          paste(head(x, 2), collapse = " ")
+        }, character(1))
+        cn_lookup <- stats::setNames(common_name_db$common_name, gs_keys)
+        cn_lookup <- cn_lookup[!duplicated(names(cn_lookup))]
         labels <- vapply(sp, function(s) {
           cn <- cn_lookup[s]
           if (!is.na(cn) && nzchar(cn)) {
             paste0(tools::toTitleCase(tolower(cn)), " (", s, ")")
           } else {
-            gs <- paste(head(strsplit(s, " ")[[1]], 2), collapse = " ")
-            cn2 <- cn_lookup[gs]
-            if (!is.na(cn2) && nzchar(cn2)) {
-              paste0(tools::toTitleCase(tolower(cn2)), " (", s, ")")
-            } else {
-              s
-            }
+            s
           }
         }, character(1), USE.NAMES = FALSE)
         choices <- stats::setNames(sp, labels)
@@ -193,12 +192,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       updateSelectizeInput(session, "analysis_species",
                            choices = choices,
                            selected = if (nzchar(current)) current else NULL,
-                           server = TRUE,
-                           options = list(
-                             create = TRUE, persist = FALSE, maxOptions = 50,
-                             openOnFocus = FALSE, closeAfterSelect = TRUE, selectOnTab = TRUE,
-                             placeholder = 'Type common or Latin name...'
-                           ))
+                           server = FALSE)
     })
 
     # --- Reference badges (USDA traits + NWPL) ---
