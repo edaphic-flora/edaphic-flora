@@ -1,10 +1,8 @@
 # tests/testthat/test-helpers.R
 # Unit tests for helper functions
+# Functions are sourced from app/R/helpers.R via setup.R
 
 library(testthat)
-
-# Get the app directory path
-app_dir <- normalizePath(file.path(dirname(getwd()), "..", "app"), mustWork = FALSE)
 
 # Create soil texture classes inline for testing
 soil_texture_classes <- data.frame(
@@ -19,39 +17,6 @@ soil_texture_classes <- data.frame(
   Sand_Max = c(45, 20, 65, 45, 20, 80, 52, 50, 85, 20, 90, 100),
   stringsAsFactors = FALSE
 )
-
-# Define classify_texture function inline for testing
-classify_texture <- function(sand, silt, clay, soil_texture_classes) {
-  if (abs((sand + silt + clay) - 100) > 0.1) {
-    return("Error: Percentages must sum to 100%")
-  }
-  for (i in seq_len(nrow(soil_texture_classes))) {
-    if (clay >= (soil_texture_classes$Clay_Min[i] - 0.1) &&
-        clay <= (soil_texture_classes$Clay_Max[i] + 0.1) &&
-        silt >= (soil_texture_classes$Silt_Min[i] - 0.1) &&
-        silt <= (soil_texture_classes$Silt_Max[i] + 0.1) &&
-        sand >= (soil_texture_classes$Sand_Min[i] - 0.1) &&
-        sand <= (soil_texture_classes$Sand_Max[i] + 0.1)) {
-      return(as.character(soil_texture_classes$Texture[i]))
-    }
-  }
-  "Unclassified"
-}
-
-# Define get_texture_percentages function inline
-get_texture_percentages <- function(texture_class, soil_texture_classes) {
-  cd <- soil_texture_classes[soil_texture_classes$Texture == texture_class, ]
-  if (!nrow(cd)) return(NULL)
-  sand_mid <- mean(c(cd$Sand_Min, cd$Sand_Max))
-  silt_mid <- mean(c(cd$Silt_Min, cd$Silt_Max))
-  clay_mid <- mean(c(cd$Clay_Min, cd$Clay_Max))
-  total <- sand_mid + silt_mid + clay_mid
-  list(
-    sand = sand_mid * (100 / total),
-    silt = silt_mid * (100 / total),
-    clay = clay_mid * (100 / total)
-  )
-}
 
 # ---------------------------
 # Tests for classify_texture()
@@ -115,14 +80,6 @@ test_that("get_texture_percentages returns NULL for invalid class", {
 # Tests for get_ecoregion()
 # ---------------------------
 
-# Define get_ecoregion function inline for testing
-get_ecoregion <- function(lat, long, eco_sf) {
-  if (is.null(lat) || is.null(long) || is.na(lat) || is.na(long)) {
-    return(list(name = NA_character_, code = NA_character_))
-  }
-  list(name = NA_character_, code = NA_character_)
-}
-
 test_that("get_ecoregion handles NULL inputs", {
   result <- get_ecoregion(NULL, NULL, NULL)
   expect_true(is.na(result$name))
@@ -136,51 +93,32 @@ test_that("get_ecoregion handles NA inputs", {
 })
 
 # ---------------------------
-# Tests for calc_species_profile()
+# Tests for safe_min() / safe_max()
 # ---------------------------
 
-# Define calc_species_profile function inline for testing
-calc_species_profile <- function(dat) {
-  if (nrow(dat) == 0) return(NULL)
+test_that("safe_min handles all-NA input", {
+  expect_true(is.na(safe_min(c(NA, NA, NA))))
+})
 
-  profile <- list(
-    n_samples = nrow(dat),
-    ph_mean = mean(dat$ph, na.rm = TRUE),
-    ph_min = min(dat$ph, na.rm = TRUE),
-    ph_max = max(dat$ph, na.rm = TRUE),
-    om_mean = mean(dat$organic_matter, na.rm = TRUE),
-    om_min = min(dat$organic_matter, na.rm = TRUE),
-    om_max = max(dat$organic_matter, na.rm = TRUE)
-  )
+test_that("safe_max handles all-NA input", {
+  expect_true(is.na(safe_max(c(NA, NA, NA))))
+})
 
-  # Texture - most common class
-  if (sum(!is.na(dat$texture_class)) > 0) {
-    profile$texture_class <- names(sort(table(dat$texture_class), decreasing = TRUE))[1]
-  }
+test_that("safe_min handles mixed input", {
+  expect_equal(safe_min(c(NA, 3, 1, NA)), 1)
+})
 
-  # Nutrients - means
-  if (sum(!is.na(dat$nitrate_ppm)) > 0) profile$nitrate_mean <- mean(dat$nitrate_ppm, na.rm = TRUE)
-  if (sum(!is.na(dat$phosphorus_ppm)) > 0) profile$phosphorus_mean <- mean(dat$phosphorus_ppm, na.rm = TRUE)
-  if (sum(!is.na(dat$potassium_ppm)) > 0) profile$potassium_mean <- mean(dat$potassium_ppm, na.rm = TRUE)
-  if (sum(!is.na(dat$calcium_ppm)) > 0) profile$calcium_mean <- mean(dat$calcium_ppm, na.rm = TRUE)
-  if (sum(!is.na(dat$magnesium_ppm)) > 0) profile$magnesium_mean <- mean(dat$magnesium_ppm, na.rm = TRUE)
+test_that("safe_max handles mixed input", {
+  expect_equal(safe_max(c(NA, 3, 1, NA)), 3)
+})
 
-  # Success rate
-  if ("outcome" %in% names(dat) && sum(!is.na(dat$outcome)) > 0) {
-    outcomes <- dat$outcome[!is.na(dat$outcome)]
-    profile$success_rate <- sum(outcomes %in% c("Thriving", "Established")) / length(outcomes) * 100
-  }
+test_that("safe_min handles empty input", {
+  expect_true(is.na(safe_min(numeric(0))))
+})
 
-  # Best conditions
-  if (sum(!is.na(dat$sun_exposure)) > 0) {
-    profile$best_sun <- names(sort(table(dat$sun_exposure), decreasing = TRUE))[1]
-  }
-  if (sum(!is.na(dat$site_hydrology)) > 0) {
-    profile$best_hydrology <- names(sort(table(dat$site_hydrology), decreasing = TRUE))[1]
-  }
-
-  profile
-}
+# ---------------------------
+# Tests for calc_species_profile()
+# ---------------------------
 
 test_that("calc_species_profile returns NULL for empty data", {
   dat <- data.frame(ph = numeric(0), organic_matter = numeric(0))
@@ -281,57 +219,22 @@ test_that("calc_species_profile handles NA values in nutrients", {
   expect_null(result$phosphorus_mean)  # All NA, so not added to profile
 })
 
+test_that("calc_species_profile handles all-NA pH gracefully", {
+  dat <- data.frame(
+    ph = c(NA, NA, NA),
+    organic_matter = c(3.0, 4.0, 5.0)
+  )
+  result <- calc_species_profile(dat)
+
+  expect_true(is.na(result$ph_min))
+  expect_true(is.na(result$ph_max))
+  expect_equal(result$om_min, 3.0)
+  expect_equal(result$om_max, 5.0)
+})
+
 # ---------------------------
 # Tests for calc_similarity()
 # ---------------------------
-
-# Define calc_similarity function inline for testing
-calc_similarity <- function(profile1, profile2) {
-  if (is.null(profile1) || is.null(profile2)) return(0)
-
-  scores <- c()
-  weights <- c()
-
-  # pH similarity (weight: 30) - check range overlap
-  if (!is.na(profile1$ph_mean) && !is.na(profile2$ph_mean)) {
-    ph_diff <- abs(profile1$ph_mean - profile2$ph_mean)
-    ph_score <- max(0, 100 - ph_diff * 25)  # -25 points per pH unit difference
-    scores <- c(scores, ph_score)
-    weights <- c(weights, 30)
-  }
-
-  # OM similarity (weight: 20)
-  if (!is.na(profile1$om_mean) && !is.na(profile2$om_mean)) {
-    om_diff <- abs(profile1$om_mean - profile2$om_mean)
-    om_score <- max(0, 100 - om_diff * 10)  # -10 points per % difference
-    scores <- c(scores, om_score)
-    weights <- c(weights, 20)
-  }
-
-  # Texture similarity (weight: 15)
-  if (!is.null(profile1$texture_class) && !is.null(profile2$texture_class)) {
-    texture_score <- if (profile1$texture_class == profile2$texture_class) 100 else 50
-    scores <- c(scores, texture_score)
-    weights <- c(weights, 15)
-  }
-
-  # Nutrient similarities (weight: 5 each, total 25)
-  nutrient_params <- c("nitrate_mean", "phosphorus_mean", "potassium_mean", "calcium_mean", "magnesium_mean")
-  for (param in nutrient_params) {
-    if (!is.null(profile1[[param]]) && !is.null(profile2[[param]])) {
-      # Normalize by using ratio (within 2x = similar)
-      ratio <- profile1[[param]] / max(profile2[[param]], 0.1)
-      if (ratio > 1) ratio <- 1 / ratio
-      nutrient_score <- ratio * 100
-      scores <- c(scores, nutrient_score)
-      weights <- c(weights, 5)
-    }
-  }
-
-  # Calculate weighted average
-  if (length(scores) == 0) return(0)
-  sum(scores * weights) / sum(weights)
-}
 
 test_that("calc_similarity returns 0 for NULL profiles", {
   expect_equal(calc_similarity(NULL, NULL), 0)
@@ -434,4 +337,24 @@ test_that("calc_similarity returns 0 when only NA values available", {
 
   result <- calc_similarity(profile1, profile2)
   expect_equal(result, 0)
+})
+
+# ---------------------------
+# Tests for %||% operator
+# ---------------------------
+
+test_that("%||% handles NULL", {
+  expect_equal(NULL %||% "default", "default")
+})
+
+test_that("%||% handles non-NULL", {
+  expect_equal("value" %||% "default", "value")
+})
+
+test_that("%||% handles empty vector", {
+  expect_equal(character(0) %||% "default", "default")
+})
+
+test_that("%||% handles all-NA", {
+  expect_equal(c(NA, NA) %||% "default", "default")
 })

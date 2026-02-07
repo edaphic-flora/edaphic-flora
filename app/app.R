@@ -269,17 +269,108 @@ base_ui <- page_navbar(
  # ========== ANALYSIS TAB ==========
  analysisUI("analysis"),
 
- # ========== FIND PLANTS TAB (coming soon placeholder) ==========
+ # ========== ROADMAP TAB ==========
  nav_panel(
-   title = "Find Plants",
-   icon = icon("seedling"),
-   div(class = "empty-state",
-       tags$i(class = "fa fa-seedling"),
-       h5("Find Plants \u2014 Coming Soon"),
-       p("Personalized plant recommendations based on your soil data."),
-       p(style = "font-size: 0.85rem;",
-         "This feature activates once we have 10+ samples per species. ",
-         "Help by contributing soil data in the Data Entry tab!")
+   title = "Roadmap",
+   icon = icon("map"),
+   div(class = "container-fluid", style = "max-width: 800px; padding: 2rem 1rem;",
+       div(style = "text-align: center; margin-bottom: 2rem;",
+           tags$i(class = "fa fa-map", style = "font-size: 2.5rem; color: #7A9A86; opacity: 0.6; margin-bottom: 0.75rem;"),
+           h4("Roadmap", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;"),
+           p(style = "font-family: 'Rokkitt', serif; color: #5F7268; max-width: 500px; margin: 0 auto;",
+             "Planned and in-progress features for Edaphic Flora.")
+       ),
+
+       # Find Plants
+       div(class = "card mb-3",
+           div(class = "card-body d-flex align-items-start",
+               tags$i(class = "fa fa-seedling me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
+               div(
+                 div(class = "d-flex align-items-center mb-1",
+                     h6("Find Plants", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
+                     tags$span(class = "badge", style = "background: #D39B35; color: #fff; font-size: 0.7rem;", "Needs Data")
+                 ),
+                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
+                   "Personalized plant recommendations based on your soil data. ",
+                   "Activates once we reach 10+ samples per species. Engine built, waiting for data threshold.")
+               )
+           )
+       ),
+
+       # Batch Plant Upload
+       div(class = "card mb-3",
+           div(class = "card-body d-flex align-items-start",
+               tags$i(class = "fa fa-upload me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
+               div(
+                 div(class = "d-flex align-items-center mb-1",
+                     h6("Batch Plant Upload", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
+                     tags$span(class = "badge", style = "background: #7A9A86; color: #fff; font-size: 0.7rem;", "In Progress")
+                 ),
+                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
+                   "CSV upload for bulk plant entry. Currently in development, gated behind a beta feature flag.")
+               )
+           )
+       ),
+
+       # Outcome Reminders
+       div(class = "card mb-3",
+           div(class = "card-body d-flex align-items-start",
+               tags$i(class = "fa fa-bell me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
+               div(
+                 div(class = "d-flex align-items-center mb-1",
+                     h6("Outcome Reminders", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
+                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Planned")
+                 ),
+                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
+                   "Email reminders to update how your plants are doing. Track outcomes over time.")
+               )
+           )
+       ),
+
+       # Sign Out
+       div(class = "card mb-3",
+           div(class = "card-body d-flex align-items-start",
+               tags$i(class = "fa fa-sign-out-alt me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
+               div(
+                 div(class = "d-flex align-items-center mb-1",
+                     h6("Sign Out", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
+                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Investigating")
+                 ),
+                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
+                   "Sign-out is currently not functional due to a Polished authentication endpoint issue.")
+               )
+           )
+       ),
+
+       # State-Level Native Status
+       div(class = "card mb-3",
+           div(class = "card-body d-flex align-items-start",
+               tags$i(class = "fa fa-map-marker-alt me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
+               div(
+                 div(class = "d-flex align-items-center mb-1",
+                     h6("State-Level Native Status", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
+                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Planned")
+                 ),
+                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
+                   "True state-level native/introduced data beyond the current North America level. Pending BONAP data permission.")
+               )
+           )
+       ),
+
+       # Mobile Responsive
+       div(class = "card mb-3",
+           div(class = "card-body d-flex align-items-start",
+               tags$i(class = "fa fa-mobile-alt me-3", style = "font-size: 1.5rem; color: #7A9A86; margin-top: 0.25rem;"),
+               div(
+                 div(class = "d-flex align-items-center mb-1",
+                     h6("Mobile Responsive Layout", class = "mb-0 me-2", style = "font-family: 'Montserrat', sans-serif;"),
+                     tags$span(class = "badge", style = "background: #5F7268; color: #fff; font-size: 0.7rem;", "Planned")
+                 ),
+                 p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.9rem; color: #5F7268;",
+                   "Currently desktop-optimized. Mobile and tablet layouts are planned for a future release.")
+               )
+           )
+       )
    )
  ),
 

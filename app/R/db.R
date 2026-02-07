@@ -4,11 +4,23 @@ library(DBI)
 library(RPostgres)
 library(pool)
 
-# Note: %||% operator defined in R/usda.R (with robust NA/empty handling)
-# If usda.R is not loaded, use this simple fallback:
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
-}
+# Note: %||% operator defined in R/helpers.R (canonical definition)
+
+# ---------------------------
+# Column Whitelist
+# ---------------------------
+SOIL_SAMPLE_COLUMNS <- c(
+  "species", "cultivar", "ph", "organic_matter", "organic_matter_class",
+  "nitrate_ppm", "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
+  "calcium_ppm", "magnesium_ppm", "sulfur_ppm", "iron_ppm", "manganese_ppm",
+  "zinc_ppm", "boron_ppm", "copper_ppm", "soluble_salts_ppm",
+  "cec_meq", "texture_sand", "texture_silt", "texture_clay", "texture_class",
+  "location_lat", "location_long", "date", "ecoregion_l4", "ecoregion_l4_code",
+  "ecoregion_l3", "ecoregion_l3_code", "ecoregion_l2", "ecoregion_l2_code",
+  "notes", "created_by", "outcome", "sun_exposure", "site_hydrology"
+)
+
+SOIL_SAMPLE_SELECT <- paste("id,", paste(SOIL_SAMPLE_COLUMNS, collapse = ", "), ", created_at")
 
 # ---------------------------
 # Database Connection
@@ -185,7 +197,7 @@ db_migrate <- function() {
 
 db_get_all_samples <- function(limit = NULL) {
   tryCatch({
-    sql <- "SELECT * FROM soil_samples ORDER BY created_at DESC"
+    sql <- paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples ORDER BY created_at DESC")
     if (!is.null(limit) && is.numeric(limit) && limit > 0) {
       sql <- paste(sql, "LIMIT", as.integer(limit))
     }
@@ -199,7 +211,7 @@ db_get_all_samples <- function(limit = NULL) {
 db_get_species_data <- function(species, limit = NULL) {
   if (is.null(species) || !nzchar(trimws(species))) return(data.frame())
   tryCatch({
-    sql <- "SELECT * FROM soil_samples WHERE species = $1 ORDER BY created_at DESC"
+    sql <- paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples WHERE species = $1 ORDER BY created_at DESC")
     if (!is.null(limit) && is.numeric(limit) && limit > 0) {
       sql <- paste(sql, "LIMIT", as.integer(limit))
     }
@@ -225,6 +237,8 @@ db_add_sample <- function(sample_data) {
     if ("date" %in% names(sample_data)) {
       sample_data$date <- as.character(as.Date(sample_data$date))
     }
+    # Filter through column whitelist
+    sample_data <- sample_data[names(sample_data) %in% SOIL_SAMPLE_COLUMNS]
     fields <- names(sample_data)
     values <- as.list(unname(sample_data))
     placeholders <- paste0("$", seq_along(fields))
@@ -244,7 +258,7 @@ db_add_sample <- function(sample_data) {
 
 db_get_sample_by_id <- function(id) {
   tryCatch({
-    dbGetQuery(pool, "SELECT * FROM soil_samples WHERE id = $1", params = list(id))
+    dbGetQuery(pool, paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples WHERE id = $1"), params = list(id))
   }, error = function(e) {
     message("Error fetching sample by id: ", e$message)
     data.frame()
@@ -254,7 +268,7 @@ db_get_sample_by_id <- function(id) {
 db_get_user_samples <- function(user_id) {
   if (is.null(user_id) || !nzchar(trimws(user_id))) return(data.frame())
   tryCatch({
-    dbGetQuery(pool, "SELECT * FROM soil_samples WHERE created_by = $1 ORDER BY created_at DESC",
+    dbGetQuery(pool, paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples WHERE created_by = $1 ORDER BY created_at DESC"),
                params = list(user_id))
   }, error = function(e) {
     message("Error fetching user samples: ", e$message)
@@ -279,6 +293,9 @@ db_update_sample <- function(id, sample_data, user_id, is_admin = FALSE) {
     if ("date" %in% names(sample_data)) {
       sample_data$date <- as.character(as.Date(sample_data$date))
     }
+
+    # Filter through column whitelist
+    sample_data <- sample_data[names(sample_data) %in% SOIL_SAMPLE_COLUMNS]
 
     # Build UPDATE statement
     fields <- names(sample_data)
@@ -671,23 +688,23 @@ db_get_nearby_samples <- function(lat, lon, radius_miles = DEFAULT_NEIGHBOR_RADI
   tryCatch({
     # Bounding box pre-filter in SQL
     if (!is.null(exclude_user_id) && nzchar(exclude_user_id)) {
-      query <- "
-        SELECT *
+      query <- paste("
+        SELECT", SOIL_SAMPLE_SELECT, "
         FROM soil_samples
         WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
           AND location_lat BETWEEN $1 AND $2
           AND location_long BETWEEN $3 AND $4
           AND (created_by IS NULL OR created_by != $5)
-      "
+      ")
       result <- dbGetQuery(pool, query, params = list(lat_min, lat_max, lon_min, lon_max, exclude_user_id))
     } else {
-      query <- "
-        SELECT *
+      query <- paste("
+        SELECT", SOIL_SAMPLE_SELECT, "
         FROM soil_samples
         WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
           AND location_lat BETWEEN $1 AND $2
           AND location_long BETWEEN $3 AND $4
-      "
+      ")
       result <- dbGetQuery(pool, query, params = list(lat_min, lat_max, lon_min, lon_max))
     }
 
