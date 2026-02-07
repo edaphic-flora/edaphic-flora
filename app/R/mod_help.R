@@ -25,7 +25,7 @@ helpUI <- function(id) {
             class = "px-md-5",
 
             h4("How to Get a Soil Test", id = "guide-soil-testing"),
-            p("Edaphic Flora requires data from a certified soil testing laboratory. Lab tests use precise chemical ",
+            p("edaphic flora requires data from a certified soil testing laboratory. Lab tests use precise chemical ",
               "extractions and calibrated instruments that home test kits and DIY probes simply cannot match. ",
               "Without lab-grade accuracy, comparisons across sites and contributors are unreliable. ",
               "Most state cooperative extension offices offer free or low-cost soil testing."),
@@ -325,7 +325,7 @@ helpUI <- function(id) {
             class = "px-md-5",
 
             p(class = "lead",
-              "Edaphic Flora is a tool for exploration, not prescription. It reveals patterns in real-world soil data, ",
+              "edaphic flora is a tool for exploration, not prescription. It reveals patterns in real-world soil data, ",
               "but those patterns come with important limitations you should understand before acting on them."),
 
             h4(class = "mt-4", "Soil Is One Factor Among Many"),
