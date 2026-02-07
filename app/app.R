@@ -161,6 +161,7 @@ is_admin_user <- function(user_email) {
 
 base_ui <- page_navbar(
  id = "main_nav",
+ selected = "Welcome",
  title = span(
    class = "brand-name",
    HTML('<svg width="36" height="28" viewBox="170 0 250 280" style="vertical-align: middle; margin-right: 8px;">
@@ -224,6 +225,11 @@ base_ui <- page_navbar(
          background-color: #D39B35 !important;
          border-color: #D39B35 !important;
        }
+       /* Brand name clickable cursor */
+       .navbar-brand, .brand-name { cursor: pointer; }
+       /* Hide admin tab by default, show for admins via JS */
+       .navbar .nav-item:has(a[data-value='Admin']) { display: none; }
+       .navbar .nav-item:has(a[data-value='Admin']).admin-visible { display: list-item; }
      ")),
      tags$script(HTML("
        // Pro toggle: bind to Shiny input and handle server-sent updates
@@ -232,6 +238,23 @@ base_ui <- page_navbar(
        });
        Shiny.addCustomMessageHandler('updateProToggle', function(is_pro) {
          $('#pro_mode_toggle').prop('checked', is_pro);
+       });
+       // Show/hide admin tab based on server message
+       Shiny.addCustomMessageHandler('showAdminTab', function(show) {
+         var el = $('a[data-value=\"Admin\"]').closest('.nav-item');
+         if (show) { el.addClass('admin-visible'); } else { el.removeClass('admin-visible'); }
+       });
+       // Scroll to anchor after tab navigation
+       Shiny.addCustomMessageHandler('scrollToAnchor', function(id) {
+         setTimeout(function() {
+           var el = document.getElementById(id);
+           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+         }, 300);
+       });
+       // Brand name click → navigate to Welcome
+       $(document).on('click', '.navbar-brand, .brand-name', function(e) {
+         e.preventDefault();
+         Shiny.setInputValue('brand_click', Math.random(), {priority: 'event'});
        });
      "))
    )
@@ -246,13 +269,24 @@ base_ui <- page_navbar(
  # ========== ANALYSIS TAB ==========
  analysisUI("analysis"),
 
-# ========== FIND PLANTS TAB (hidden until data threshold met) ==========
-# findPlantsUI("find_plants"),
+ # ========== FIND PLANTS TAB (coming soon placeholder) ==========
+ nav_panel(
+   title = "Find Plants",
+   icon = icon("seedling"),
+   div(class = "empty-state",
+       tags$i(class = "fa fa-seedling"),
+       h5("Find Plants \u2014 Coming Soon"),
+       p("Personalized plant recommendations based on your soil data."),
+       p(style = "font-size: 0.85rem;",
+         "This feature activates once we have 10+ samples per species. ",
+         "Help by contributing soil data in the Data Entry tab!")
+   )
+ ),
 
  # ========== DATA MANAGEMENT TAB ==========
  dataManagementUI("data_mgmt"),
 
- # ========== ADMIN TAB ==========
+ # ========== ADMIN TAB (hidden by default, revealed for admins via server) ==========
  adminUI("admin"),
 
  # ========== HELP MENU ==========
@@ -401,7 +435,7 @@ custom_sign_in_ui <- tagList(
       .sign-in-tagline {
         font-family: 'Rokkitt', Georgia, serif;
         font-weight: 300;
-        color: #8B9A8E;
+        color: #5F7268;
         font-size: 1rem;
         margin-bottom: 32px;
         animation: fadeInUp 0.6s ease 0.2s backwards;
@@ -532,6 +566,11 @@ server_inner <- function(input, output, session) {
 
  data_changed <- reactiveVal(0)
 
+ # Show/hide admin tab based on admin status
+ observe({
+   session$sendCustomMessage("showAdminTab", is_admin())
+ })
+
  # --- User Preferences ---
  prefs_changed <- reactiveVal(0)
 
@@ -659,15 +698,23 @@ analysisServer("analysis", pool, data_changed, state_grid, is_prod,
                edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
                user_prefs, species_search_index, common_name_db)
 
-# Help links from welcome page - navigate to Field Guide
+# Brand click → navigate to Welcome page
+ observeEvent(input$brand_click, {
+   nav_select("main_nav", "Welcome")
+ }, ignoreInit = TRUE)
+
+# Help links from welcome page - navigate to Field Guide with anchor scroll
 observeEvent(input$help_link_soil, {
    nav_select("main_nav", "Field Guide")
+   session$sendCustomMessage("scrollToAnchor", "guide-soil-properties")
  })
  observeEvent(input$help_link_nutrients, {
    nav_select("main_nav", "Field Guide")
+   session$sendCustomMessage("scrollToAnchor", "guide-nutrients")
  })
  observeEvent(input$help_link_performance, {
    nav_select("main_nav", "Field Guide")
+   session$sendCustomMessage("scrollToAnchor", "guide-plant-performance")
  })
 
  # ---------------------------
