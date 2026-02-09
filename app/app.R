@@ -511,12 +511,15 @@ base_ui <- page_navbar(
            div(class = "dropdown-section-desc",
              "For native & invasive species info in your area")
          )
+       ),
+       tags$li(tags$hr(class = "dropdown-divider")),
+       tags$li(
+         actionLink("sign_out_btn", label = tagList(icon("right-from-bracket"), " Sign Out"),
+                    class = "dropdown-item", style = "cursor: pointer;")
        )
      )
    )
  )
- # NOTE: Sign out button removed - Polished sign-out endpoint not working locally
- # Future improvement: investigate polished::sign_out_button() or custom sign-out handling
 )
 
 # Edit Modal
@@ -920,6 +923,11 @@ observeEvent(input$help_link_soil, {
  observeEvent(input$`data_entry-link_to_field_guide`, {
    nav_select("main_nav", "Field Guide")
    session$sendCustomMessage("scrollToAnchor", "guide-soil-testing")
+ })
+
+ # Sign out
+ observeEvent(input$sign_out_btn, {
+   polished::sign_out_from_shiny(session)
  })
 
  # ---------------------------
