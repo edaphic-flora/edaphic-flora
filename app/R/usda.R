@@ -531,14 +531,16 @@ get_native_status_for_state <- function(gs_name, state_code, pool) {
 
     # Query native status for this state
     res <- DBI::dbGetQuery(pool, "
-      SELECT native_status
+      SELECT native_status, source
       FROM ref_state_distribution
       WHERE taxon_id = $1 AND state_code = $2
       LIMIT 1;",
       params = list(taxon$taxon_id, toupper(state_code)))
 
     if (nrow(res) > 0 && !is.na(res$native_status[1])) {
-      res$native_status[1]
+      result <- res$native_status[1]
+      attr(result, "source") <- res$source[1]
+      result
     } else {
       NA_character_
     }
@@ -806,27 +808,30 @@ get_native_status_for_user <- function(gs_name, user_prefs, pool) {
     }
   }
 
-  # We have state-specific data
+  # We have state-specific data — include source attribution if available
+  source_tag <- attr(status, "source")
+  source_suffix <- if (!is.null(source_tag) && nzchar(source_tag)) paste0(" (", source_tag, ")") else ""
+
   if (status == "Native") {
     list(
       status = "native",
       state_code = state_code,
       state_name = state_name,
-      tooltip = paste0("Native to ", state_name)
+      tooltip = paste0("Native to ", state_name, source_suffix)
     )
   } else if (status == "Introduced") {
     list(
       status = "introduced",
       state_code = state_code,
       state_name = state_name,
-      tooltip = paste0("Introduced in ", state_name, " (not native)")
+      tooltip = paste0("Introduced in ", state_name, " (not native)", source_suffix)
     )
   } else if (status == "Both") {
     list(
       status = "both",
       state_code = state_code,
       state_name = state_name,
-      tooltip = paste0("Native to parts of ", state_name, ", introduced in others")
+      tooltip = paste0("Native to parts of ", state_name, ", introduced in others", source_suffix)
     )
   } else {
     list(

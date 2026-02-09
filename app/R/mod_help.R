@@ -180,7 +180,9 @@ helpUI <- function(id) {
               tags$li(tags$a(href = "https://powo.science.kew.org/", target = "_blank", "Plants of the World Online (Kew)"),
                       " - Authoritative plant taxonomy and nomenclature"),
               tags$li(tags$a(href = "https://www.inaturalist.org/", target = "_blank", "iNaturalist"),
-                      " - Citizen science platform for species observations")
+                      " - Citizen science platform for species observations"),
+              tags$li(tags$a(href = "https://bonap.net/tdc", target = "_blank", "BONAP Taxonomic Data Center"),
+                      " - State-level native status data (Biota of North America Program)")
             ),
 
             div(class = "mt-4 p-3 bg-light rounded",
@@ -188,7 +190,8 @@ helpUI <- function(id) {
                            icon("book"), " ",
                            tags$strong("References: "),
                            "Nutrient guidelines adapted from university extension publications. ",
-                           "Species data from WCVP (Royal Botanic Gardens, Kew) and USDA PLANTS Database."))
+                           "Species data from WCVP (Royal Botanic Gardens, Kew) and USDA PLANTS Database. ",
+                           "State-level nativity data from Kartesz, J.T., The Biota of North America Program (BONAP)."))
           )
         )
       )
