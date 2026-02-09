@@ -612,59 +612,115 @@ custom_sign_in_ui <- tagList(
         pointer-events: none;
       }
       .sign-in-logo {
-        max-width: 220px;
-        margin-bottom: 24px;
+        max-width: 520px;
+        width: 90%;
+        margin-bottom: 12px;
         filter: drop-shadow(0 2px 8px rgba(122, 154, 134, 0.2));
         animation: fadeInUp 0.6s ease;
-      }
-      .sign-in-welcome {
-        font-family: 'Montserrat', sans-serif;
-        color: #373D3C;
-        font-size: 1.75rem;
-        margin-bottom: 8px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        animation: fadeInUp 0.6s ease 0.1s backwards;
       }
       .sign-in-tagline {
         font-family: 'Rokkitt', Georgia, serif;
         font-weight: 300;
         color: #5F7268;
-        font-size: 1rem;
-        margin-bottom: 32px;
-        animation: fadeInUp 0.6s ease 0.2s backwards;
+        font-size: 1.4rem;
+        margin-bottom: 28px;
+        animation: fadeInUp 0.6s ease 0.15s backwards;
       }
       .sign-in-box {
         background: white;
-        padding: 36px;
+        padding: 36px 40px;
         border-radius: 16px;
         box-shadow: 0 8px 32px rgba(55, 61, 60, 0.12);
-        max-width: 420px;
+        max-width: 460px;
         width: 100%;
         border-top: 4px solid #7A9A86;
-        animation: fadeInUp 0.6s ease 0.3s backwards;
+        animation: fadeInUp 0.6s ease 0.25s backwards;
         position: relative;
         z-index: 1;
+        overflow: hidden;
       }
-      .sign-in-box h1 {
+
+      /* --- Polished overrides: kill ALL forced heights --- */
+      .sign-in-box div,
+      .sign-in-box .container-fluid,
+      .sign-in-box .row,
+      .sign-in-box [class*='col-'],
+      .sign-in-box .auth_panel,
+      .sign-in-box .well,
+      .sign-in-box .panel,
+      .sign-in-box .panel-body {
+        height: auto !important;
+        min-height: 0 !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .sign-in-box .auth_panel {
+        width: 100% !important;
+        border-radius: 0 !important;
+      }
+
+      /* Sign In heading from Polished */
+      .sign-in-box .auth_panel h1.text-center {
         font-family: 'Montserrat', sans-serif !important;
         color: #7A9A86 !important;
-        font-size: 1.5rem;
+        font-size: 1.4rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.3px !important;
+        margin-top: 0 !important;
+        margin-bottom: 24px !important;
+        padding-bottom: 18px !important;
+        border-bottom: 1px solid #e8e5da !important;
       }
-      .sign-in-box .btn-primary {
-        background: linear-gradient(135deg, #7A9A86 0%, #6A8A76 100%) !important;
+
+      /* --- Provider button base --- */
+      .sign-in-box .auth_panel .btn-primary {
         border: none !important;
-        border-radius: 8px !important;
-        padding: 0.75rem 1.5rem !important;
+        border-radius: 10px !important;
+        padding: 14px 1.5rem !important;
         font-family: 'Montserrat', sans-serif !important;
         font-weight: 600 !important;
+        font-size: 1.05rem !important;
+        letter-spacing: 0.3px !important;
         transition: all 0.2s ease !important;
+        width: 100% !important;
+        display: block !important;
       }
-      .sign-in-box .btn-primary:hover {
-        background: linear-gradient(135deg, #6A8A76 0%, #5D7A6A 100%) !important;
+
+      /* Google button: Charcoal - attribute selectors for namespaced IDs */
+      [id$=sign_in_with_google] {
+        background-color: #373D3C !important;
+        background: #373D3C !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 10px !important;
+      }
+      [id$=sign_in_with_google]:hover {
+        background-color: #2a2f2e !important;
+        background: #2a2f2e !important;
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(122, 154, 134, 0.3);
+        box-shadow: 0 4px 12px rgba(55, 61, 60, 0.25) !important;
       }
+
+      /* Email button: Sage */
+      [id$=sign_in_with_email] {
+        background-color: #7A9A86 !important;
+        background: #7A9A86 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 10px !important;
+      }
+      [id$=sign_in_with_email]:hover {
+        background-color: #6A8A76 !important;
+        background: #6A8A76 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(122, 154, 134, 0.3) !important;
+      }
+
+      /* --- Form inputs (email/password sub-flow) --- */
       .sign-in-box input {
         font-family: 'Rokkitt', serif !important;
         font-weight: 300 !important;
@@ -676,15 +732,63 @@ custom_sign_in_ui <- tagList(
         border-color: #7A9A86 !important;
         box-shadow: 0 0 0 3px rgba(122, 154, 134, 0.15) !important;
       }
-      .sign-in-footer {
+
+      /* Submit button in email sub-flow */
+      .sign-in-box .auth_panel .btn[type='submit'],
+      .sign-in-box .auth_panel input[type='submit'] {
+        background: #7A9A86 !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-family: 'Montserrat', sans-serif !important;
+        font-weight: 600 !important;
+      }
+
+      /* --- Feature highlights --- */
+      .sign-in-features {
+        display: flex;
+        gap: 48px;
         margin-top: 32px;
-        color: #8B9A8E;
-        font-size: 0.85rem;
-        font-family: 'Rokkitt', serif;
-        font-weight: 300;
         animation: fadeInUp 0.6s ease 0.4s backwards;
         position: relative;
         z-index: 1;
+      }
+      .sign-in-feature {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        text-align: center;
+      }
+      .sign-in-feature-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(122, 154, 134, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #7A9A86;
+        font-size: 1.3rem;
+      }
+      .sign-in-feature-label {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #373D3C;
+        line-height: 1.3;
+      }
+
+      /* --- Footer --- */
+      .sign-in-footer {
+        margin-top: 32px;
+        color: #8B9A8E;
+        font-size: 1.05rem;
+        font-family: 'Rokkitt', serif;
+        font-weight: 400;
+        animation: fadeInUp 0.6s ease 0.5s backwards;
+        position: relative;
+        z-index: 1;
+        text-align: center;
       }
       .sign-in-footer a {
         color: #7A9A86;
@@ -695,6 +799,25 @@ custom_sign_in_ui <- tagList(
         color: #5D7A6A;
         text-decoration: underline;
       }
+      .sign-in-footer-tagline {
+        display: block;
+        margin-top: 8px;
+        font-family: 'Rokkitt', serif;
+        font-weight: 400;
+        color: #8B9A8E;
+        font-size: 1.1rem;
+        letter-spacing: 0.3px;
+      }
+
+      /* --- Responsive --- */
+      @media (max-width: 480px) {
+        .sign-in-logo { max-width: 300px; }
+        .sign-in-tagline { font-size: 1.05rem; }
+        .sign-in-features { gap: 24px; }
+        .sign-in-feature-label { font-size: 0.8rem; }
+        .sign-in-box { padding: 28px 24px; }
+      }
+
       @keyframes fadeInUp {
         from {
           opacity: 0;
@@ -705,12 +828,29 @@ custom_sign_in_ui <- tagList(
           transform: translateY(0);
         }
       }
+    ")),
+    # JS to override Polished inline styles - use attribute selectors for namespaced IDs
+    tags$script(HTML("
+      (function() {
+        var googleStyle = 'background-color:#373D3C; color:#fff; border:none; border-radius:10px; font-family:Montserrat,sans-serif; font-weight:600; font-size:1.05rem; letter-spacing:0.3px; padding:14px 1.5rem; width:100%; display:block;';
+        var emailStyle  = 'background-color:#7A9A86; color:#fff; border:none; border-radius:10px; font-family:Montserrat,sans-serif; font-weight:600; font-size:1.05rem; letter-spacing:0.3px; padding:14px 1.5rem; width:100%; display:block;';
+        function brand() {
+          var g = document.querySelector('[id$=sign_in_with_google]');
+          var e = document.querySelector('[id$=sign_in_with_email]');
+          if (g) g.setAttribute('style', googleStyle);
+          if (e) e.setAttribute('style', emailStyle);
+          return g && e;
+        }
+        var iv = setInterval(function() {
+          if (brand()) clearInterval(iv);
+        }, 150);
+        setTimeout(function() { clearInterval(iv); }, 10000);
+      })();
     "))
   ),
   div(class = "sign-in-container",
-    img(src = "logo.svg", class = "sign-in-logo", alt = "edaphic flora"),
-    h2(class = "sign-in-welcome", "Welcome to edaphic flora"),
-    p(class = "sign-in-tagline", "Record and analyze soil conditions for plant species"),
+    img(src = "logo_full_header.svg", class = "sign-in-logo", alt = "edaphic flora"),
+    p(class = "sign-in-tagline", "Better data from the ground up."),
     div(class = "sign-in-box",
       polished::sign_in_ui_default(
         color = "#7A9A86",
@@ -719,10 +859,32 @@ custom_sign_in_ui <- tagList(
         logo_bottom = NULL
       )
     ),
+    # Feature highlights with inline SVG icons
+    div(class = "sign-in-features",
+      div(class = "sign-in-feature",
+        div(class = "sign-in-feature-icon",
+          HTML("<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='#7A9A86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M10 2v8L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45L14 10V2'/><path d='M8.5 2h7'/><path d='M7 16h10'/></svg>")
+        ),
+        span(class = "sign-in-feature-label", "Lab-grade", tags$br(), "soil data")
+      ),
+      div(class = "sign-in-feature",
+        div(class = "sign-in-feature-icon",
+          HTML("<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='#7A9A86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 1 8-1.5 5.5-5 7-9 10z'/><path d='M2 21c0-3 1.85-5.36 5.08-7C10.33 12.33 13.5 12.5 16 11'/><path d='m8 16 1.5-1.5'/></svg>")
+        ),
+        span(class = "sign-in-feature-label", "Native species", tags$br(), "badges")
+      ),
+      div(class = "sign-in-feature",
+        div(class = "sign-in-feature-icon",
+          HTML("<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='#7A9A86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/><path d='M2 12h20'/></svg>")
+        ),
+        span(class = "sign-in-feature-label", "Community", tags$br(), "insights")
+      )
+    ),
     div(class = "sign-in-footer",
       a(href = "privacy.html", target = "_blank", "Privacy Policy"),
       span(" | "),
-      a(href = "terms.html", target = "_blank", "Terms of Service")
+      a(href = "terms.html", target = "_blank", "Terms of Service"),
+      span(class = "sign-in-footer-tagline", "Community-powered soil science")
     )
   )
 )
