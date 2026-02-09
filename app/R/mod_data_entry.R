@@ -229,7 +229,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                             value = FALSE),
               tags$small(class = "text-muted d-block mt-1",
                          "Most state ",
-                         tags$a(href = "https://www.nifa.usda.gov/grants/programs/cooperative-extension-system",
+                         tags$a(href = "https://www.nifa.usda.gov/about-nifa/what-we-do/extension/cooperative-extension-system",
                                 target = "_blank", "cooperative extension"),
                          " offices offer free or low-cost soil testing. Home test kits lack the accuracy needed for meaningful comparisons. ",
                          actionLink(ns("link_to_field_guide"), "See our soil testing guide",
