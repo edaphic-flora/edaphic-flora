@@ -888,7 +888,7 @@ server_inner <- function(input, output, session) {
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,
                edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
-               user_prefs, species_search_index, common_name_db)
+               user_prefs, species_search_index, common_name_db, experience_level)
 
 # Brand click → navigate to Welcome page
  observeEvent(input$brand_click, {
@@ -914,6 +914,12 @@ observeEvent(input$help_link_soil, {
  observeEvent(input$help_link_performance, {
    nav_select("main_nav", "Field Guide")
    session$sendCustomMessage("scrollToAnchor", "guide-plant-performance")
+ })
+
+ # Soil testing guide link from data entry module
+ observeEvent(input$`data_entry-link_to_field_guide`, {
+   nav_select("main_nav", "Field Guide")
+   session$sendCustomMessage("scrollToAnchor", "guide-soil-testing")
  })
 
  # ---------------------------

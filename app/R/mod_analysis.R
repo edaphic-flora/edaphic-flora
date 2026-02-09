@@ -21,7 +21,6 @@ analysisUI <- function(id) {
                          openOnFocus = FALSE, closeAfterSelect = TRUE, selectOnTab = TRUE,
                          placeholder = 'Type a species name...'
                        )),
-        uiOutput(ns("common_name_display")),
         hr(),
         uiOutput(ns("species_summary")),
         uiOutput(ns("reference_badges")),
@@ -146,7 +145,8 @@ analysisUI <- function(id) {
 
 analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                            edaphic_colors, theme_edaphic, scale_color_edaphic, scale_fill_edaphic,
-                           user_prefs = NULL, species_search_index = NULL, common_name_db = NULL) {
+                           user_prefs = NULL, species_search_index = NULL, common_name_db = NULL,
+                           experience_level = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -168,8 +168,12 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       current <- isolate(input$analysis_species) %||% ""
 
-      # Build choices with common name labels for species that have data
-      if (!is.null(common_name_db) && nrow(common_name_db) > 0 && length(sp) > 0) {
+      # Build choices: Casual users see "Common Name (Scientific Name)",
+      # Pro users see scientific name only
+      is_casual <- is.null(experience_level) || !is.reactive(experience_level) ||
+                   experience_level() != "enthusiast"
+
+      if (is_casual && !is.null(common_name_db) && nrow(common_name_db) > 0 && length(sp) > 0) {
         # Key lookup by genus-species (first 2 words) since DB stores full author citations
         gs_keys <- vapply(strsplit(common_name_db$scientific_name, " "), function(x) {
           paste(head(x, 2), collapse = " ")
@@ -278,23 +282,6 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         div(class = "text-info small mt-2",
             icon("info-circle"), " No samples yet. Showing reference data only.")
       }
-    })
-
-    # --- Common name display ---
-    output$common_name_display <- renderUI({
-      sp <- input$analysis_species %||% ""
-      if (!nzchar(sp)) return(NULL)
-
-      # Try to get common name from USDA data
-      common_name <- get_usda_common_name(sp, pool)
-
-      if (is.null(common_name) || !nzchar(common_name)) return(NULL)
-
-      div(
-        class = "text-muted small mt-1 mb-2",
-        style = "font-style: italic;",
-        tools::toTitleCase(common_name)
-      )
     })
 
     # --- Species stats threshold (reactive, used by summary + charts) ---

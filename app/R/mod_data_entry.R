@@ -506,13 +506,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
     })
 
-    # Field Guide link handler
-    observeEvent(input$link_to_field_guide, {
-      showNotification(
-        "Check Help > Field Guide for soil testing guidance.",
-        type = "message", duration = 5
-      )
-    })
+    # Field Guide link — handled in app.R via namespaced input
 
     # Enter manually -> go to step 2
     observeEvent(input$enter_manually, {

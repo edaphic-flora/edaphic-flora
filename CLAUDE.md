@@ -86,7 +86,7 @@ Main table `soil_samples`:
 - Location: location_lat, location_long, ecoregion_l4, ecoregion_l4_code
 - Metadata: date, outcome, sun_exposure, site_hydrology, notes
 
-Reference tables: `ref_taxon`, `ref_usda_traits` (93,915 entries), `ref_wetland_indicator`, `ref_noxious_invasive` (1,950 records, 50 states), `ref_state_distribution` (AK/HI only), `user_preferences`
+Reference tables: `ref_taxon`, `ref_usda_traits` (93,915 entries), `ref_wetland_indicator`, `ref_noxious_invasive` (1,950 records, 50 states), `ref_state_distribution` (408K BONAP records, all 50 states + DC), `user_preferences`
 
 ## Environment Variables
 
