@@ -779,31 +779,28 @@ get_native_status_for_user <- function(gs_name, user_prefs, pool) {
         status = "native_na",
         state_code = state_code,
         state_name = state_name,
-        tooltip = paste0("Native to North America (state-specific data not available for ", state_name, ")")
+        tooltip = paste0("Native to other US states, not recorded in ", state_name, " (USDA)")
       ))
     } else if (na_status$status == "introduced") {
       return(list(
         status = "introduced_na",
         state_code = state_code,
         state_name = state_name,
-        tooltip = paste0("Introduced to North America (not native to ", state_name, ")")
+        tooltip = paste0("Introduced to North America, not native to ", state_name, " (USDA)")
       ))
     } else if (na_status$status == "both") {
-      # For L48 states, "both" means native to continental US but introduced elsewhere (e.g., Hawaii)
-      # Show as "Native to N. America" for practical purposes
-      # AK/HI users will get state-specific data from ref_state_distribution instead
       return(list(
         status = "native_na",
         state_code = state_code,
         state_name = state_name,
-        tooltip = "Native to North America (introduced to some territories)"
+        tooltip = paste0("Native to other US states, not recorded in ", state_name, " (USDA)")
       ))
     } else {
       return(list(
         status = "unknown",
         state_code = state_code,
         state_name = state_name,
-        tooltip = paste0("Native status data not available for ", state_name)
+        tooltip = paste0("Native status not available for ", state_name)
       ))
     }
   }
