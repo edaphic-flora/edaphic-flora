@@ -154,7 +154,7 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 | Data Entry with PDF extraction | Production |
 | Analysis with 9 visualization tabs | Production |
 | User preferences (zip code in navbar) | Production |
-| Native/Introduced badges | Production (NA-level) |
+| Native/Introduced badges | Production (state-level via BONAP) |
 | State-level invasive badges | Production (50 states) |
 | Batch plant upload | Dev only |
 | Find Plants recommendations | Hidden (needs 10+ samples/species) |
@@ -168,14 +168,15 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 - `scripts/fetch_state_invasive_lists.R` - Compilation script with all 50 states
 - `data/state_invasive_for_import.csv` - Compiled output
 
-### Native Status Data
-- **North America level**: From USDA Plants `ref_usda_traits.native_status`
-- **State level**: Only AK and HI have state-specific data in `ref_state_distribution`
-- **L48 states**: Show "Native to N. America" (L48 expansion removed - too broad)
-- **Pending**: BONAP data for true state-level native status (permission pending)
+### Native Status Data - COMPLETE
+- **State level**: BONAP (Biota of North America Program) provides authoritative per-state nativity for all 50 states + DC. 408K records in `ref_state_distribution` with `source='BONAP'`. Covers ~20K species at 90% match rate to `ref_taxon`.
+- **NA-level fallback**: USDA Plants `ref_usda_traits.native_status` used when BONAP lacks state data for a species (~10% of flora). Shows "Native to other US states, not recorded in {state}" with USDA source.
+- **Tooltips**: Include source attribution, e.g., "Native to Minnesota (BONAP)"
 
-### Native Status Parsing
-Species marked "Native, Introduced" in USDA (native to L48, introduced to HI) show as "Native to N. America" for L48 users. Fixed regex to properly detect N/I markers in status strings like "CAN, HI, L48, N, I, Native, Introduced".
+**Key files:**
+- `scripts/scrape_bonap_nativity.R` - BONAP TDC scraper (cached TSVs in `data/cache_bonap/`)
+- `app/R/etl/bonap_state_dist_etl.R` - ETL to load BONAP data into DB
+- `data/bonap_state_nativity_compiled.csv` - Compiled scrape output (160K records)
 
 ## Memory Notes
 
