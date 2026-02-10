@@ -428,19 +428,6 @@ base_ui <- page_navbar(
            )
        ),
 
-       # Mobile Layout
-       div(class = "card mb-3", style = "border-left: 3px solid #7A9A86;",
-           div(class = "card-body",
-               div(class = "d-flex align-items-center mb-2",
-                   tags$i(class = "fa fa-mobile-alt me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
-                   h6("Mobile-Friendly Layout", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
-               ),
-               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
-                 "Log soil samples from the field on your phone. A responsive layout is coming so you can ",
-                 "record data wherever the dirt is.")
-           )
-       ),
-
        # --- CTA footer ---
        div(style = "text-align: center; margin-top: 2.5rem; padding: 1.5rem; background: #F7F4E8; border-radius: 8px;",
            p(style = "font-family: 'Rokkitt', serif; color: #5F7268; font-size: 1rem; margin-bottom: 0.25rem;",
