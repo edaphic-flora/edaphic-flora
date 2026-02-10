@@ -1052,6 +1052,15 @@ analysisServer("analysis", pool, data_changed, state_grid, is_prod,
    session$sendCustomMessage("closeUserDropdown", TRUE)
  }, ignoreInit = TRUE)
 
+# Welcome page CTA buttons
+observeEvent(input$welcome_submit_data, {
+  nav_select("main_nav", "Data Entry")
+}, ignoreInit = TRUE)
+
+observeEvent(input$welcome_browse_data, {
+  nav_select("main_nav", "Analysis")
+}, ignoreInit = TRUE)
+
 # Help links from welcome page - navigate to Field Guide with anchor scroll
 observeEvent(input$help_link_soil, {
    nav_select("main_nav", "Field Guide")
