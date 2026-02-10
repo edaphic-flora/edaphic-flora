@@ -1100,6 +1100,11 @@ edaphic_css <- function() {
         height: 400px !important;
       }
 
+      /* Plotly: hide mode bar, tighten margins */
+      .plotly .modebar-container {
+        display: none !important;
+      }
+
       .bslib-sidebar-layout > .sidebar {
         width: 260px !important;
       }
@@ -1110,6 +1115,23 @@ edaphic_css <- function() {
 
       .card-header {
         padding: 0.75rem 1rem !important;
+      }
+
+      /* Analysis tabs: scrollable with visible hint */
+      .analysis-tabs-container .nav-tabs,
+      .analysis-tabs-container .card-header-tabs,
+      .analysis-tabs-container ul.nav.nav-tabs {
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        /* Fade hint on right edge */
+        mask-image: linear-gradient(to right, black 85%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+      }
+
+      .analysis-tabs-container .nav-tabs .nav-link,
+      .analysis-tabs-container .card-header-tabs .nav-link {
+        font-size: 0.8rem !important;
+        padding: 0.4rem 0.6rem !important;
       }
     }
 
@@ -1138,9 +1160,18 @@ edaphic_css <- function() {
         max-width: 100% !important;
       }
 
-      /* Plots: compact */
+      /* Plots: compact, legend below chart */
       .plotly, .shiny-plot-output {
-        height: 320px !important;
+        height: 350px !important;
+      }
+
+      .plotly .legend {
+        font-size: 10px !important;
+      }
+
+      /* Plotly title: smaller */
+      .plotly .gtitle {
+        font-size: 13px !important;
       }
 
       /* Cards: tighter padding */
