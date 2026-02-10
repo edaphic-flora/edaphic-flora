@@ -1096,14 +1096,22 @@ edaphic_css <- function() {
     .lab-confirm-gate .form-check,
     .lab-confirm-gate .checkbox label {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.5rem;
     }
 
     .lab-confirm-gate .form-check-input,
     .lab-confirm-gate .checkbox input[type='checkbox'] {
-      margin-top: 0;
+      margin-top: 0.3rem;
       flex-shrink: 0;
+    }
+
+    /* Keep checkbox label on one line on desktop */
+    @media (min-width: 577px) {
+      .lab-confirm-gate .form-check-label,
+      .lab-confirm-gate .checkbox label span {
+        white-space: nowrap;
+      }
     }
 
     /* ===========================

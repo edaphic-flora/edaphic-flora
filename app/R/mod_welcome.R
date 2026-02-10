@@ -77,10 +77,25 @@ welcomeUI <- function(id) {
               ),
 
               h4(class = "mt-2", "Getting Started"),
-              p(class = "mb-1", "Head to the ", tags$strong("Data Entry"), " tab to submit your first soil sample. ",
-                "Use the ", tags$strong("Analysis"), " tab to explore existing data."),
-              p(class = "mb-1 text-muted", style = "font-size: 0.93rem;",
-                "Click your name in the top right to set your home location and preferences."),
+              div(class = "d-flex flex-column flex-sm-row gap-2 mb-3",
+                  actionButton("welcome_submit_data",
+                               label = tagList(icon("flask"), " I have a soil report"),
+                               class = "btn-lg",
+                               style = "background-color: #7A9A86; color: white; border: none; font-family: 'Montserrat', sans-serif; font-weight: 600;"),
+                  actionButton("welcome_browse_data",
+                               label = tagList(icon("chart-line"), " I'm exploring species data"),
+                               class = "btn-lg",
+                               style = "background-color: #D39B35; color: white; border: none; font-family: 'Montserrat', sans-serif; font-weight: 600;")
+              ),
+              div(class = "p-2 mb-3 rounded",
+                  style = "background-color: rgba(122, 154, 134, 0.1); border-left: 3px solid #7A9A86;",
+                  tags$span(style = "font-size: 0.93rem; color: #373D3C;",
+                    icon("user-gear", style = "color: #7A9A86;"), " ",
+                    tags$strong("Set your home location:"),
+                    " Click your name in the top right to set your zip code and state. ",
+                    "This enables local native status, nearby sample features, and autofills your zip code on the submission form."
+                  )
+              ),
 
               # Help links - NOT namespaced so main app observers can handle navigation
               div(class = "mt-2 p-2 border rounded",
