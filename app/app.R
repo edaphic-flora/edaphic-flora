@@ -348,14 +348,6 @@ base_ui <- page_navbar(
          var dd = document.querySelector('.navbar .dropdown-toggle');
          if (dd) { bootstrap.Dropdown.getOrCreateInstance(dd).hide(); }
        });
-       // Fix Leaflet tile render on initial load
-       $(document).on('shiny:value', function(e) {
-         if (e.name && e.name.indexOf('map') !== -1) {
-           setTimeout(function() {
-             window.dispatchEvent(new Event('resize'));
-           }, 200);
-         }
-       });
        // Analysis tab scroll arrows
        $(document).on('click', '.tab-scroll-left', function() {
          var tabs = $(this).closest('.analysis-tabs-container').find('.nav-tabs')[0];
