@@ -162,6 +162,7 @@ is_admin_user <- function(user_email) {
 base_ui <- page_navbar(
  id = "main_nav",
  selected = "Welcome",
+ window_title = "edaphic flora",
  title = span(
    class = "brand-name",
    HTML('<svg width="36" height="28" viewBox="170 0 250 280" style="vertical-align: middle; margin-right: 8px;">
@@ -199,6 +200,7 @@ base_ui <- page_navbar(
    edaphic_css(),
    tags$head(
      tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1, maximum-scale=5"),
      tags$link(rel = "stylesheet",
                href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
      # Brand fonts: Baumans (logo), Montserrat (headings), Rokkitt (body) - loaded via bslib but backup here
@@ -414,19 +416,6 @@ base_ui <- page_navbar(
                p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
                  "Get a friendly nudge to check in on your plants. Update whether they're thriving, struggling, ",
                  "or didn't make it \u2014 the data gets better with every update.")
-           )
-       ),
-
-       # State-Level Native Status
-       div(class = "card mb-3", style = "border-left: 3px solid #7A9A86;",
-           div(class = "card-body",
-               div(class = "d-flex align-items-center mb-2",
-                   tags$i(class = "fa fa-map-marker-alt me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
-                   h6("State-Level Native Status", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
-               ),
-               p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
-                 "Know exactly which species are native to ", tags$em("your"), " state, not just the continent. ",
-                 "We're working to bring truly local native/introduced data to every entry.")
            )
        ),
 
@@ -1090,6 +1079,7 @@ observeEvent(input$help_link_soil, {
  # Sign out
  observeEvent(input$sign_out_btn, {
    polished::sign_out_from_shiny(session)
+   shinyjs::delay(300, shinyjs::runjs("window.location.reload();"))
  })
 
  # ---------------------------
