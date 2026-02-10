@@ -1065,6 +1065,140 @@ edaphic_css <- function() {
       background: linear-gradient(90deg, #7A9A86 0%, #5D7A6A 100%);
       border-radius: 4px;
     }
+
+    /* Lab confirmation checkbox: inline */
+    .lab-confirm-gate .form-check,
+    .lab-confirm-gate .checkbox label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .lab-confirm-gate .form-check-input,
+    .lab-confirm-gate .checkbox input[type='checkbox'] {
+      margin-top: 0;
+      flex-shrink: 0;
+    }
+
+    /* ===========================
+       RESPONSIVE / MOBILE
+       =========================== */
+
+    /* --- Tablet (≤768px) --- */
+    @media (max-width: 768px) {
+      .user-dropdown-menu {
+        max-width: calc(100vw - 20px) !important;
+        right: 0 !important;
+      }
+
+      .dataTables_wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .plotly, .shiny-plot-output {
+        height: 400px !important;
+      }
+
+      .bslib-sidebar-layout > .sidebar {
+        width: 260px !important;
+      }
+
+      .card-body {
+        padding: 1rem !important;
+      }
+
+      .card-header {
+        padding: 0.75rem 1rem !important;
+      }
+    }
+
+    /* --- Phone (≤576px) --- */
+    @media (max-width: 576px) {
+      /* Touch targets: minimum 44px per WCAG */
+      .btn, .action-button, .dropdown-item {
+        min-height: 44px;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+      }
+
+      .form-control, .form-select, .selectize-input {
+        min-height: 44px;
+        font-size: 16px !important; /* prevents iOS auto-zoom on focus */
+      }
+
+      /* Navbar zip input: compact */
+      #nav_zipcode {
+        width: 60px !important;
+      }
+
+      /* Sidebar: full-width overlay */
+      .bslib-sidebar-layout > .sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      /* Plots: compact */
+      .plotly, .shiny-plot-output {
+        height: 320px !important;
+      }
+
+      /* Cards: tighter padding */
+      .card-body {
+        padding: 0.75rem !important;
+      }
+
+      .card-header {
+        padding: 0.5rem 0.75rem !important;
+      }
+
+      /* DataTables: smaller text, tighter cells */
+      .dataTables_wrapper {
+        font-size: 0.85rem;
+      }
+
+      .dataTable thead th {
+        padding: 0.5rem !important;
+        font-size: 0.8rem;
+      }
+
+      .dataTable tbody td {
+        padding: 0.5rem !important;
+        font-size: 0.85rem;
+      }
+
+      /* Modals: near full-width */
+      .modal-dialog {
+        margin: 0.5rem !important;
+        max-width: calc(100vw - 1rem) !important;
+      }
+
+      /* Typography scale-down */
+      h1 { font-size: 1.5rem !important; }
+      h2 { font-size: 1.3rem !important; }
+      h3 { font-size: 1.15rem !important; }
+
+      /* Welcome hero: compact */
+      .welcome-hero img {
+        max-height: 120px;
+      }
+
+      /* Stat cards on welcome page */
+      .stat-card {
+        padding: 0.5rem 0.25rem !important;
+      }
+
+      .stat-number {
+        font-size: 1.5rem !important;
+      }
+    }
+
+    /* --- Landscape mobile (short viewport) --- */
+    @media (max-height: 480px) and (orientation: landscape) {
+      .plotly, .shiny-plot-output {
+        height: 280px !important;
+      }
+    }
   "))
 }
 

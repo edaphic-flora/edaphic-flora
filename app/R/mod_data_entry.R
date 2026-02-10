@@ -94,7 +94,7 @@ dataEntryUI <- function(id) {
       # --- My Data Section (hidden by default, shown via link or after submit) ---
       shinyjs::hidden(
         div(id = ns("my_data_section"),
-            style = "width: 100vw; max-width: 1400px; position: relative; left: 50%; transform: translateX(-50%);",
+            style = "max-width: 1400px; margin: 0 auto;",
           div(class = "card",
             div(class = "card-header d-flex justify-content-between align-items-center",
                 span(icon("database"), " My Data"),
@@ -221,7 +221,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         # Step 1: Soil Source
         "1" = tagList(
           # Lab test confirmation gate
-          div(class = "mb-3 p-3 border rounded",
+          div(class = "mb-3 p-3 border rounded lab-confirm-gate",
               style = "background-color: #F7F4E8; border-color: #D39B35 !important;",
               checkboxInput(ns("lab_test_confirm"),
                             tags$span(style = "font-weight: 600; font-family: 'Montserrat', sans-serif; white-space: nowrap;",
