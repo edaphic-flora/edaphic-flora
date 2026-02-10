@@ -224,7 +224,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           div(class = "mb-3 p-3 border rounded lab-confirm-gate",
               style = "background-color: #F7F4E8; border-color: #D39B35 !important;",
               checkboxInput(ns("lab_test_confirm"),
-                            tags$span(style = "font-weight: 600; font-family: 'Montserrat', sans-serif; white-space: nowrap;",
+                            tags$span(style = "font-weight: 600; font-family: 'Montserrat', sans-serif;",
                                       "I confirm this data comes from a certified soil testing laboratory"),
                             value = FALSE),
               tags$small(class = "text-muted d-block mt-1",
