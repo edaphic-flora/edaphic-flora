@@ -21,6 +21,15 @@ analysisUI <- function(id) {
                          openOnFocus = FALSE, closeAfterSelect = TRUE, selectOnTab = TRUE,
                          placeholder = 'Type a species name...'
                        )),
+        # Mobile: button to collapse sidebar after species selection
+        div(class = "d-md-none mt-2",
+            tags$button(
+              class = "btn btn-sm w-100",
+              style = "background-color: #7A9A86; color: white; font-family: 'Montserrat', sans-serif; font-weight: 600;",
+              onclick = "var sb = this.closest('.bslib-sidebar-layout'); if(sb) { var toggle = sb.querySelector('.collapse-toggle'); if(toggle) toggle.click(); }",
+              icon("chart-line"), " View Analysis"
+            )
+        ),
         hr(),
         uiOutput(ns("species_summary")),
         uiOutput(ns("reference_badges")),
@@ -70,6 +79,12 @@ analysisUI <- function(id) {
 
       div(
         class = "analysis-tabs-container",
+        # Mobile tab scroll arrows (hidden on desktop via CSS)
+        div(class = "tab-scroll-arrows d-md-none",
+            tags$button(class = "tab-scroll-left btn btn-sm", icon("chevron-left")),
+            tags$span(class = "text-muted small", "Scroll tabs"),
+            tags$button(class = "tab-scroll-right btn btn-sm", icon("chevron-right"))
+        ),
         navset_card_tab(
           id = ns("analysis_tabs"),
           full_screen = TRUE,

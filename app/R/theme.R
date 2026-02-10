@@ -1066,6 +1066,32 @@ edaphic_css <- function() {
       border-radius: 4px;
     }
 
+    /* Analysis tab scroll arrows (mobile only, shown via d-md-none) */
+    .tab-scroll-arrows {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 0.4rem 0;
+    }
+
+    .tab-scroll-arrows .btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #7A9A86;
+      color: white;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+    }
+
+    .tab-scroll-arrows .btn:active {
+      background: #5D7A6A;
+    }
+
     /* Lab confirmation checkbox: inline */
     .lab-confirm-gate .form-check,
     .lab-confirm-gate .checkbox label {
@@ -1117,15 +1143,12 @@ edaphic_css <- function() {
         padding: 0.75rem 1rem !important;
       }
 
-      /* Analysis tabs: scrollable with visible hint */
+      /* Analysis tabs: scrollable with touch */
       .analysis-tabs-container .nav-tabs,
       .analysis-tabs-container .card-header-tabs,
       .analysis-tabs-container ul.nav.nav-tabs {
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
-        /* Fade hint on right edge */
-        mask-image: linear-gradient(to right, black 85%, transparent 100%);
-        -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
       }
 
       .analysis-tabs-container .nav-tabs .nav-link,
