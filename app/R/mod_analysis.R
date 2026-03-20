@@ -74,7 +74,15 @@ analysisUI <- function(id) {
         ),
         uiOutput(ns("reference_msg")),
         # Download button for current species data
-        uiOutput(ns("download_species_ui"))
+        uiOutput(ns("download_species_ui")),
+        # Export all data
+        div(class = "mt-3 pt-3 border-top",
+          tags$span(title = "Download the entire database — all species, all contributors — as a single CSV file",
+            downloadButton(ns("export_all_csv"), "Export All Data",
+                           class = "btn-sm btn-outline-secondary w-100",
+                           icon = icon("file-export"))
+          )
+        )
       ),
 
       div(
@@ -439,9 +447,11 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (nrow(dat) == 0) return(NULL)
 
       div(class = "mt-3 pt-3 border-top",
-        downloadButton(ns("download_species_csv"), "Download CSV",
-                       class = "btn-sm btn-outline-secondary w-100",
-                       icon = icon("download"))
+        tags$span(title = "Download filtered data for the selected species as a CSV file",
+          downloadButton(ns("download_species_csv"), "Download CSV",
+                         class = "btn-sm btn-outline-secondary w-100",
+                         icon = icon("download"))
+        )
       )
     })
 
@@ -461,6 +471,27 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                          "location_lat", "location_long", "ecoregion_l4", "date", "notes")
         export_cols <- export_cols[export_cols %in% names(dat)]
         write.csv(dat[, export_cols, drop = FALSE], file, row.names = FALSE, na = "")
+      }
+    )
+
+    # Export all data handler
+    output$export_all_csv <- downloadHandler(
+      filename = function() {
+        paste0("edaphic_flora_all_data_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        data <- db_get_all_samples()
+        write.csv(data, file, row.names = FALSE, na = "")
+
+        # Audit log
+        u <- tryCatch(session$userData$user(), error = function(e) NULL)
+        if (!is.null(u)) {
+          tryCatch(
+            db_audit_log("export", "soil_samples", user_id = u$user_uid,
+                         details = sprintf("exported all data (%d rows)", nrow(data))),
+            error = function(e) NULL
+          )
+        }
       }
     )
 

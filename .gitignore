@@ -45,5 +45,8 @@ deploy.R
 # Windows artifacts
 nul
 
+# Wildlife source data (proprietary - never commit)
+data/wildlife_source/
+
 # Alpha feedback (local only)
 feedback/

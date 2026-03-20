@@ -72,7 +72,8 @@ app/
 │   ├── mod_help.R        # Field Guide + FAQ
 │   ├── mod_admin.R       # Admin panel
 │   ├── mod_data_management.R  # Import/export
-│   └── mod_find_plants.R # Species recommendations (hidden until data threshold)
+│   ├── mod_find_plants.R # Species recommendations (deprecated, replaced by My Garden)
+│   └── mod_my_garden.R  # Wildlife dashboard with donut charts
 ├── species_accepted.csv  # WCVP species database (360K species)
 ├── fetch_usda_data.R     # USDA batch fetcher
 └── sql/                  # Schema migrations
@@ -156,8 +157,10 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 | User preferences (zip code in navbar) | Production |
 | Native/Introduced badges | Production (state-level via BONAP) |
 | State-level invasive badges | Production (50 states) |
+| Mobile-responsive layout | Production |
+| My Garden wildlife dashboard | Production (needs wildlife ETL data) |
 | Batch plant upload | Dev only |
-| Find Plants recommendations | Hidden (needs 10+ samples/species) |
+| Find Plants recommendations | Deprecated (replaced by My Garden) |
 
 ## Data Status
 
@@ -177,6 +180,18 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 - `scripts/scrape_bonap_nativity.R` - BONAP TDC scraper (cached TSVs in `data/cache_bonap/`)
 - `app/R/etl/bonap_state_dist_etl.R` - ETL to load BONAP data into DB
 - `data/bonap_state_nativity_compiled.csv` - Compiled scrape output (160K records)
+
+### Wildlife Data
+- **4 tables**: `ref_wildlife_plants` (~463), `ref_wildlife_species` (~2,220), `ref_wildlife_interactions` (~11,246), `ref_specialist_bees_by_genus` (~61)
+- **Source**: Proprietary Excel files from consulting business (never committed to git)
+- **ETL**: `app/R/etl/wildlife_etl.R` — follows bonap_state_dist_etl.R pattern
+- **Module**: `app/R/mod_my_garden.R` — donut charts showing wildlife coverage per family
+
+## Important Conventions
+- Brand name is always lowercase: "edaphic flora" (never Title Case)
+- Admin access requires BOTH Polished admin status AND listing in `ADMIN_EMAILS` env var
+- Welcome page action buttons use unnamespaced IDs (handled by app.R observers, not module)
+- Don't commit/push until user confirms changes work
 
 ## Memory Notes
 

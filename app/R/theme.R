@@ -1066,6 +1066,19 @@ edaphic_css <- function() {
       border-radius: 4px;
     }
 
+    /* ===========================================
+       15. WILDLIFE DASHBOARD (My Garden)
+       =========================================== */
+
+    .wildlife-donut-grid .card {
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .wildlife-donut-grid .card:hover {
+      box-shadow: 0 4px 12px rgba(122, 154, 134, 0.15);
+      transform: translateY(-1px);
+    }
+
     /* Analysis tab scroll arrows (mobile only, shown via d-md-none) */
     .tab-scroll-arrows {
       display: flex;
@@ -1120,6 +1133,11 @@ edaphic_css <- function() {
 
     /* --- Tablet (≤768px) --- */
     @media (max-width: 768px) {
+      .wildlife-donut-grid .col-lg-3 {
+        flex: 0 0 50%;
+        max-width: 50%;
+      }
+
       .user-dropdown-menu {
         max-width: calc(100vw - 20px) !important;
         right: 0 !important;
@@ -1168,6 +1186,13 @@ edaphic_css <- function() {
 
     /* --- Phone (≤576px) --- */
     @media (max-width: 576px) {
+      .wildlife-donut-grid .col-lg-3,
+      .wildlife-donut-grid .col-md-4,
+      .wildlife-donut-grid .col-sm-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+      }
+
       /* Touch targets: minimum 44px per WCAG */
       .btn, .action-button, .dropdown-item {
         min-height: 44px;

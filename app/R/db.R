@@ -181,6 +181,67 @@ db_migrate <- function() {
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_noxious_taxon ON ref_noxious_invasive(taxon_id)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_noxious_state ON ref_noxious_invasive(state_code)")
 
+    # Wildlife reference tables (proprietary data loaded via ETL)
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_wildlife_plants (
+        id SERIAL PRIMARY KEY,
+        taxon_id INTEGER REFERENCES ref_taxon(id) ON DELETE CASCADE,
+        species_code VARCHAR(50) UNIQUE NOT NULL,
+        genus VARCHAR(100),
+        life_form VARCHAR(50),
+        lepidoptera_species_count INTEGER DEFAULT 0,
+        specialist_bee_species_count INTEGER DEFAULT 0,
+        songbird_value VARCHAR(50),
+        bird_food TEXT,
+        hummingbird_plant BOOLEAN DEFAULT FALSE,
+        is_keystone_genus BOOLEAN DEFAULT FALSE,
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wildlife_plants_taxon ON ref_wildlife_plants(taxon_id)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wildlife_plants_genus ON ref_wildlife_plants(genus)")
+
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_wildlife_species (
+        id SERIAL PRIMARY KEY,
+        wildlife_id VARCHAR(50) UNIQUE NOT NULL,
+        scientific_name TEXT NOT NULL,
+        common_name TEXT,
+        wildlife_type VARCHAR(30) NOT NULL,
+        family VARCHAR(100),
+        specialist_generalist VARCHAR(30),
+        functional_group VARCHAR(50),
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wildlife_species_type ON ref_wildlife_species(wildlife_type)")
+    dbExecute(pool, "ALTER TABLE ref_wildlife_species ADD COLUMN IF NOT EXISTS midatlantic_present BOOLEAN")
+
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_wildlife_interactions (
+        id SERIAL PRIMARY KEY,
+        plant_species_code VARCHAR(50) NOT NULL,
+        wildlife_id VARCHAR(50) NOT NULL,
+        interaction_type VARCHAR(50) NOT NULL,
+        evidence_level VARCHAR(30),
+        source TEXT,
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        UNIQUE(plant_species_code, wildlife_id, interaction_type)
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wildlife_int_plant ON ref_wildlife_interactions(plant_species_code)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wildlife_int_wildlife ON ref_wildlife_interactions(wildlife_id)")
+
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_specialist_bees_by_genus (
+        id SERIAL PRIMARY KEY,
+        host_genus VARCHAR(100) UNIQUE NOT NULL,
+        specialist_bee_count INTEGER DEFAULT 0,
+        specialist_bee_species TEXT,
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    ")
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
@@ -722,6 +783,228 @@ db_get_nearby_samples <- function(lat, lon, radius_miles = DEFAULT_NEIGHBOR_RADI
     result
   }, error = function(e) {
     message("Error getting nearby samples: ", e$message)
+    data.frame()
+  })
+}
+
+# ---------------------------
+# Wildlife Dashboard Queries
+# ---------------------------
+
+#' Get distinct species from a user's soil samples (their "garden")
+#' @param user_id Firebase UID
+#' @param pool Database connection pool
+#' @return Character vector of species names
+db_get_user_garden_species <- function(user_id, pool) {
+  if (is.null(user_id) || !nzchar(user_id)) return(character())
+  tryCatch({
+    result <- dbGetQuery(pool, "
+      SELECT DISTINCT species FROM soil_samples
+      WHERE created_by = $1 AND species IS NOT NULL AND species != ''
+      ORDER BY species
+    ", params = list(user_id))
+    result$species
+  }, error = function(e) {
+    message("Error fetching garden species: ", e$message)
+    character()
+  })
+}
+
+#' Get wildlife coverage for a set of garden species
+#' Joins species → ref_taxon (genus match) → ref_wildlife_plants → ref_wildlife_interactions → ref_wildlife_species
+#' @param species_list Character vector of species names from soil_samples
+#' @param pool Database connection pool
+#' @return Data frame with columns: garden_species, plant_species_code, wildlife_id, wildlife_type,
+#'         wildlife_family, wildlife_common_name, wildlife_scientific_name, interaction_type,
+#'         specialist_generalist, functional_group
+db_get_wildlife_coverage <- function(species_list, pool) {
+  if (length(species_list) == 0) return(data.frame())
+  tryCatch({
+    # Stage garden species in temp table for join
+    con <- poolCheckout(pool)
+    on.exit(poolReturn(con), add = TRUE)
+
+    dbExecute(con, "DROP TABLE IF EXISTS tmp_garden_species")
+    dbExecute(con, "CREATE TEMP TABLE tmp_garden_species (species TEXT)")
+    if (length(species_list) > 0) {
+      dbWriteTable(con, "tmp_garden_species",
+                   data.frame(species = species_list, stringsAsFactors = FALSE),
+                   append = TRUE, temporary = TRUE, row.names = FALSE)
+    }
+
+    dbGetQuery(con, "
+      SELECT DISTINCT
+        g.species AS garden_species,
+        wp.species_code AS plant_species_code,
+        ws.wildlife_id,
+        ws.wildlife_type,
+        COALESCE(ws.family, 'Unknown') AS wildlife_family,
+        ws.common_name AS wildlife_common_name,
+        ws.scientific_name AS wildlife_scientific_name,
+        wi.interaction_type,
+        ws.specialist_generalist,
+        ws.functional_group
+      FROM tmp_garden_species g
+      JOIN ref_taxon t ON lower(split_part(t.scientific_name, ' ', 1))
+                        = lower(split_part(g.species, ' ', 1))
+      JOIN ref_wildlife_plants wp ON wp.taxon_id = t.id
+      JOIN ref_wildlife_interactions wi ON wi.plant_species_code = wp.species_code
+      JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
+    ")
+  }, error = function(e) {
+    message("Error fetching wildlife coverage: ", e$message)
+    data.frame()
+  })
+}
+
+#' Aggregate wildlife coverage into per-family/group summary stats
+#' Pure R function — no DB hit.
+#' @param coverage_df Data frame from db_get_wildlife_coverage
+#' @return List keyed by wildlife_type, each containing a data frame with
+#'         family, species_covered, total_species, coverage_pct
+db_get_wildlife_summary <- function(coverage_df, all_species_df = NULL) {
+  if (is.null(coverage_df) || nrow(coverage_df) == 0) return(list())
+
+  types <- unique(coverage_df$wildlife_type)
+  result <- list()
+
+  for (wtype in types) {
+    type_df <- coverage_df[coverage_df$wildlife_type == wtype, ]
+    covered_by_family <- tapply(type_df$wildlife_id, type_df$wildlife_family, function(x) length(unique(x)))
+
+    # Get total species per family from all_species_df if available
+    if (!is.null(all_species_df) && nrow(all_species_df) > 0) {
+      all_type <- all_species_df[all_species_df$wildlife_type == wtype, ]
+      total_by_family <- tapply(all_type$wildlife_id, all_type$family, function(x) length(unique(x)))
+    } else {
+      total_by_family <- covered_by_family
+    }
+
+    families <- union(names(covered_by_family), names(total_by_family))
+    families <- families[!is.na(families) & nzchar(families)]
+
+    summary_df <- data.frame(
+      family = families,
+      species_covered = as.integer(covered_by_family[families]),
+      total_species = as.integer(total_by_family[families]),
+      stringsAsFactors = FALSE
+    )
+    summary_df$species_covered[is.na(summary_df$species_covered)] <- 0L
+    summary_df$total_species[is.na(summary_df$total_species)] <- 0L
+    summary_df$coverage_pct <- ifelse(summary_df$total_species > 0,
+                                       round(100 * summary_df$species_covered / summary_df$total_species, 1),
+                                       0)
+    summary_df <- summary_df[order(-summary_df$species_covered), ]
+    result[[wtype]] <- summary_df
+  }
+
+  result
+}
+
+#' Get all wildlife species (for total counts per family)
+#' @param pool Database connection pool
+#' @return Data frame with wildlife_id, wildlife_type, family
+db_get_all_wildlife_species <- function(pool) {
+  tryCatch({
+    dbGetQuery(pool, "
+      SELECT wildlife_id, wildlife_type, COALESCE(family, 'Unknown') AS family
+      FROM ref_wildlife_species
+    ")
+  }, error = function(e) {
+    message("Error fetching all wildlife species: ", e$message)
+    data.frame()
+  })
+}
+
+#' Get gap recommendations — plants NOT in user's garden that would add the most wildlife
+#' @param covered_codes Character vector of plant species_codes already in garden
+#' @param user_state Two-letter state code for native filtering
+#' @param pool Database connection pool
+#' @param max_results Max recommendations to return
+#' @return Data frame with species info and wildlife impact counts
+db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
+                                     life_form_filter = NULL, max_results = 10) {
+  tryCatch({
+    con <- poolCheckout(pool)
+    on.exit(poolReturn(con), add = TRUE)
+
+    # Stage covered codes
+    dbExecute(con, "DROP TABLE IF EXISTS tmp_covered_codes")
+    dbExecute(con, "CREATE TEMP TABLE tmp_covered_codes (species_code VARCHAR(50))")
+    if (length(covered_codes) > 0) {
+      dbWriteTable(con, "tmp_covered_codes",
+                   data.frame(species_code = covered_codes, stringsAsFactors = FALSE),
+                   append = TRUE, temporary = TRUE, row.names = FALSE)
+    }
+
+    # Build state filter
+    state_join <- ""
+    if (!is.null(user_state) && nzchar(user_state)) {
+      state_join <- sprintf("
+        JOIN ref_state_distribution sd ON sd.taxon_id = wp.taxon_id
+          AND sd.state_code = '%s' AND sd.native_status = 'Native'
+      ", gsub("'", "''", user_state))
+    }
+
+    # Build life_form filter
+    life_form_clause <- ""
+    if (!is.null(life_form_filter) && nzchar(life_form_filter) && life_form_filter != "All") {
+      # Map filter categories to actual life_form values
+      lf_values <- switch(life_form_filter,
+        "Tree" = c("Tree"),
+        "Shrub" = c("Shrub", "Shrub/small tree"),
+        "Perennial" = c("Perennial", "Perennial (ephemeral)", "Groundcover"),
+        "Grass/Sedge" = c("Grass", "Sedge"),
+        "Vine" = c("Vine"),
+        "Fern" = c("Fern"),
+        "Annual" = c("Annual"),
+        NULL
+      )
+      if (!is.null(lf_values)) {
+        quoted <- paste0("'", gsub("'", "''", lf_values), "'", collapse = ", ")
+        life_form_clause <- sprintf("AND wp.life_form IN (%s)", quoted)
+      }
+    }
+
+    # Aggregate at genus level — show one representative per genus
+    query <- sprintf("
+      WITH gap_plants AS (
+        SELECT wp.species_code, wp.taxon_id, wp.genus, wp.is_keystone_genus,
+               wp.lepidoptera_species_count, wp.specialist_bee_species_count,
+               wp.life_form,
+               t.scientific_name
+        FROM ref_wildlife_plants wp
+        JOIN ref_taxon t ON t.id = wp.taxon_id
+        %s
+        WHERE NOT EXISTS (
+          SELECT 1 FROM tmp_covered_codes cc WHERE cc.species_code = wp.species_code
+        )
+        %s
+      ),
+      genus_impact AS (
+        SELECT gp.genus,
+               MAX(gp.is_keystone_genus::int)::boolean AS is_keystone_genus,
+               MAX(gp.life_form) AS life_form,
+               COUNT(DISTINCT wi.wildlife_id) AS new_wildlife_count,
+               COUNT(DISTINCT CASE WHEN ws.wildlife_type IN ('Moth', 'Butterfly', 'Skipper')
+                     THEN ws.wildlife_id END) AS lep_count,
+               COUNT(DISTINCT CASE WHEN ws.wildlife_type = 'Bee'
+                     THEN ws.wildlife_id END) AS bee_count,
+               COUNT(DISTINCT CASE WHEN ws.wildlife_type = 'Bird'
+                     THEN ws.wildlife_id END) AS bird_count
+        FROM gap_plants gp
+        JOIN ref_wildlife_interactions wi ON wi.plant_species_code = gp.species_code
+        JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
+        GROUP BY gp.genus
+      )
+      SELECT * FROM genus_impact
+      ORDER BY is_keystone_genus DESC, new_wildlife_count DESC
+      LIMIT %d
+    ", state_join, life_form_clause, max_results)
+
+    dbGetQuery(con, query)
+  }, error = function(e) {
+    message("Error fetching wildlife gap recommendations: ", e$message)
     data.frame()
   })
 }
