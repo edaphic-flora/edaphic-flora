@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/www/readme_header.svg" alt="edaphic flora" width="400">
+  <img src="app/www/readme_header.svg" alt="Edaphic Flora" width="400">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 
 ---
 
-edaphic flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource for gardeners, researchers, restorationists, and land managers to understand what soil conditions different species actually thrive in—not just what's listed in general references.
+Edaphic Flora is an open-source R Shiny application for recording and analyzing soil conditions where plants grow. By crowdsourcing soil data from real growing locations, we're building a resource for gardeners, researchers, restorationists, and land managers to understand what soil conditions different species actually thrive in—not just what's listed in general references.
 
 > *"Edaphic" means relating to the soil, especially as it affects living organisms.*
 
@@ -196,7 +196,7 @@ See [DATA_SOURCES.md](DATA_SOURCES.md) for complete attribution and license deta
 
 ## Support the Project
 
-edaphic flora is free and open-source. If you find it useful, consider supporting development:
+Edaphic Flora is free and open-source. If you find it useful, consider supporting development:
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-7A9A86?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/toddtesterman)
 

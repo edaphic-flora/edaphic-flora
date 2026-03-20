@@ -6,7 +6,7 @@ Use this content when configuring your invite email in the Polished dashboard.
 
 ## Subject Line
 
-You're invited to the edaphic flora alpha!
+You're invited to the Edaphic Flora alpha!
 
 ---
 
@@ -25,7 +25,7 @@ You're invited to the edaphic flora alpha!
   <div style="background: #F7F4E8; border-radius: 8px; padding: 25px; margin-bottom: 25px;">
     <h2 style="color: #373D3C; margin-top: 0;">You're Invited!</h2>
     <p style="color: #444; line-height: 1.6;">
-      Hi there! You've been selected to try <strong>edaphic flora</strong> during our private alpha phase.
+      Hi there! You've been selected to try <strong>Edaphic Flora</strong> during our private alpha phase.
     </p>
     <p style="color: #444; line-height: 1.6;">
       Edaphic flora is a community-driven database that connects soil conditions to plant success.
@@ -79,9 +79,9 @@ You're invited to the edaphic flora alpha!
 ## Plain Text Version
 
 ```
-You're invited to the edaphic flora alpha!
+You're invited to the Edaphic Flora alpha!
 
-Hi there! You've been selected to try edaphic flora during our private alpha phase.
+Hi there! You've been selected to try Edaphic Flora during our private alpha phase.
 
 Edaphic flora is a community-driven database that connects soil conditions to plant success. By contributing your soil test data, you'll help build a resource that answers the question: "What soil conditions help this plant thrive?"
 
