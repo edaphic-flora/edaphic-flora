@@ -27,22 +27,21 @@ welcomeUI <- function(id) {
           ),
           div(class = "text-center",
               tags$img(src = "readme_header.svg",
-                       alt = "edaphic flora",
+                       alt = "Edaphic Flora",
                        class = "welcome-brand-logo",
-                       style = "max-width: 100%; width: 600px; height: auto;")
+                       style = "max-width: 100%; width: 560px; height: auto;")
           )
         ),
         card_body(
           div(class = "px-md-4",
-              h4("What is edaphic flora?"),
-              p("edaphic flora helps gardeners, horticulturists, and researchers understand the relationship ",
+              h4("What is Edaphic Flora?"),
+              p("Edaphic Flora helps gardeners, horticulturists, and researchers understand the relationship ",
                 "between soil conditions and plant success. By collecting real-world soil data from locations ",
                 "where specific plants grow, we build a reference database that can guide planting decisions."),
 
               h4(class = "mt-3", "How It Works"),
-              # Visual step cards - compact
+              # Visual step cards
               div(class = "row g-2 mb-3 stagger-reveal",
-                # Step 1
                 div(class = "col-md-6 col-lg-3",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("flask", class = "fa-lg mb-1", style = "color: #7A9A86;"),
@@ -50,7 +49,6 @@ welcomeUI <- function(id) {
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Enter soil test results")
                     )
                 ),
-                # Step 2
                 div(class = "col-md-6 col-lg-3",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("map-marker-alt", class = "fa-lg mb-1", style = "color: #7A9A86;"),
@@ -58,7 +56,6 @@ welcomeUI <- function(id) {
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Geocode for ecoregions")
                     )
                 ),
-                # Step 3
                 div(class = "col-md-6 col-lg-3",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("chart-line", class = "fa-lg mb-1", style = "color: #7A9A86;"),
@@ -66,18 +63,17 @@ welcomeUI <- function(id) {
                         tags$small(class = "text-muted", style = "font-size: 0.8rem;", "View patterns & profiles")
                     )
                 ),
-                # Step 4
                 div(class = "col-md-6 col-lg-3",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("seedling", class = "fa-lg mb-1", style = "color: #7A9A86;"),
                         div(class = "step-card-title", "4. Discover"),
-                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Find plants for your soil")
+                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "See your garden's wildlife impact")
                     )
                 )
               ),
 
               h4(class = "mt-2", "Getting Started"),
-              div(class = "d-flex flex-column flex-sm-row gap-2 mb-3",
+              div(class = "d-flex flex-column flex-sm-row gap-2 mb-2",
                   actionButton("welcome_submit_data",
                                label = tagList(icon("flask"), " I have a soil report"),
                                class = "btn-lg",
@@ -87,35 +83,35 @@ welcomeUI <- function(id) {
                                class = "btn-lg",
                                style = "background-color: #D39B35; color: white; border: none; font-family: 'Montserrat', sans-serif; font-weight: 600;")
               ),
-              div(class = "p-2 mb-3 rounded",
-                  style = "background-color: rgba(122, 154, 134, 0.1); border-left: 3px solid #7A9A86;",
-                  tags$span(style = "font-size: 0.93rem; color: #373D3C;",
+
+              # Location callout + help links side by side
+              div(class = "row g-2 mb-2",
+                div(class = "col-md-7",
+                  div(class = "p-2 rounded h-100",
+                    style = "background-color: rgba(122, 154, 134, 0.1); border-left: 3px solid #7A9A86; font-size: 0.9rem;",
                     icon("user-gear", style = "color: #7A9A86;"), " ",
                     tags$strong("Set your home location:"),
-                    " Click your name in the top right to set your zip code and state. ",
-                    "This enables local native status, nearby sample features, and autofills your zip code on the submission form."
+                    " Click your name in the top right to set your zip code. ",
+                    "This enables native status and nearby sample features."
                   )
+                ),
+                div(class = "col-md-5",
+                  div(class = "p-2 border rounded h-100", style = "font-size: 0.9rem;",
+                    tags$span(class = "text-muted d-block mb-1", icon("question-circle"), " Need help?"),
+                    actionLink("help_link_soil", "Soil Properties", class = "text-decoration-none"),
+                    " \u00b7 ",
+                    actionLink("help_link_nutrients", "Nutrients", class = "text-decoration-none"),
+                    " \u00b7 ",
+                    actionLink("help_link_performance", "Performance", class = "text-decoration-none")
+                  )
+                )
               ),
 
-              # Help links - NOT namespaced so main app observers can handle navigation
-              div(class = "mt-2 p-2 border rounded",
-                  tags$span(class = "text-muted d-block mb-1", style = "font-size: 0.9rem;", icon("question-circle"), " Need help understanding the fields?"),
-                  tags$ul(class = "mb-0", style = "font-size: 0.85rem;",
-                    tags$li(actionLink("help_link_soil", "Soil Properties", class = "text-decoration-none"),
-                            " \u2014 pH, organic matter, texture"),
-                    tags$li(actionLink("help_link_nutrients", "Nutrient Guide", class = "text-decoration-none"),
-                            " \u2014 Macro and micronutrient ranges"),
-                    tags$li(actionLink("help_link_performance", "Plant Performance", class = "text-decoration-none"),
-                            " \u2014 Outcomes and conditions")
-                  )
-              ),
-
-              div(class = "mt-2 p-2 bg-light rounded", style = "font-size: 0.9rem;",
+              div(class = "p-2 bg-light rounded text-center", style = "font-size: 0.85rem;",
                   tags$span(class = "text-muted",
                              icon("info-circle"), " ",
                              tags$strong("Data Usage: "),
-                             "All submitted data is shared under CC BY-NC 4.0.")),
-
+                             "All submitted data is shared under CC BY-NC 4.0."))
           )
         )
       ),

@@ -41,8 +41,9 @@ source("R/pdf_extract.R")
 source("R/mod_help.R")
 source("R/mod_welcome.R")
 source("R/mod_admin.R")
-source("R/mod_data_management.R")
+# source("R/mod_data_management.R")  # Removed — export moved to Analysis sidebar
 source("R/mod_find_plants.R")
+source("R/mod_my_garden.R")
 source("R/mod_data_entry.R")
 source("R/ecoregion_ref.R")
 source("R/mod_analysis.R")
@@ -338,6 +339,10 @@ base_ui <- page_navbar(
            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
          }, 300);
        });
+       // Navigate to tab (used by My Garden module)
+       Shiny.addCustomMessageHandler('navigateTab', function(tab) {
+         Shiny.setInputValue('navigate_to_tab', tab, {priority: 'event'});
+       });
        // Brand name click → navigate to Welcome
        $(document).on('click', '.navbar-brand, .brand-name', function(e) {
          e.preventDefault();
@@ -370,8 +375,10 @@ base_ui <- page_navbar(
  # ========== ANALYSIS TAB ==========
  analysisUI("analysis"),
 
- # ========== DATA MANAGEMENT TAB ==========
- dataManagementUI("data_mgmt"),
+ # ========== MY GARDEN (Wildlife Dashboard) ==========
+ myGardenUI("my_garden"),
+
+ # Data Management tab removed — export moved to Analysis sidebar
 
  # ========== ADMIN TAB (hidden by default, revealed for admins via server) ==========
  adminUI("admin"),
@@ -379,8 +386,8 @@ base_ui <- page_navbar(
  # ========== HELP MENU ==========
  helpUI("help"),
 
- # ========== ROADMAP TAB ==========
- nav_panel(
+ # ========== ROADMAP TAB (dev only) ==========
+ if (is_dev) nav_panel(
    title = "Roadmap",
    icon = icon("rocket"),
    div(class = "container-fluid", style = "max-width: 800px; padding: 2rem 1rem;",
@@ -390,24 +397,26 @@ base_ui <- page_navbar(
            tags$i(class = "fa fa-rocket", style = "font-size: 2.5rem; color: #D39B35; margin-bottom: 0.75rem;"),
            h4("What's Coming", style = "font-family: 'Montserrat', sans-serif; color: #373D3C;"),
            p(style = "font-family: 'Rokkitt', serif; color: #5F7268; max-width: 520px; margin: 0 auto; font-size: 1.05rem;",
-             "edaphic flora is growing. Here's a look at what we're building next ",
+             "Edaphic Flora is growing. Here's a look at what we're building next ",
              "to make soil data more useful, more personal, and more powerful.")
        ),
 
-       # --- Coming Soon section ---
-       h6(style = "font-family: 'Montserrat', sans-serif; color: #D39B35; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem;",
-          tags$i(class = "fa fa-bolt me-1"), "Coming Soon"),
+       # --- Recently Launched section ---
+       h6(style = "font-family: 'Montserrat', sans-serif; color: #7A9A86; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem;",
+          tags$i(class = "fa fa-check-circle me-1"), "Recently Launched"),
 
-       # Find Plants
-       div(class = "card mb-3", style = "border-left: 3px solid #D39B35;",
+       # My Garden
+       div(class = "card mb-3", style = "border-left: 3px solid #7A9A86;",
            div(class = "card-body",
                div(class = "d-flex align-items-center mb-2",
                    tags$i(class = "fa fa-seedling me-2", style = "font-size: 1.3rem; color: #7A9A86;"),
-                   h6("Find Plants for Your Soil", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;")
+                   h6("My Garden \u2014 Wildlife Dashboard", class = "mb-0", style = "font-family: 'Montserrat', sans-serif;"),
+                   tags$span(class = "badge bg-success ms-2", "New")
                ),
                p(class = "mb-0", style = "font-family: 'Rokkitt', serif; font-size: 0.95rem; color: #5F7268;",
-                 "Enter your soil test and get species recommendations ranked by how well they match your conditions. ",
-                 "The engine is built and ready \u2014 it activates as our community adds more samples.")
+                 "See what wildlife your garden plants support through interactive donut charts. ",
+                 "Track your coverage of butterflies, moths, specialist bees, and birds \u2014 ",
+                 "plus get recommendations for high-impact native plants to add next.")
            )
        ),
 
@@ -1015,19 +1024,19 @@ server_inner <- function(input, output, session) {
  helpServer("help")
  welcomeServer("welcome", pool, data_changed)
  adminServer("admin", pool, is_admin, current_user, data_changed)
- dataManagementServer("data_mgmt", pool, current_user, data_changed, soil_data_template)
+ # dataManagementServer removed — export moved to Analysis sidebar
 
  # PDF extraction daily limit for non-admin users (hardcoded for free tier)
  pdf_extract_limit <- 3L
 
- # --- Find Plants module (hidden until data threshold met) ---
-# find_plants_faq <- findPlantsServer("find_plants", pool, current_user, is_admin, data_changed,
-#                                      pdf_extract_limit, common_name_db)
-#
-# # Handle FAQ link from Find Plants module
-# observeEvent(find_plants_faq(), {
-#   nav_select("main_nav", "FAQ")
-# }, ignoreInit = TRUE)
+ # --- My Garden (Wildlife Dashboard) module ---
+ myGardenServer("my_garden", pool, current_user, data_changed,
+                user_prefs, common_name_db, experience_level)
+
+ # --- Navigate to tab handler (used by My Garden "Add a Plant" buttons) ---
+ observeEvent(input$navigate_to_tab, {
+   nav_select("main_nav", input$navigate_to_tab)
+ }, ignoreInit = TRUE)
 
  # --- Data Entry module ---
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
