@@ -40,14 +40,45 @@ FAMILY_INFO <- list(
   Drepanidae = list(name = "Hooktip Moths", blurb = "Arched hooktip, rose hooktip"),
   Limacodidae = list(name = "Slug Caterpillar Moths", blurb = "Saddleback caterpillars, hag moths"),
   Crambidae = list(name = "Grass Moths", blurb = "Sod webworms, grape leaffolder moths"),
+  Depressariidae = list(name = "Flat-Body Moths", blurb = "Agonopterix and kin \u2014 larvae feed in flower heads and rolled leaves"),
   Choreutidae = list(name = "Metalmark Moths", blurb = "Day-flying moths with metallic wing patterns"),
   Cossidae = list(name = "Carpenter Moths", blurb = "Large moths whose larvae bore in wood"),
   Megalopygidae = list(name = "Flannel Moths", blurb = "Fluffy 'puss caterpillars' with hidden stinging spines"),
   Zygaenidae = list(name = "Smoky Moths", blurb = "Day-flying moths, some with bright warning colors"),
   Hepialidae = list(name = "Ghost Moths", blurb = "Swift moths with hovering courtship flights at dusk"),
+  Blastobasidae = list(name = "Scavenger Moths", blurb = "Small moths whose larvae feed on seeds and detritus"),
+  Thyatiridae = list(name = "Lutestring Moths", blurb = "Subtly patterned moths, often on birch and willow"),
+  Tineidae = list(name = "Fungus & Clothes Moths", blurb = "Larvae feed on fungi, lichens, and organic debris"),
+  Elachistidae = list(name = "Grass-Miner Moths", blurb = "Tiny moths whose larvae mine in grass blades"),
+  Lyonetiidae = list(name = "Liner Moths", blurb = "Minute moths with narrow fringed wings"),
+  Acrolophidae = list(name = "Tube Moths", blurb = "Larvae build silk tubes in soil and leaf litter"),
+  Scythrididae = list(name = "Flower Moths", blurb = "Small day-flying moths often found on flowers"),
+  Eriocraniidae = list(name = "Sparkling Archaic Moths", blurb = "Primitive metallic moths, early spring fliers"),
+  Mimallonidae = list(name = "Sack-Bearer Moths", blurb = "Caterpillars build leaf cases, resembling bagworms"),
+  Incurvariidae = list(name = "Leafcutter Moths", blurb = "Females cut leaf discs to protect their eggs"),
+  Epiplemidae = list(name = "Tropical Geometers", blurb = "Geometrid relatives with scalloped wing edges"),
+  Carposinidae = list(name = "Fruitworm Moths", blurb = "Larvae bore into fruits and seeds"),
+  Ypsolophidae = list(name = "Ypsolophid Moths", blurb = "Small moths, larvae on trees and shrubs"),
+  Momphidae = list(name = "Mompha Moths", blurb = "Tiny moths whose larvae mine in evening primrose stems"),
+  Apatelodidae = list(name = "American Silkworm Moths", blurb = "Fuzzy moths related to silk moths"),
+  Schreckensteiniidae = list(name = "Bristle-Legged Moths", blurb = "Distinctive spiny-legged micro-moths"),
+  Libytheidae = list(name = "Snout Butterflies", blurb = "American Snouts \u2014 long palps resemble a snout"),
+  Symmocidae = list(name = "Symmocid Moths", blurb = "Obscure micro-moths, mostly bark and litter feeders"),
+  Douglasiidae = list(name = "Douglas Moths", blurb = "Tiny leaf-mining moths on mints and composites"),
+  Epermeniidae = list(name = "Fringe-Tufted Moths", blurb = "Small moths with raised scale tufts on hindwings"),
+  Copromorphidae = list(name = "Tropical Fruitworm Moths", blurb = "Rare family, larvae in fruits and seeds"),
+  Plutellidae = list(name = "Diamondback Moths", blurb = "Includes the widespread diamondback moth"),
+  Urodidae = list(name = "False Burnet Moths", blurb = "Rare moths related to burnets"),
+  Adelidae = list(name = "Fairy Moths", blurb = "Tiny metallic moths with extremely long antennae"),
+  Thyrididae = list(name = "Window-Winged Moths", blurb = "Translucent wing patches like tiny stained glass"),
+  Prodoxidae = list(name = "Yucca Moths", blurb = "Famous pollinators of yucca plants"),
+  Galacticidae = list(name = "Galactic Moths", blurb = "Rare micro-moths, poorly known biology"),
   Satyridae = list(name = "Satyrs & Wood-Nymphs", blurb = "Common Wood-Nymphs, Little Wood-Satyrs"),
   Danaidae = list(name = "Milkweed Butterflies", blurb = "Monarchs, Queens \u2014 milkweed specialists"),
   Riodinidae = list(name = "Metalmarks", blurb = "Northern Metalmarks \u2014 small, jewel-like butterflies"),
+  # Bird families missing blurbs
+  Anatidae = list(name = "Ducks & Geese", blurb = "Wood Ducks, Mallards \u2014 waterfowl that eat seeds and acorns"),
+  Sturnidae = list(name = "Starlings", blurb = "European Starlings \u2014 introduced, abundant fruit eaters"),
   # Bee families
   Andrenidae = list(name = "Mining Bees", blurb = "Solitary ground-nesters, important spring pollinators"),
   Halictidae = list(name = "Sweat Bees", blurb = "Metallic green bees, tiny but prolific pollinators"),
@@ -678,6 +709,9 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                    "No additional plant recommendations available."))
       }
 
+      prefs <- user_prefs()
+      user_state <- if (!is.null(prefs)) prefs$home_state else NULL
+
       div(class = "stagger-reveal",
         lapply(seq_len(nrow(recs)), function(i) {
           r <- recs[i, ]
@@ -690,11 +724,74 @@ myGardenServer <- function(id, pool, current_user, data_changed,
             tags$span(class = "badge bg-light text-dark", style = "font-size: 0.7rem;", lf)
           }
 
+          # Pre-fetch native species for this genus (rendered as static HTML)
+          species_panel_id <- paste0("gap_native_", gsub("[^a-zA-Z]", "", genus), "_", i)
+          native_content <- if (!is.null(user_state) && nzchar(user_state)) {
+            species_df <- db_get_native_species_for_genus(genus, user_state, pool)
+            if (nrow(species_df) > 0) {
+              tagList(
+                tags$small(class = "text-muted d-block mb-2",
+                           tags$strong(sprintf("Native %s in %s", genus, user_state)),
+                           sprintf(" \u2014 %d species", nrow(species_df))),
+                div(class = "row g-1",
+                  lapply(seq_len(nrow(species_df)), function(j) {
+                    sp <- species_df[j, ]
+                    cn <- if (!is.na(sp$common_name) && nzchar(sp$common_name)) {
+                      tools::toTitleCase(tolower(sp$common_name))
+                    } else NULL
+                    div(class = "col-md-6",
+                      div(class = "d-flex align-items-baseline py-1 px-2",
+                          style = "border-bottom: 1px solid #f0ede3; font-size: 0.85rem;",
+                        if (!is.null(cn)) {
+                          tagList(
+                            tags$span(style = "color: #5D7A6A; font-weight: 500;", cn),
+                            tags$span(class = "species-name text-muted ms-2",
+                                      style = "font-size: 0.78rem;", sp$species_name)
+                          )
+                        } else {
+                          tags$span(class = "species-name",
+                                    style = "font-size: 0.78rem; color: #5D7A6A;",
+                                    sp$species_name)
+                        }
+                      )
+                    )
+                  })
+                )
+              )
+            } else {
+              div(class = "text-muted small py-1",
+                  sprintf("No %s species recorded as native to %s.", genus, user_state))
+            }
+          } else {
+            div(class = "text-muted small py-1",
+                tags$i(class = "fa fa-map-pin me-1"),
+                "Set your home location to see native species.")
+          }
+
           card(class = "mb-2",
             card_body(class = "py-2 px-3",
-              div(class = "d-flex justify-content-between align-items-start",
+              # Main row — clickable to expand
+              tags$div(
+                class = "d-flex justify-content-between align-items-start",
+                style = "cursor: pointer;",
+                onclick = sprintf("
+                  var panel = document.getElementById('%s');
+                  var arrow = document.getElementById('%s_arrow');
+                  if (panel.style.display === 'none') {
+                    panel.style.display = 'block';
+                    arrow.classList.remove('fa-chevron-down');
+                    arrow.classList.add('fa-chevron-up');
+                  } else {
+                    panel.style.display = 'none';
+                    arrow.classList.remove('fa-chevron-up');
+                    arrow.classList.add('fa-chevron-down');
+                  }
+                ", species_panel_id, species_panel_id),
                 div(style = "flex: 1;",
                   div(class = "d-flex align-items-center gap-2 flex-wrap mb-1",
+                    tags$i(id = paste0(species_panel_id, "_arrow"),
+                           class = "fa fa-chevron-down",
+                           style = "font-size: 0.7rem; color: #7A9A86; transition: transform 0.2s;"),
                     if (!is.null(genus_common)) {
                       tags$strong(style = "font-size: 1.05rem;", genus_common)
                     } else {
@@ -723,6 +820,11 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                   if (!is.na(r$bird_count) && r$bird_count > 0)
                     div(class = "text-muted", sprintf("%d birds", as.integer(r$bird_count)))
                 )
+              ),
+
+              # Expandable native species panel (pre-rendered, hidden)
+              div(id = species_panel_id, style = "display: none;",
+                div(class = "mt-2 pt-2 border-top", native_content)
               )
             )
           )

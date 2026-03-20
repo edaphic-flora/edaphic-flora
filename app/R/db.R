@@ -1008,3 +1008,36 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
     data.frame()
   })
 }
+
+#' Get native species for a genus in a given state (from BONAP)
+#' Deduplicates at genus+epithet level (ignores varieties/subspecies)
+#' @param genus Character, e.g., "Quercus"
+#' @param state_code Two-letter state code, e.g., "MN"
+#' @param pool Database connection pool
+#' @return Data frame with species_name and common_name columns
+db_get_native_species_for_genus <- function(genus, state_code, pool) {
+  if (is.null(genus) || is.null(state_code) || !nzchar(genus) || !nzchar(state_code)) {
+    return(data.frame(species_name = character(), common_name = character(), stringsAsFactors = FALSE))
+  }
+  tryCatch({
+    dbGetQuery(pool, "
+      SELECT DISTINCT ON (split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2))
+        split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2) AS species_name,
+        u.common_name
+      FROM ref_state_distribution sd
+      JOIN ref_taxon t ON t.id = sd.taxon_id
+      LEFT JOIN ref_usda_traits u ON u.taxon_id = t.id
+      WHERE sd.state_code = $1
+        AND sd.native_status = 'Native'
+        AND lower(split_part(t.scientific_name, ' ', 1)) = lower($2)
+        AND split_part(t.scientific_name, ' ', 2) NOT LIKE '%[%'
+        AND split_part(t.scientific_name, ' ', 2) != ''
+      ORDER BY split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2),
+        CASE WHEN t.scientific_name !~ ' (var|ssp|subsp|f)\\.? ' THEN 0 ELSE 1 END,
+        t.scientific_name
+    ", params = list(state_code, genus))
+  }, error = function(e) {
+    message("Error fetching native species for genus: ", e$message)
+    data.frame(species_name = character(), common_name = character(), stringsAsFactors = FALSE)
+  })
+}
