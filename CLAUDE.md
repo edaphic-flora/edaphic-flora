@@ -188,7 +188,7 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 - **Module**: `app/R/mod_my_garden.R` — donut charts showing wildlife coverage per family
 
 ## Important Conventions
-- Brand name is always lowercase: "edaphic flora" (never Title Case)
+- Brand name is capitalized in text: "Edaphic Flora" (logos/navbar stay lowercase per brand design)
 - Admin access requires BOTH Polished admin status AND listing in `ADMIN_EMAILS` env var
 - Welcome page action buttons use unnamespaced IDs (handled by app.R observers, not module)
 - Don't commit/push until user confirms changes work

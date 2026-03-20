@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in edaphic flora, please report it responsibly:
+If you discover a security vulnerability in Edaphic Flora, please report it responsibly:
 
 1. **Do not** open a public GitHub issue
 2. Email **edaphicflora@gmail.com** with:
@@ -16,7 +16,7 @@ We will acknowledge receipt within 48 hours and aim to provide a fix or mitigati
 ## Scope
 
 This policy covers:
-- The edaphic flora web application
+- The Edaphic Flora web application
 - This GitHub repository
 - The production database (report data exposure issues)
 

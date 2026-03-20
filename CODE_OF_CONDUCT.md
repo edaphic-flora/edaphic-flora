@@ -2,7 +2,7 @@
 
 ## Our Pledge
 
-We are committed to making participation in edaphic flora a welcoming experience for everyone, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+We are committed to making participation in Edaphic Flora a welcoming experience for everyone, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
 ## Our Standards
 
