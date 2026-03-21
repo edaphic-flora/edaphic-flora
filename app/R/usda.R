@@ -13,6 +13,16 @@
 .usda_cache$native_status <- new.env(parent = emptyenv())
 .usda_cache$hits <- 0L
 .usda_cache$misses <- 0L
+USDA_CACHE_MAX_ENTRIES <- 2000L
+
+# Evict a sub-cache when it exceeds max entries (simple clear, not LRU)
+.usda_cache_check <- function(subcache_name) {
+  env <- .usda_cache[[subcache_name]]
+  if (length(ls(env)) > USDA_CACHE_MAX_ENTRIES) {
+    .usda_cache[[subcache_name]] <- new.env(parent = emptyenv())
+    message(sprintf("USDA cache '%s' evicted (exceeded %d entries)", subcache_name, USDA_CACHE_MAX_ENTRIES))
+  }
+}
 
 #' Clear all USDA caches
 clear_usda_cache <- function() {
@@ -112,6 +122,7 @@ resolve_taxon_id <- function(gs_name, pool) {
 
  # Cache the result (even NULL results to avoid repeated lookups)
  assign(cache_key, result, envir = .usda_cache$taxon)
+ .usda_cache_check("taxon")
  result
 }
 
@@ -177,6 +188,7 @@ get_usda_characteristics_for_name <- function(gs_name, pool) {
 
  # Cache the result
  assign(cache_key, result, envir = .usda_cache$characteristics)
+ .usda_cache_check("characteristics")
  result
 }
 
@@ -241,6 +253,7 @@ get_nwpl_national_for_name <- function(gs_name, pool) {
 
  # Cache the result
  assign(cache_key, result, envir = .usda_cache$nwpl)
+ .usda_cache_check("nwpl")
  result
 }
 
@@ -461,6 +474,7 @@ get_native_status_na <- function(gs_name, pool) {
 
   # Cache the result
   assign(cache_key, result, envir = .usda_cache$native_status)
+  .usda_cache_check("native_status")
   result
 }
 
@@ -551,6 +565,7 @@ get_native_status_for_state <- function(gs_name, state_code, pool) {
 
   # Cache the result
   assign(cache_key, result, envir = .usda_cache$native_status)
+  .usda_cache_check("native_status")
   result
 }
 
@@ -672,6 +687,7 @@ get_invasive_status <- function(gs_name, user_state = NULL, pool) {
 
     # Cache the result
     assign(cache_key, cached_data, envir = .usda_cache$invasive)
+    .usda_cache_check("invasive")
   }
 
   # Process cached data

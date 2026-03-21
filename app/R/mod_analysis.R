@@ -222,6 +222,14 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                            server = FALSE)
     })
 
+    # --- Cached species data (single DB query, used by all downstream reactives) ---
+    species_data <- reactive({
+      data_changed()
+      sp <- input$analysis_species %||% ""
+      if (!nzchar(sp)) return(data.frame())
+      db_get_species_data(sp)
+    })
+
     # --- Reference badges (USDA traits + NWPL) ---
     output$reference_badges <- renderUI({
       sp <- input$analysis_species %||% ""
@@ -292,7 +300,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       sp <- input$analysis_species %||% ""
       if (!nzchar(sp)) return(NULL)
 
-      dat <- db_get_species_data(sp)
+      dat <- species_data()
       n <- nrow(dat)
 
       if (n > 0) return(NULL)
@@ -317,7 +325,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     # --- Species summary sidebar ---
     output$species_summary <- renderUI({
       req(input$analysis_species, input$analysis_species != "")
-      dat <- db_get_species_data(input$analysis_species)
+      dat <- species_data()
       if (nrow(dat) == 0) return(NULL)
 
       n_samples <- nrow(dat)
@@ -373,7 +381,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       sp <- input$analysis_species %||% ""
       if (!nzchar(sp)) return(NULL)
 
-      dat <- db_get_species_data(sp)
+      dat <- species_data()
       cultivars <- unique(dat$cultivar[!is.na(dat$cultivar) & nzchar(dat$cultivar)])
 
       if (length(cultivars) == 0) return(NULL)
@@ -400,7 +408,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       sp <- input$analysis_species %||% ""
       if (!nzchar(sp)) return(data.frame())
 
-      dat <- db_get_species_data(sp)
+      dat <- species_data()
       if (nrow(dat) == 0) return(dat)
 
       if (nzchar(input$filter_outcome %||% "")) {
@@ -427,7 +435,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       sp <- input$analysis_species %||% ""
       if (!nzchar(sp)) return(NULL)
 
-      total <- nrow(db_get_species_data(sp))
+      total <- nrow(species_data())
       filtered <- nrow(filtered_species_data())
 
       if (total == filtered) {
@@ -463,6 +471,16 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         paste0("edaphic_flora_", clean_name, "_", Sys.Date(), ".csv")
       },
       content = function(file) {
+        # Export rate limiting
+        u <- tryCatch(session$userData$user(), error = function(e) NULL)
+        if (!is.null(u) && !db_check_export_rate(u$user_uid, pool)) {
+          showNotification(
+            "You've reached the daily export limit (10 per day). Please try again tomorrow.",
+            type = "error", duration = 8)
+          writeLines("Export rate limit exceeded", file)
+          return()
+        }
+
         dat <- filtered_species_data()
         export_cols <- c("species", "cultivar", "outcome", "sun_exposure", "site_hydrology",
                          "ph", "organic_matter", "texture_class", "texture_sand", "texture_silt", "texture_clay",
@@ -471,6 +489,16 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                          "location_lat", "location_long", "ecoregion_l4", "date", "notes")
         export_cols <- export_cols[export_cols %in% names(dat)]
         write.csv(dat[, export_cols, drop = FALSE], file, row.names = FALSE, na = "")
+
+        # Audit log for species export
+        if (!is.null(u)) {
+          tryCatch(
+            db_audit_log("export", "soil_samples", user_id = u$user_uid,
+                         details = sprintf("exported species data: %s (%d rows)",
+                                           input$analysis_species %||% "unknown", nrow(dat))),
+            error = function(e) NULL
+          )
+        }
       }
     )
 
@@ -480,12 +508,22 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         paste0("edaphic_flora_all_data_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
       },
       content = function(file) {
+        # Export rate limiting
+        u <- tryCatch(session$userData$user(), error = function(e) NULL)
+        if (!is.null(u) && !db_check_export_rate(u$user_uid, pool)) {
+          showNotification(
+            "You've reached the daily export limit (10 per day). Please try again tomorrow.",
+            type = "error", duration = 8)
+          # Write empty file to satisfy downloadHandler contract
+          writeLines("Export rate limit exceeded", file)
+          return()
+        }
+
         data <- db_get_all_samples()
         data$created_by <- NULL  # Strip user IDs from export
         write.csv(data, file, row.names = FALSE, na = "")
 
         # Audit log
-        u <- tryCatch(session$userData$user(), error = function(e) NULL)
         if (!is.null(u)) {
           tryCatch(
             db_audit_log("export", "soil_samples", user_id = u$user_uid,
@@ -517,7 +555,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       profiles <- list()
       for (sp in species_counts$species) {
-        dat <- db_get_species_data(sp)
+        dat <- species_data()
         profiles[[sp]] <- calc_species_profile(dat)
         profiles[[sp]]$species <- sp
       }
@@ -799,7 +837,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
               style = "font-size: 0.85em; padding: 0.4em 0.65em; background-color: #f0ad4e;",
               icon("info-circle", class = "me-1"), "Invasive elsewhere"
             ),
-            paste0("Listed as invasive/noxious in: ", states_text),
+            paste0("Listed as invasive or noxious in: ", states_text),
             placement = "bottom"
           )
         )
@@ -809,16 +847,16 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       native_badge_class <- switch(native_info$status,
         "native" = "bg-success",
         "native_na" = "bg-success",
-        "introduced" = "text-dark",
-        "introduced_na" = "text-dark",
+        "introduced" = "",
+        "introduced_na" = "",
         "both" = "bg-info text-dark",
         "no_prefs" = "bg-secondary",
         "bg-secondary"
       )
 
       native_badge_style <- switch(native_info$status,
-        "introduced" = "background-color: #f0ad4e;",
-        "introduced_na" = "background-color: #f0ad4e;",
+        "introduced" = "background-color: #373D3C; color: #FFFFFF;",
+        "introduced_na" = "background-color: #373D3C; color: #FFFFFF;",
         ""
       )
 

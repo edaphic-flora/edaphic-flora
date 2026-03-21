@@ -174,7 +174,7 @@ helpUI <- function(id) {
               tags$dd(class = "col-sm-9", "This species is native to your state according to BONAP (Biota of North America Program). ",
                       "Native plants co-evolved with local wildlife and support pollinators, birds, and beneficial insects ",
                       "far more effectively than non-native species."),
-              tags$dt(class = "col-sm-3", tags$span(class = "badge bg-secondary", "Introduced")),
+              tags$dt(class = "col-sm-3", tags$span(class = "badge", style = "background: #373D3C; color: #FFFFFF;", "Introduced")),
               tags$dd(class = "col-sm-9", "This species is not native to your state. It was brought from elsewhere and may or may not ",
                       "be naturalized. Introduced species are not inherently harmful, but they typically support fewer ",
                       "native wildlife species than true natives."),
