@@ -97,6 +97,9 @@ POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
 POLISHED_APP_NAME, POLISHED_API_KEY
 FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID
 ADMIN_EMAILS=admin@example.com
+# For data collection scripts (optional):
+GBIF_USER, GBIF_PWD, GBIF_EMAIL  # GBIF download API
+EBIRD_API_KEY                     # eBird API (https://ebird.org/api/keygen)
 ```
 
 ## Branding Guidelines
@@ -158,7 +161,7 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 | Native/Introduced badges | Production (state-level via BONAP) |
 | State-level invasive badges | Production (50 states) |
 | Mobile-responsive layout | Production |
-| My Garden wildlife dashboard | Production (needs wildlife ETL data) |
+| My Garden wildlife dashboard | Production (needs wildlife ETL + state presence data) |
 | Batch plant upload | Dev only |
 | Find Plants recommendations | Deprecated (replaced by My Garden) |
 
@@ -182,10 +185,12 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 - `data/bonap_state_nativity_compiled.csv` - Compiled scrape output (160K records)
 
 ### Wildlife Data
-- **4 tables**: `ref_wildlife_plants` (~463), `ref_wildlife_species` (~2,220), `ref_wildlife_interactions` (~11,246), `ref_specialist_bees_by_genus` (~61)
+- **5 tables**: `ref_wildlife_plants` (~463), `ref_wildlife_species` (~2,220), `ref_wildlife_interactions` (~11,246), `ref_specialist_bees_by_genus` (~61), `ref_wildlife_state_presence` (GBIF+eBird state occurrence data)
 - **Source**: Proprietary Excel files from consulting business (never committed to git)
 - **ETL**: `app/R/etl/wildlife_etl.R` — follows bonap_state_dist_etl.R pattern
-- **Module**: `app/R/mod_my_garden.R` — donut charts showing wildlife coverage per family
+- **State presence ETL**: `app/R/etl/wildlife_state_presence_etl.R` — loads GBIF+eBird data
+- **Data collection**: `scripts/fetch_gbif_wildlife_presence.R` (Lep+Bees), `scripts/fetch_ebird_wildlife_presence.R` (Birds)
+- **Module**: `app/R/mod_my_garden.R` — donut charts showing wildlife coverage per family, state-filtered when presence data available
 
 ## Important Conventions
 - Brand name is capitalized in text: "Edaphic Flora" (logos/navbar stay lowercase per brand design)

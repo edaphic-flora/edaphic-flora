@@ -124,6 +124,7 @@ dataManagementServer <- function(id, pool, current_user, data_changed, soil_data
       filename = function() paste0("soil_data_export_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv"),
       content  = function(file) {
         data <- db_get_all_samples()
+        data$created_by <- NULL  # Strip user IDs from export
         write.csv(data, file, row.names = FALSE)
         u <- current_user()
         if (!is.null(u)) {

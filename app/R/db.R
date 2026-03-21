@@ -242,6 +242,21 @@ db_migrate <- function() {
       )
     ")
 
+    # Wildlife state-level presence (GBIF + eBird occurrence data)
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS ref_wildlife_state_presence (
+        id SERIAL PRIMARY KEY,
+        wildlife_id VARCHAR(50) NOT NULL,
+        state_code VARCHAR(2) NOT NULL,
+        source VARCHAR(50) NOT NULL,
+        observation_count INTEGER,
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        UNIQUE(wildlife_id, state_code)
+      )
+    ")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wsp_state_wildlife ON ref_wildlife_state_presence(state_code, wildlife_id)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wsp_wildlife ON ref_wildlife_state_presence(wildlife_id)")
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
@@ -928,6 +943,14 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
     con <- poolCheckout(pool)
     on.exit(poolReturn(con), add = TRUE)
 
+    # Validate state_code format (2 uppercase letters only)
+    if (!is.null(user_state) && nzchar(user_state)) {
+      if (!grepl("^[A-Z]{2}$", user_state)) {
+        message("Invalid state_code format, skipping state filter")
+        user_state <- NULL
+      }
+    }
+
     # Stage covered codes
     dbExecute(con, "DROP TABLE IF EXISTS tmp_covered_codes")
     dbExecute(con, "CREATE TEMP TABLE tmp_covered_codes (species_code VARCHAR(50))")
@@ -937,16 +960,23 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
                    append = TRUE, temporary = TRUE, row.names = FALSE)
     }
 
-    # Build state filter
+    # Build state filter using parameterized query
     state_join <- ""
+    query_params <- list()
+    param_idx <- 0L
+
     if (!is.null(user_state) && nzchar(user_state)) {
+      param_idx <- param_idx + 1L
       state_join <- sprintf("
         JOIN ref_state_distribution sd ON sd.taxon_id = wp.taxon_id
-          AND sd.state_code = '%s' AND sd.native_status = 'Native'
-      ", gsub("'", "''", user_state))
+          AND sd.state_code = $%d AND sd.native_status = 'Native'
+      ", param_idx)
+      query_params <- c(query_params, list(user_state))
     }
 
     # Build life_form filter
+    # Values come from a hardcoded switch statement, so they are safe,
+    # but we use parameterized placeholders for defense-in-depth
     life_form_clause <- ""
     if (!is.null(life_form_filter) && nzchar(life_form_filter) && life_form_filter != "All") {
       # Map filter categories to actual life_form values
@@ -961,10 +991,20 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
         NULL
       )
       if (!is.null(lf_values)) {
-        quoted <- paste0("'", gsub("'", "''", lf_values), "'", collapse = ", ")
-        life_form_clause <- sprintf("AND wp.life_form IN (%s)", quoted)
+        lf_placeholders <- vapply(seq_along(lf_values), function(i) {
+          param_idx <<- param_idx + 1L
+          query_params[[param_idx]] <<- lf_values[i]
+          sprintf("$%d", param_idx)
+        }, character(1))
+        life_form_clause <- sprintf("AND wp.life_form IN (%s)",
+                                    paste(lf_placeholders, collapse = ", "))
       }
     }
+
+    # max_results as parameterized value
+    param_idx <- param_idx + 1L
+    query_params <- c(query_params, list(as.integer(max_results)))
+    limit_placeholder <- sprintf("$%d", param_idx)
 
     # Aggregate at genus level — show one representative per genus
     query <- sprintf("
@@ -999,10 +1039,10 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
       )
       SELECT * FROM genus_impact
       ORDER BY is_keystone_genus DESC, new_wildlife_count DESC
-      LIMIT %d
-    ", state_join, life_form_clause, max_results)
+      LIMIT %s
+    ", state_join, life_form_clause, limit_placeholder)
 
-    dbGetQuery(con, query)
+    dbGetQuery(con, query, params = query_params)
   }, error = function(e) {
     message("Error fetching wildlife gap recommendations: ", e$message)
     data.frame()

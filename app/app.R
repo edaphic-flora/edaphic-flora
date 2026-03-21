@@ -1031,7 +1031,8 @@ server_inner <- function(input, output, session) {
 
  # --- My Garden (Wildlife Dashboard) module ---
  myGardenServer("my_garden", pool, current_user, data_changed,
-                user_prefs, common_name_db, experience_level)
+                user_prefs, common_name_db, experience_level,
+                zipcode_db = zipcode_db, prefs_changed = prefs_changed)
 
  # --- Navigate to tab handler (used by My Garden "Add a Plant" buttons) ---
  observeEvent(input$navigate_to_tab, {

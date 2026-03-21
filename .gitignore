@@ -48,5 +48,9 @@ nul
 # Wildlife source data (proprietary - never commit)
 data/wildlife_source/
 
+# GBIF and eBird cache data (large bulk downloads)
+data/cache_gbif/
+data/cache_ebird/
+
 # Alpha feedback (local only)
 feedback/

@@ -137,30 +137,46 @@ family_inat_url <- function(family) {
 DONUT_COVERED_COLOR <- "#7A9A86"
 DONUT_GAP_COLOR <- "#e8e5da"
 
-# Source attribution text used on each tab
-SOURCE_ATTRIBUTION <- tags$div(class = "text-muted small mt-4 p-3 rounded",
-  style = "background: rgba(122,154,134,0.05); border: 1px solid rgba(122,154,134,0.15);",
-  tags$strong("Sources & Methodology"),
-  tags$ul(class = "mb-1 mt-1", style = "font-size: 0.85rem;",
+# Source attribution builder (state-aware)
+build_source_attribution <- function(state_code = NULL) {
+  base_sources <- tags$ul(class = "mb-1 mt-1", style = "font-size: 0.85rem;",
     tags$li("Lepidoptera host plant associations adapted from Tallamy & Shropshire (2009), ",
             "Tallamy et al. (2020), and the National Wildlife Federation's Native Plant Finder."),
     tags$li("Specialist bee data adapted from Fowler (2016) and Jarrod Fowler's specialist bee compilations."),
     tags$li("Bird\u2013plant associations adapted from Audubon's Plants for Birds database and ",
             "Tallamy (2021) ", tags$em("The Nature of Oaks"), ".")
-  ),
-  tags$strong("A Note on Geography", class = "d-block mt-2"),
-  tags$p(class = "mb-1", style = "font-size: 0.85rem;",
-    "The wildlife data shown here is compiled primarily from eastern US research and represents ",
-    "species documented across the broader region \u2014 not filtered to a specific state. ",
-    "The actual wildlife species present in your area will vary based on geography, habitat, ",
-    "and local conditions. Species counts should be interpreted as ", tags$em("potential"), " associations ",
-    "rather than guarantees of local presence. For example, a moth species documented as using oaks ",
-    "as a host plant may occur in the Southeast but not the Upper Midwest."),
-  tags$p(class = "mb-1", style = "font-size: 0.85rem;",
-    "Family-level totals (e.g., \u201c133/781 Owlet Moths\u201d) reflect your garden\u2019s coverage of ",
-    "the full documented species pool. Your actual local impact is likely a meaningful subset of these numbers."),
-  tags$small(class = "text-muted", "Data curated by Edaphic Flora. Not for redistribution.")
-)
+  )
+  if (!is.null(state_code) && nzchar(state_code)) {
+    occurrence_sources <- tags$ul(class = "mb-1", style = "font-size: 0.85rem;",
+      tags$li("Butterfly and bee state occurrence data from ",
+              tags$a("GBIF.org", href = "https://www.gbif.org", target = "_blank"),
+              ", licensed under CC BY."),
+      tags$li("Bird state occurrence data from ",
+              tags$a("eBird", href = "https://ebird.org", target = "_blank"),
+              " (Cornell Lab of Ornithology).")
+    )
+    geo_note <- tags$p(class = "mb-1", style = "font-size: 0.85rem;",
+      "Species totals reflect the full eastern US research database. ",
+      sprintf("Badges on each family card indicate confirmed presence in %s ", state_code),
+      "based on GBIF and eBird occurrence records. Families marked ",
+      tags$em("Partial"), " have some species confirmed; others may be present but lack records.")
+  } else {
+    occurrence_sources <- NULL
+    geo_note <- tags$p(class = "mb-1", style = "font-size: 0.85rem;",
+      "The wildlife data shown here is compiled primarily from eastern US research and represents ",
+      "species documented across the broader region \u2014 not filtered to a specific state. ",
+      "Set your home state in preferences for state-level filtering.")
+  }
+  tags$div(class = "text-muted small mt-4 p-3 rounded",
+    style = "background: rgba(122,154,134,0.05); border: 1px solid rgba(122,154,134,0.15);",
+    tags$strong("Sources & Methodology"),
+    base_sources,
+    occurrence_sources,
+    tags$strong("A Note on Geography", class = "d-block mt-2"),
+    geo_note,
+    tags$small(class = "text-muted", "Data curated by Edaphic Flora. Not for redistribution.")
+  )
+}
 
 # Life form filter choices for gap recommendations
 LIFE_FORM_CHOICES <- c("All", "Tree", "Shrub", "Perennial", "Grass/Sedge", "Vine", "Fern")
@@ -190,6 +206,11 @@ myGardenUI <- function(id) {
         div(style = "max-height: 400px; overflow-y: auto;",
           uiOutput(ns("species_list"))
         ),
+
+        hr(),
+
+        # Home location
+        uiOutput(ns("location_section")),
 
         hr(),
 
@@ -232,7 +253,8 @@ myGardenUI <- function(id) {
 # ---------------------------
 
 myGardenServer <- function(id, pool, current_user, data_changed,
-                            user_prefs, common_name_db, experience_level = NULL) {
+                            user_prefs, common_name_db, experience_level = NULL,
+                            zipcode_db = NULL, prefs_changed = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -242,6 +264,31 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       u <- current_user()
       if (is.null(u)) return(character())
       db_get_user_garden_species(u$user_uid, pool)
+    })
+
+    # --- Reactive: user's state for wildlife presence filtering ---
+    user_state <- reactive({
+      prefs <- user_prefs()
+      if (!is.null(prefs)) prefs$home_state else NULL
+    })
+
+    # --- Reactive: check if state has presence data (for fallback) ---
+    state_has_presence_data <- reactive({
+      st <- user_state()
+      if (is.null(st) || !nzchar(st)) return(FALSE)
+      tryCatch({
+        n <- dbGetQuery(pool,
+          "SELECT COUNT(*)::int AS n FROM ref_wildlife_state_presence WHERE state_code = $1",
+          params = list(st)
+        )$n[1]
+        !is.null(n) && n >= 50
+      }, error = function(e) FALSE)
+    })
+
+    # --- Reactive: effective state_code for queries (NULL if no/low data) ---
+    effective_state <- reactive({
+      st <- user_state()
+      if (!is.null(st) && nzchar(st) && state_has_presence_data()) st else NULL
     })
 
     # --- Reactive: all wildlife species (for total counts) ---
@@ -254,6 +301,34 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       sp <- garden_species()
       if (length(sp) == 0) return(data.frame())
       db_get_wildlife_coverage(sp, pool)
+    })
+
+    # --- Reactive: families with confirmed state presence (for badges) ---
+    family_state_presence <- reactive({
+      eff_st <- effective_state()
+      if (is.null(eff_st)) return(list())
+      tryCatch({
+        result <- dbGetQuery(pool, "
+          SELECT COALESCE(ws.family, 'Unknown') AS family,
+            COUNT(DISTINCT ws.wildlife_id)::int AS total_species,
+            COUNT(DISTINCT wsp.wildlife_id)::int AS confirmed_species
+          FROM ref_wildlife_species ws
+          LEFT JOIN ref_wildlife_state_presence wsp
+            ON wsp.wildlife_id = ws.wildlife_id
+            AND wsp.state_code = $1
+          GROUP BY ws.family
+        ", params = list(eff_st))
+        stats::setNames(
+          lapply(seq_len(nrow(result)), function(i) {
+            list(confirmed = result$confirmed_species[i],
+                 total = result$total_species[i])
+          }),
+          result$family
+        )
+      }, error = function(e) {
+        message("Error fetching family state presence: ", e$message)
+        list()
+      })
     })
 
     # --- Reactive: per-family summary stats ---
@@ -400,6 +475,86 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       session$sendCustomMessage("navigateTab", "Data Entry")
     })
 
+    # --- Sidebar: Location section ---
+    output$location_section <- renderUI({
+      prefs <- user_prefs()
+      has_location <- !is.null(prefs) && !is.null(prefs$home_state) && nzchar(prefs$home_state)
+      if (has_location) {
+        div(
+          div(class = "d-flex align-items-center justify-content-between",
+            tags$span(
+              tags$i(class = "fa fa-map-marker-alt me-1", style = "color: #7A9A86;"),
+              tags$strong(sprintf("%s, %s", prefs$home_city %||% "", prefs$home_state),
+                          style = "font-size: 0.85rem;")
+            ),
+            actionLink(ns("change_location"), "Change",
+                       style = "font-size: 0.75rem; color: #7A9A86;")
+          )
+        )
+      } else {
+        div(
+          tags$label("Set Home Location", class = "form-label",
+                     style = "font-size: 0.85rem; font-weight: 600;"),
+          tags$small(class = "text-muted d-block mb-2",
+                     "Enter your zip code for local wildlife data"),
+          div(class = "d-flex gap-2",
+            textInput(ns("garden_zipcode"), NULL, placeholder = "e.g., 55401",
+                      width = "120px"),
+            actionButton(ns("save_zipcode"), "Set",
+                         class = "btn-sm btn-outline-primary",
+                         style = "height: 38px;")
+          )
+        )
+      }
+    })
+
+    observeEvent(input$change_location, {
+      prefs <- user_prefs()
+      output$location_section <- renderUI({
+        div(
+          tags$label("Update Location", class = "form-label",
+                     style = "font-size: 0.85rem; font-weight: 600;"),
+          div(class = "d-flex gap-2",
+            textInput(ns("garden_zipcode"), NULL,
+                      value = if (!is.null(prefs)) prefs$home_zipcode %||% "" else "",
+                      placeholder = "e.g., 55401", width = "120px"),
+            actionButton(ns("save_zipcode"), "Set",
+                         class = "btn-sm btn-outline-primary",
+                         style = "height: 38px;")
+          )
+        )
+      })
+    })
+
+    observeEvent(input$save_zipcode, {
+      zip <- input$garden_zipcode
+      if (is.null(zip) || nchar(gsub("[^0-9]", "", zip)) != 5) {
+        showNotification("Please enter a 5-digit zip code", type = "warning", duration = 3)
+        return()
+      }
+      u <- current_user()
+      if (is.null(u)) {
+        showNotification("Sign in to save your location", type = "warning", duration = 3)
+        return()
+      }
+      loc <- if (!is.null(zipcode_db)) lookup_zipcode(zip, zipcode_db) else NULL
+      if (is.null(loc)) {
+        showNotification("Zip code not found", type = "error", duration = 3)
+        return()
+      }
+      success <- db_set_user_prefs(
+        user_id = u$user_uid, zipcode = zip, city = loc$city, state = loc$state,
+        lat = loc$latitude, lon = loc$longitude, pool = pool
+      )
+      if (success) {
+        if (!is.null(prefs_changed)) prefs_changed(prefs_changed() + 1)
+        showNotification(sprintf("Location set to %s, %s", loc$city, loc$state),
+                         type = "message", duration = 3)
+      } else {
+        showNotification("Failed to save location", type = "error", duration = 3)
+      }
+    })
+
     # --- Helper: render a single donut chart ---
     # supported_plants: char vector of garden plant names filling this slice
     # gap_plants: char vector of recommended plant genera to fill the gap
@@ -479,6 +634,8 @@ myGardenServer <- function(id, pool, current_user, data_changed,
 
       summary <- coverage_summary()
       cov <- wildlife_coverage()
+      st_pres <- family_state_presence()
+      eff_st <- effective_state()
 
       low_data_callout <- NULL
       if (length(sp) <= 2) {
@@ -488,13 +645,26 @@ myGardenServer <- function(id, pool, current_user, data_changed,
         )
       }
 
-      # Calculate totals per type
+      # State indicator
+      state_indicator <- if (!is.null(eff_st) && nzchar(eff_st)) {
+        div(class = "alert alert-success py-2 px-3 mb-3 d-flex align-items-center",
+          style = "background: rgba(122,154,134,0.1); border-color: rgba(122,154,134,0.3); color: #373D3C;",
+          tags$i(class = "fa fa-map-marker-alt me-2", style = "color: #7A9A86;"),
+          tags$span(sprintf("Showing wildlife confirmed in %s", eff_st),
+                    style = "font-size: 0.85rem;")
+        )
+      } else {
+        NULL
+      }
+
+      # Calculate totals per type (with state filtering)
       type_totals <- list()
       for (wtype in names(summary)) {
         s <- summary[[wtype]]
+        s_filtered <- filter_by_state_presence(s, st_pres, eff_st)
         type_totals[[wtype]] <- list(
-          covered = sum(s$species_covered),
-          total = sum(s$total_species)
+          covered = sum(s_filtered$species_covered),
+          total = sum(s_filtered$total_species)
         )
       }
 
@@ -513,6 +683,7 @@ myGardenServer <- function(id, pool, current_user, data_changed,
 
       tagList(
         low_data_callout,
+        state_indicator,
 
         # Summary donut row
         div(class = "row g-3 mb-4",
@@ -553,7 +724,7 @@ myGardenServer <- function(id, pool, current_user, data_changed,
         ),
         uiOutput(ns("gap_recs_panel")),
 
-        SOURCE_ATTRIBUTION
+        build_source_attribution(eff_st)
       )
     })
 
@@ -585,12 +756,27 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       }
     })
 
+    # --- Helper: filter summary_df to families with state presence ---
+    filter_by_state_presence <- function(summary_df, st_pres, eff_st) {
+      if (is.null(eff_st) || !nzchar(eff_st) || length(st_pres) == 0) return(summary_df)
+      keep <- sapply(summary_df$family, function(fam) {
+        fp <- st_pres[[fam]]
+        !is.null(fp) && fp$confirmed > 0
+      })
+      excluded <- sum(!keep)
+      result <- summary_df[keep, , drop = FALSE]
+      attr(result, "excluded_count") <- excluded
+      result
+    }
+
     # --- Butterflies Tab ---
     output$butterfly_content <- renderUI({
       sp <- garden_species()
       if (length(sp) == 0) return(empty_garden_ui(ns, "butterfly"))
 
       summary <- coverage_summary()
+      st_pres <- family_state_presence()
+      eff_st <- effective_state()
       bfly_parts <- Filter(Negate(is.null), summary[c("Butterfly", "Skipper")])
       combined <- if (length(bfly_parts) > 0) do.call(rbind, bfly_parts) else data.frame()
       if (nrow(combined) == 0) {
@@ -598,7 +784,16 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                    "No butterfly data found for your garden plants."))
       }
       combined <- combined[order(-combined$species_covered), ]
-      tagList(render_family_section(combined, "butterfly", ns), SOURCE_ATTRIBUTION)
+      combined <- filter_by_state_presence(combined, st_pres, eff_st)
+      if (nrow(combined) == 0) {
+        return(div(class = "text-muted text-center py-4",
+                   sprintf("No butterfly families with confirmed presence in %s.", eff_st)))
+      }
+      tagList(
+        render_family_section(combined, "butterfly", ns,
+                              state_presence = st_pres, state_code = eff_st),
+        build_source_attribution(eff_st)
+      )
     })
 
     # --- Moths Tab ---
@@ -607,13 +802,24 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (length(sp) == 0) return(empty_garden_ui(ns, "moth"))
 
       summary <- coverage_summary()
+      st_pres <- family_state_presence()
+      eff_st <- effective_state()
       moth_df <- summary[["Moth"]]
       if (is.null(moth_df) || nrow(moth_df) == 0) {
         return(div(class = "text-muted text-center py-4",
                    "No moth data found for your garden plants."))
       }
       moth_df <- moth_df[order(-moth_df$species_covered), ]
-      tagList(render_family_section(moth_df, "moth", ns), SOURCE_ATTRIBUTION)
+      moth_df <- filter_by_state_presence(moth_df, st_pres, eff_st)
+      if (nrow(moth_df) == 0) {
+        return(div(class = "text-muted text-center py-4",
+                   sprintf("No moth families with confirmed presence in %s.", eff_st)))
+      }
+      tagList(
+        render_family_section(moth_df, "moth", ns,
+                              state_presence = st_pres, state_code = eff_st),
+        build_source_attribution(eff_st)
+      )
     })
 
     # --- Specialist Bees Tab ---
@@ -622,13 +828,24 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (length(sp) == 0) return(empty_garden_ui(ns, "bee"))
 
       summary <- coverage_summary()
+      st_pres <- family_state_presence()
+      eff_st <- effective_state()
       bee_df <- summary[["Bee"]]
       if (is.null(bee_df) || nrow(bee_df) == 0) {
         return(div(class = "text-muted text-center py-4",
                    "No specialist bee data found for your garden plants."))
       }
       bee_df <- bee_df[order(-bee_df$species_covered), ]
-      tagList(render_family_section(bee_df, "bee", ns), SOURCE_ATTRIBUTION)
+      bee_df <- filter_by_state_presence(bee_df, st_pres, eff_st)
+      if (nrow(bee_df) == 0) {
+        return(div(class = "text-muted text-center py-4",
+                   sprintf("No specialist bee families with confirmed presence in %s.", eff_st)))
+      }
+      tagList(
+        render_family_section(bee_df, "bee", ns,
+                              state_presence = st_pres, state_code = eff_st),
+        build_source_attribution(eff_st)
+      )
     })
 
     # --- Birds Tab ---
@@ -637,13 +854,24 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (length(sp) == 0) return(empty_garden_ui(ns, "bird"))
 
       summary <- coverage_summary()
+      st_pres <- family_state_presence()
+      eff_st <- effective_state()
       bird_df <- summary[["Bird"]]
       if (is.null(bird_df) || nrow(bird_df) == 0) {
         return(div(class = "text-muted text-center py-4",
                    "No bird data found for your garden plants."))
       }
       bird_df <- bird_df[order(-bird_df$species_covered), ]
-      tagList(render_family_section(bird_df, "bird", ns), SOURCE_ATTRIBUTION)
+      bird_df <- filter_by_state_presence(bird_df, st_pres, eff_st)
+      if (nrow(bird_df) == 0) {
+        return(div(class = "text-muted text-center py-4",
+                   sprintf("No bird families with confirmed presence in %s.", eff_st)))
+      }
+      tagList(
+        render_family_section(bird_df, "bird", ns,
+                              state_presence = st_pres, state_code = eff_st),
+        build_source_attribution(eff_st)
+      )
     })
 
     # --- Dynamic family donut renderers (with hover tooltips) ---
@@ -651,12 +879,16 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       summary <- coverage_summary()
       cov <- wildlife_coverage()
       gap_genera <- family_gap_genera()
+      st_pres <- family_state_presence()
+      eff_st <- effective_state()
 
       render_tab_donuts <- function(type_keys, prefix) {
         parts <- Filter(Negate(is.null), summary[type_keys])
         combined <- if (length(parts) > 0) do.call(rbind, parts) else data.frame()
         if (nrow(combined) == 0) return()
         combined <- combined[order(-combined$species_covered), ]
+        combined <- filter_by_state_presence(combined, st_pres, eff_st)
+        if (nrow(combined) == 0) return()
 
         output[[paste0(prefix, "_summary_donut")]] <- renderPlotly({
           render_donut(sum(combined$species_covered), sum(combined$total_species), "")
@@ -890,7 +1122,14 @@ GENUS_COMMON_OVERRIDES <- list(
   Schizachyrium = "Little Bluestems",
   Panicum = "Switchgrasses",
   Andropogon = "Bluestems",
-  Sporobolus = "Dropseed Grasses"
+  Sporobolus = "Dropseed Grasses",
+  Campsis = "Trumpet Creepers",
+  Clematis = "Clematis",
+  Rhododendron = "Rhododendrons & Azaleas",
+  Wisteria = "Wisterias",
+  Celastrus = "Bittersweets",
+  Parthenocissus = "Virginia Creepers",
+  Lonicera = "Honeysuckles"
 )
 
 #' Get a genus-level common name (plural) from common_name_db
@@ -924,14 +1163,30 @@ get_genus_common_name <- function(genus, common_name_db) {
     }
   }
 
-  # Strategy 2: If no genus-level entry found, use most common/shortest common name
+  # Strategy 2: If no genus-level entry found, extract shared words across species
   if (is.null(best_name) && length(genus_matches) > 0) {
     valid <- genus_matches[!is.na(common_name_db$common_name[genus_matches]) &
                            nzchar(common_name_db$common_name[genus_matches])]
     if (length(valid) > 0) {
-      # Pick the shortest common name (most likely to be the generic one)
-      names <- common_name_db$common_name[valid]
-      best_name <- names[which.min(nchar(names))]
+      names <- tolower(common_name_db$common_name[valid])
+      if (length(names) >= 2) {
+        word_lists <- strsplit(names, "\\s+")
+        shared <- Reduce(intersect, word_lists)
+        shared <- shared[nchar(shared) >= 3]
+        if (length(shared) > 0) {
+          best_name <- paste(shared, collapse = " ")
+        }
+      }
+      if (is.null(best_name)) {
+        last_words <- sapply(strsplit(names, "\\s+"), tail, 1)
+        word_freq <- table(last_words)
+        most_common <- names(which.max(word_freq))
+        if (word_freq[[most_common]] >= max(length(names) * 0.5, 1)) {
+          best_name <- most_common
+        } else {
+          best_name <- names[which.min(nchar(names))]
+        }
+      }
     }
   }
 
@@ -967,13 +1222,16 @@ empty_garden_ui <- function(ns, prefix) {
 }
 
 #' Render a family section with summary donut and per-family grid
-render_family_section <- function(summary_df, prefix, ns) {
+render_family_section <- function(summary_df, prefix, ns,
+                                  state_presence = list(), state_code = NULL) {
   if (is.null(summary_df) || nrow(summary_df) == 0) {
     return(div(class = "text-muted text-center py-4", "No data available"))
   }
 
   total_covered <- sum(summary_df$species_covered)
   total_all <- sum(summary_df$total_species)
+  has_state_data <- !is.null(state_code) && nzchar(state_code) && length(state_presence) > 0
+  excluded_count <- attr(summary_df, "excluded_count") %||% 0
 
   tagList(
     # Summary donut
@@ -998,6 +1256,36 @@ render_family_section <- function(summary_df, prefix, ns) {
         wiki_url <- family_wiki_url(fam)
         inat_url <- family_inat_url(fam)
 
+        # State presence badge
+        presence_badge <- NULL
+        if (has_state_data) {
+          fp <- state_presence[[fam]]
+          if (!is.null(fp) && fp$confirmed > 0) {
+            ratio <- fp$confirmed / max(fp$total, 1)
+            if (ratio >= 0.75) {
+              presence_badge <- tags$span(class = "badge",
+                style = "background: #7A9A86; font-size: 0.6rem; font-weight: 500;",
+                sprintf("In %s", state_code))
+            } else {
+              presence_badge <- tags$span(class = "badge",
+                style = "background: #D39B35; font-size: 0.6rem; font-weight: 500;",
+                sprintf("Partial in %s", state_code))
+            }
+          }
+        }
+
+        # Tooltip for count
+        count_title <- if (has_state_data) {
+          fp <- state_presence[[fam]]
+          if (!is.null(fp)) {
+            sprintf("%d of %d species confirmed in %s", fp$confirmed, fp$total, state_code)
+          } else {
+            ""
+          }
+        } else {
+          ""
+        }
+
         div(class = "col-lg-3 col-md-4 col-sm-6 col-12",
           card(class = "h-100",
             card_body(class = "p-2 text-center",
@@ -1010,8 +1298,10 @@ render_family_section <- function(summary_df, prefix, ns) {
                      display_name,
                      tags$i(class = "fa fa-external-link-alt ms-1",
                             style = "font-size: 0.6rem; opacity: 0.4;")),
-              tags$small(class = "text-muted d-block",
+              tags$small(class = "text-muted d-block", title = count_title,
                          sprintf("%d / %d", row$species_covered, row$total_species)),
+              # State presence badge
+              presence_badge,
               # Familiar species blurb
               if (!is.null(blurb)) {
                 tags$small(class = "text-muted d-block mt-1",
@@ -1028,6 +1318,16 @@ render_family_section <- function(summary_df, prefix, ns) {
           )
         )
       })
-    )
+    ),
+
+    # Note about excluded families
+    if (excluded_count > 0) {
+      tags$small(class = "text-muted d-block mt-2 text-center",
+                 style = "font-size: 0.75rem;",
+                 sprintf("%d %s not shown (no confirmed presence in %s)",
+                         excluded_count,
+                         ifelse(excluded_count == 1, "family", "families"),
+                         state_code))
+    }
   )
 }

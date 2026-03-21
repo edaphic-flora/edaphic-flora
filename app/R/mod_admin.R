@@ -81,6 +81,14 @@ adminServer <- function(id, pool, is_admin, current_user, data_changed) {
         mutate(date = as.character(date),
                created_at = as.character(created_at))
 
+      # Sanitize user-provided text fields to prevent XSS
+      text_cols <- c("species", "created_by", "texture_class")
+      for (col in intersect(text_cols, names(display))) {
+        display[[col]] <- vapply(display[[col]], function(v) {
+          if (is.na(v) || v == "") v else htmltools::htmlEscape(v)
+        }, character(1), USE.NAMES = FALSE)
+      }
+
       # Add action buttons - these trigger global edit_entry/delete_entry inputs
       display$actions <- sapply(display$id, function(entry_id) {
         sprintf(
@@ -102,6 +110,7 @@ adminServer <- function(id, pool, is_admin, current_user, data_changed) {
       content = function(file) {
         if (is_admin()) {
           data <- db_get_all_samples()
+          data$created_by <- NULL  # Strip user IDs from export
           write.csv(data, file, row.names = FALSE)
           u <- current_user()
           if (!is.null(u)) {
