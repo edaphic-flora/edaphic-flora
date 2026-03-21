@@ -167,6 +167,46 @@ helpUI <- function(id) {
                       "Red = positive correlation, Blue = negative correlation.")
             ),
 
+            h4(class = "mt-4", "Native & Invasive Badges", id = "guide-badges"),
+            p("Throughout the app, species are labeled with colored badges indicating their status in your home state:"),
+            tags$dl(class = "row",
+              tags$dt(class = "col-sm-3", tags$span(class = "badge bg-success", "Native")),
+              tags$dd(class = "col-sm-9", "This species is native to your state according to BONAP (Biota of North America Program). ",
+                      "Native plants co-evolved with local wildlife and support pollinators, birds, and beneficial insects ",
+                      "far more effectively than non-native species."),
+              tags$dt(class = "col-sm-3", tags$span(class = "badge bg-secondary", "Introduced")),
+              tags$dd(class = "col-sm-9", "This species is not native to your state. It was brought from elsewhere and may or may not ",
+                      "be naturalized. Introduced species are not inherently harmful, but they typically support fewer ",
+                      "native wildlife species than true natives."),
+              tags$dt(class = "col-sm-3", tags$span(class = "badge bg-danger", "Invasive")),
+              tags$dd(class = "col-sm-9", "This species appears on your state's noxious or invasive species list. ",
+                      "Invasive plants can escape cultivation, displace native species, and damage ecosystems. ",
+                      "Clicking the badge will open your state's invasive species resource page.")
+            ),
+            p(class = "text-muted", "Badges are based on your home state, which you can set in user preferences. ",
+              "If no home state is set, badges will not appear."),
+
+            h4(class = "mt-4", "My Garden Wildlife Dashboard", id = "guide-wildlife"),
+            p("The My Garden tab shows the wildlife value of the plants in your garden. It draws on research linking ",
+              "native plant genera to the insects, bees, and birds they support."),
+
+            h5(class = "mt-3", "Donut Charts"),
+            p("Each wildlife group (Lepidoptera, Native Bees, and Birds) gets a donut chart showing how much of the known ",
+              "wildlife diversity your garden plants support. The chart displays the number of wildlife species associated ",
+              "with your garden's plant genera compared to the total known for your region. A higher percentage means your ",
+              "garden is providing habitat and food for a larger share of local wildlife."),
+
+            h5(class = "mt-3", "State Presence Badges"),
+            p("When state-level occurrence data is available (from GBIF and eBird), wildlife families are tagged with a badge ",
+              "indicating whether they have been documented in your state. This helps you understand which wildlife families ",
+              "are actually present near you, rather than just theoretically associated with your plants. Families confirmed ",
+              "in your state appear with a green badge; those not yet documented appear with a gray badge."),
+
+            h5(class = "mt-3", "Gap Recommendations"),
+            p("The dashboard identifies gaps in your garden's wildlife coverage and suggests native plant genera that would ",
+              "attract additional wildlife species. These recommendations are filtered to your state and prioritize genera ",
+              "that support wildlife families not yet covered by your current plantings."),
+
             h4(class = "mt-4", "External Resources"),
             tags$ul(
               tags$li(tags$a(href = "https://plants.usda.gov/", target = "_blank", "USDA PLANTS Database"),
@@ -191,7 +231,11 @@ helpUI <- function(id) {
                            tags$strong("References: "),
                            "Nutrient guidelines adapted from university extension publications. ",
                            "Species data from WCVP (Royal Botanic Gardens, Kew) and USDA PLANTS Database. ",
-                           "State-level nativity data from Kartesz, J.T., The Biota of North America Program (BONAP)."))
+                           "State-level nativity data from Kartesz, J.T., The Biota of North America Program (BONAP). ",
+                           "Lepidoptera-host plant associations from Tallamy, D.W. & Shropshire, K.J. (National Wildlife Federation). ",
+                           "Native bee-plant associations from Fowler, J. (Jarrod Fowler Pollinator Conservation). ",
+                           "Bird-plant associations adapted from Audubon native plant database. ",
+                           "Species occurrence data from GBIF (Global Biodiversity Information Facility) and eBird (Cornell Lab of Ornithology)."))
           )
         )
       )
@@ -300,6 +344,36 @@ helpUI <- function(id) {
                 " or your state's invasive species list.")
             ),
 
+            h5("What do the wildlife donut charts in My Garden show?"),
+            p(class = "text-muted mb-4",
+              "Each donut chart represents one wildlife group: Lepidoptera (butterflies and moths), Native Bees, or Birds. ",
+              "The chart shows the percentage of known wildlife species in that group that are associated with the plant ",
+              "genera in your garden. For example, if your garden plants support host relationships with 45 out of 200 ",
+              "Lepidoptera species known in your region, the chart shows 22.5%. Adding more native plant genera, ",
+              "especially from underrepresented families, increases your coverage."),
+
+            h5("Why should I set my home location?"),
+            p(class = "text-muted mb-4",
+              "Your home location (set via zip code in user preferences) enables several features: native/introduced/invasive ",
+              "badges are determined by your state, the wildlife dashboard filters occurrence data to show which wildlife ",
+              "families are documented in your area, and gap recommendations prioritize plant genera native to your state. ",
+              "Without a home location, these features cannot provide state-specific information."),
+
+            h5("What do the state presence badges mean on wildlife families?"),
+            p(class = "text-muted mb-4",
+              "When viewing wildlife families in the My Garden dashboard, some families show a green or gray badge. ",
+              "A green badge means that family has been documented in your state based on GBIF occurrence records ",
+              "(for Lepidoptera and bees) or eBird observations (for birds). A gray badge means no records were found for ",
+              "your state, which may mean the family is absent or simply under-documented. These badges help you focus on ",
+              "wildlife that is actually present in your area."),
+
+            h5("How do the plant recommendations work?"),
+            p(class = "text-muted mb-4",
+              "The My Garden dashboard identifies wildlife families that are not yet supported by your current garden plants ",
+              "and recommends native plant genera that would fill those gaps. Recommendations are filtered to genera native ",
+              "to your state and prioritized by how many additional wildlife species they would attract. This helps you make ",
+              "informed decisions about which plants to add for maximum ecological benefit."),
+
             h5("Found a bug or have a suggestion?"),
             p(class = "text-muted mb-4",
               "We welcome feedback! If you encounter any issues or have feature requests, please reach out at ",
@@ -363,6 +437,28 @@ helpUI <- function(id) {
               "characteristics. The species may be responding to pH, drainage, or soil structure rather than calcium itself. ",
               "The app shows correlations in the data\u2014interpreting the underlying mechanisms requires agronomic knowledge ",
               "and, ideally, controlled experiments."),
+
+            h4(class = "mt-4", "Wildlife Data Limitations"),
+            p("The My Garden wildlife dashboard provides a useful picture of your garden's ecological value, ",
+              "but the underlying data has important limitations:"),
+            tags$ul(
+              tags$li(tags$strong("Regional scope"), " \u2014 Wildlife-plant association data is based primarily on research ",
+                      "conducted in eastern North America. Associations may differ in western states, and some regionally ",
+                      "important wildlife species may not be represented in the database."),
+              tags$li(class = "mt-2",
+                      tags$strong("Potential vs. guaranteed"), " \u2014 An association between a plant genus and a wildlife species ",
+                      "means the wildlife ", tags$em("can"), " use that plant, not that it ", tags$em("will"), ". Local conditions, ",
+                      "population dynamics, and habitat context all affect whether wildlife actually visits your garden."),
+              tags$li(class = "mt-2",
+                      tags$strong("State occurrence data gaps"), " \u2014 GBIF and eBird records reflect where observers have looked, ",
+                      "not necessarily where species exist. A wildlife family marked as absent from your state may simply be ",
+                      "under-documented. Rural areas and less charismatic species tend to have fewer records."),
+              tags$li(class = "mt-2",
+                      tags$strong("Taxonomic coverage"), " \u2014 The wildlife database covers approximately 80% of Lepidoptera families ",
+                      "and 95% of native bee genera with known host-plant associations. Bird coverage is based on habitat and food ",
+                      "plant preferences rather than strict host relationships. Some wildlife groups (e.g., beetles, flies, wasps) ",
+                      "are not yet included.")
+            ),
 
             h4(class = "mt-4", "Responsible Use"),
             div(class = "p-3 bg-light rounded border-start border-3",

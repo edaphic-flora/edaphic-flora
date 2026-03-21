@@ -481,6 +481,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       },
       content = function(file) {
         data <- db_get_all_samples()
+        data$created_by <- NULL  # Strip user IDs from export
         write.csv(data, file, row.names = FALSE, na = "")
 
         # Audit log
@@ -2266,7 +2267,15 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       dat <- filtered_species_data()
       if (nrow(dat) == 0) return(NULL)
 
-      # Format outcome as badge
+      # Sanitize user-provided text fields to prevent XSS (before adding any HTML)
+      text_cols <- c("species", "cultivar", "notes", "created_by")
+      for (col in intersect(text_cols, names(dat))) {
+        dat[[col]] <- vapply(dat[[col]], function(v) {
+          if (is.na(v) || v == "") v else htmltools::htmlEscape(v)
+        }, character(1), USE.NAMES = FALSE)
+      }
+
+      # Format outcome as badge (uses controlled values, not user input)
       if ("outcome" %in% names(dat)) {
         dat$outcome <- sapply(dat$outcome, function(o) {
           if (is.na(o) || o == "") return("-")
@@ -2277,13 +2286,14 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
             "Failed/Died" = "outcome-failed",
             ""
           )
-          sprintf('<span class="outcome-badge %s">%s</span>', badge_class, o)
+          escaped_o <- htmltools::htmlEscape(o)
+          sprintf('<span class="outcome-badge %s">%s</span>', badge_class, escaped_o)
         })
       }
 
       datatable(dat,
                 options = list(scrollX = TRUE, pageLength = 15),
-                escape = FALSE)  # Allow HTML rendering
+                escape = FALSE)  # Allow HTML rendering for outcome badges
     })
 
     # ---------------------------
@@ -2412,7 +2422,15 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       }
 
       result
-    }, striped = TRUE, hover = TRUE, width = "100%", sanitize.text.function = identity)
+    }, striped = TRUE, hover = TRUE, width = "100%",
+       sanitize.text.function = function(x) {
+         # Trait column uses controlled HTML for section headers (add_section);
+         # Value column contains USDA reference data. Allow known safe HTML through
+         # but escape anything unexpected.
+         ifelse(grepl('^<span style="font-weight: 600; color: #7A9A86;">', x),
+                x,  # Pass through known section-header HTML
+                htmltools::htmlEscape(x))
+       })
 
   })
 }
