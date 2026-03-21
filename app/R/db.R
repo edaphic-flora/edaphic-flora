@@ -20,7 +20,7 @@ SOIL_SAMPLE_COLUMNS <- c(
   "notes", "created_by", "outcome", "sun_exposure", "site_hydrology"
 )
 
-SOIL_SAMPLE_SELECT <- paste("id,", paste(SOIL_SAMPLE_COLUMNS, collapse = ", "), ", created_at")
+SOIL_SAMPLE_SELECT <- paste("id,", paste(SOIL_SAMPLE_COLUMNS, collapse = ", "), ", flagged, flag_reason, created_at")
 
 # ---------------------------
 # Database Connection
@@ -105,6 +105,8 @@ db_migrate <- function() {
     # Indices
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_species ON soil_samples(species)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_date ON soil_samples(date)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_created_by ON soil_samples(created_by)")
+    dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_samples_location ON soil_samples(location_lat, location_long) WHERE location_lat IS NOT NULL")
 
     # PDF extraction rate limiting table
     dbExecute(pool, "
@@ -257,6 +259,10 @@ db_migrate <- function() {
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wsp_state_wildlife ON ref_wildlife_state_presence(state_code, wildlife_id)")
     dbExecute(pool, "CREATE INDEX IF NOT EXISTS idx_wsp_wildlife ON ref_wildlife_state_presence(wildlife_id)")
 
+    # Data quality: flagged samples (admin moderation)
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE")
+    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS flag_reason TEXT")
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
@@ -287,7 +293,7 @@ db_get_all_samples <- function(limit = NULL) {
 db_get_species_data <- function(species, limit = NULL) {
   if (is.null(species) || !nzchar(trimws(species))) return(data.frame())
   tryCatch({
-    sql <- paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples WHERE species = $1 ORDER BY created_at DESC")
+    sql <- paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples WHERE species = $1 AND (flagged IS NULL OR flagged = FALSE) ORDER BY created_at DESC")
     if (!is.null(limit) && is.numeric(limit) && limit > 0) {
       sql <- paste(sql, "LIMIT", as.integer(limit))
     }
@@ -680,6 +686,7 @@ db_check_species_stats_threshold <- function(species, pool) {
              COUNT(DISTINCT created_by)::int AS n_contributors
       FROM soil_samples
       WHERE species = $1
+        AND (flagged IS NULL OR flagged = FALSE)
     ", params = list(species))
 
     n_samples <- result$n_samples[1]
@@ -719,6 +726,7 @@ db_get_site_stats <- function(pool) {
              COUNT(DISTINCT species)::int AS total_species,
              COUNT(DISTINCT created_by)::int AS total_contributors
       FROM soil_samples
+      WHERE (flagged IS NULL OR flagged = FALSE)
     ")
 
     total <- result$total_samples[1]
@@ -762,12 +770,13 @@ db_get_nearby_samples <- function(lat, lon, radius_miles = DEFAULT_NEIGHBOR_RADI
   lon_max <- lon + lon_delta
 
   tryCatch({
-    # Bounding box pre-filter in SQL
+    # Bounding box pre-filter in SQL (excludes flagged samples)
     if (!is.null(exclude_user_id) && nzchar(exclude_user_id)) {
       query <- paste("
         SELECT", SOIL_SAMPLE_SELECT, "
         FROM soil_samples
         WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
+          AND (flagged IS NULL OR flagged = FALSE)
           AND location_lat BETWEEN $1 AND $2
           AND location_long BETWEEN $3 AND $4
           AND (created_by IS NULL OR created_by != $5)
@@ -778,6 +787,7 @@ db_get_nearby_samples <- function(lat, lon, radius_miles = DEFAULT_NEIGHBOR_RADI
         SELECT", SOIL_SAMPLE_SELECT, "
         FROM soil_samples
         WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
+          AND (flagged IS NULL OR flagged = FALSE)
           AND location_lat BETWEEN $1 AND $2
           AND location_long BETWEEN $3 AND $4
       ")
@@ -1079,5 +1089,113 @@ db_get_native_species_for_genus <- function(genus, state_code, pool) {
   }, error = function(e) {
     message("Error fetching native species for genus: ", e$message)
     data.frame(species_name = character(), common_name = character(), stringsAsFactors = FALSE)
+  })
+}
+
+# ---------------------------
+# Submission Rate Limiting
+# ---------------------------
+
+#' Check if a user is under the daily submission limit
+#' @param user_id Firebase UID
+#' @param pool Database connection pool
+#' @param max_per_day Maximum submissions per 24 hours (default 20)
+#' @return TRUE if under limit, FALSE if over
+db_check_submission_rate <- function(user_id, pool, max_per_day = 20) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  tryCatch({
+    result <- dbGetQuery(pool,
+      "SELECT COUNT(*)::int AS n FROM soil_samples
+       WHERE created_by = $1 AND created_at > now() - interval '24 hours'",
+      params = list(user_id))
+    result$n[1] < max_per_day
+  }, error = function(e) {
+    message("Error checking submission rate: ", e$message)
+    # Fail open on DB error — don't block legitimate users
+    TRUE
+  })
+}
+
+# ---------------------------
+# Duplicate Detection
+# ---------------------------
+
+#' Check if user already submitted the same species within 24 hours
+#' @param species Species name
+#' @param user_id Firebase UID
+#' @param pool Database connection pool
+#' @return Integer count of recent duplicates
+db_check_duplicate <- function(species, user_id, pool) {
+  if (is.null(species) || is.null(user_id) || !nzchar(species) || !nzchar(user_id)) return(0L)
+  tryCatch({
+    result <- dbGetQuery(pool,
+      "SELECT COUNT(*)::int AS n FROM soil_samples
+       WHERE species = $1 AND created_by = $2 AND created_at > now() - interval '24 hours'",
+      params = list(species, user_id))
+    as.integer(result$n[1])
+  }, error = function(e) {
+    message("Error checking duplicate: ", e$message)
+    0L
+  })
+}
+
+# ---------------------------
+# Export Rate Limiting
+# ---------------------------
+
+#' Check if a user is under the daily export limit
+#' @param user_id Firebase UID
+#' @param pool Database connection pool
+#' @param max_per_day Maximum exports per 24 hours (default 10)
+#' @return TRUE if under limit, FALSE if over
+db_check_export_rate <- function(user_id, pool, max_per_day = 10) {
+  if (is.null(user_id) || !nzchar(user_id)) return(TRUE)
+  tryCatch({
+    result <- dbGetQuery(pool,
+      "SELECT COUNT(*)::int AS n FROM audit_log
+       WHERE user_id = $1 AND action = 'export' AND created_at > now() - interval '24 hours'",
+      params = list(user_id))
+    result$n[1] < max_per_day
+  }, error = function(e) {
+    message("Error checking export rate: ", e$message)
+    # Fail open on DB error
+    TRUE
+  })
+}
+
+# ---------------------------
+# Admin Flagging System
+# ---------------------------
+
+#' Flag a sample for review
+#' @param sample_id ID of the soil_samples record
+#' @param reason Text reason for flagging
+#' @param pool Database connection pool
+#' @return TRUE on success, FALSE on failure
+db_flag_sample <- function(sample_id, reason, pool) {
+  tryCatch({
+    dbExecute(pool,
+      "UPDATE soil_samples SET flagged = TRUE, flag_reason = $1 WHERE id = $2",
+      params = list(reason, sample_id))
+    TRUE
+  }, error = function(e) {
+    message("Error flagging sample: ", e$message)
+    FALSE
+  })
+}
+
+#' Unflag a sample (clear flag)
+#' @param sample_id ID of the soil_samples record
+#' @param pool Database connection pool
+#' @return TRUE on success, FALSE on failure
+db_unflag_sample <- function(sample_id, pool) {
+  tryCatch({
+    dbExecute(pool,
+      "UPDATE soil_samples SET flagged = FALSE, flag_reason = NULL WHERE id = $1",
+      params = list(sample_id))
+    TRUE
+  }, error = function(e) {
+    message("Error unflagging sample: ", e$message)
+    FALSE
   })
 }

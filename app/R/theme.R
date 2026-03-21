@@ -190,8 +190,8 @@ edaphic_css <- function() {
        1. TYPOGRAPHY
        =========================================== */
 
-    /* Import fonts - Brand Standard: Baumans (logo), Montserrat (headings), Rokkitt (body), JetBrains Mono (data) */
-    @import url('https://fonts.googleapis.com/css2?family=Baumans&family=Montserrat:wght@400;500;600;700&family=Rokkitt:wght@300;400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+    /* Baumans (logo only) - other fonts loaded by bslib::font_google() */
+    @import url('https://fonts.googleapis.com/css2?family=Baumans&display=swap');
 
     body {
       font-family: 'Rokkitt', Georgia, serif;
@@ -1333,25 +1333,82 @@ early_access_ui <- function(n_samples, n_contributors,
 
 #' Seed the database banner for welcome page
 #' @param total_samples Current total samples in database
-#' @param min_total Required total threshold
-#' @return Shiny UI tag
-seed_database_ui <- function(total_samples, min_total = MIN_TOTAL_SAMPLES_FOR_SITE_STATS) {
-  pct <- min(100, round(total_samples / min_total * 100))
+#' @param total_samples Current total sample count
+#' @return Shiny UI tag with escalating milestone progress
+seed_database_ui <- function(total_samples) {
+  # Escalating milestones
+  milestones <- c(10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
+  milestone_labels <- c(
+    "First Seeds"  , "Taking Root"  , "Growing Strong",
+    "Triple Digits", "Building Depth", "Half a Thousand",
+    "Major Milestone", "Research Grade", "Regional Dataset", "Continental Scale"
+  )
+
+  # Find current milestone (next one above current count)
+  current_idx <- which(milestones > total_samples)[1]
+  if (is.na(current_idx)) {
+    # Past all milestones
+    goal <- milestones[length(milestones)]
+    label <- milestone_labels[length(milestone_labels)]
+    pct <- 100
+    next_label <- NULL
+  } else {
+    goal <- milestones[current_idx]
+    label <- milestone_labels[current_idx]
+    prev_goal <- if (current_idx > 1) milestones[current_idx - 1] else 0
+    pct <- min(100, round((total_samples - prev_goal) / (goal - prev_goal) * 100))
+    next_label <- label
+  }
+
+  # Completed milestones for display
+  completed <- milestones[milestones <= total_samples]
+  n_completed <- length(completed)
+
+  # Milestone dots
+  dots <- lapply(seq_along(milestones[1:min(7, length(milestones))]), function(i) {
+    is_done <- milestones[i] <= total_samples
+    is_current <- !is.na(current_idx) && i == current_idx
+    tags$span(
+      style = paste0(
+        "width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin: 0 2px; ",
+        if (is_done) "background: #7A9A86;"
+        else if (is_current) "background: #D39B35;"
+        else "background: #e0ddd2;"
+      ),
+      title = sprintf("%s (%s samples)", milestone_labels[i], format(milestones[i], big.mark = ","))
+    )
+  })
 
   div(class = "seed-database-banner",
       div(class = "d-flex align-items-center mb-2",
           tags$i(class = "fa fa-seedling me-2", style = "color: #7A9A86;"),
-          tags$strong("Help Us Seed the Database", style = "color: #4A6B5A; font-family: 'Montserrat', sans-serif; font-size: 0.85rem;")
+          tags$strong("Community Progress",
+                      style = "color: #4A6B5A; font-family: 'Montserrat', sans-serif; font-size: 0.85rem;"),
+          if (!is.null(next_label)) {
+            tags$span(class = "ms-auto badge rounded-pill",
+                      style = "background: rgba(211,155,53,0.15); color: #b8862d; font-size: 0.7rem;",
+                      next_label)
+          }
       ),
-      tags$small(class = "text-muted d-block mb-1",
-                 "Every soil sample helps build better plant recommendations."),
-      div(class = "d-flex align-items-center",
-          tags$small(class = "text-muted me-2", style = "min-width: 80px;",
-                     sprintf("%d/%d samples", total_samples, min_total)),
-          div(class = "progress flex-grow-1",
+      # Progress bar toward next milestone
+      div(class = "d-flex align-items-center mb-2",
+          tags$small(class = "text-muted me-2",
+                     style = "min-width: 110px; font-size: 0.8rem; cursor: help; border-bottom: 1px dotted currentColor;",
+                     title = "A soil sample is one species + one lab soil test result. Each submission adds to our shared knowledge of what grows where.",
+                     sprintf("%s / %s soil samples",
+                             format(total_samples, big.mark = ","),
+                             format(goal, big.mark = ","))),
+          div(class = "progress flex-grow-1", style = "height: 8px;",
               div(class = "progress-bar", role = "progressbar",
-                  style = sprintf("width: %d%%;", pct),
-                  `aria-valuenow` = total_samples, `aria-valuemin` = 0, `aria-valuemax` = min_total))
-      )
+                  style = sprintf("width: %d%%; background-color: #7A9A86;", pct),
+                  `aria-valuenow` = total_samples, `aria-valuemin` = 0, `aria-valuemax` = goal))
+      ),
+      # Milestone dots
+      div(class = "d-flex align-items-center justify-content-center gap-0 mb-1",
+          dots
+      ),
+      tags$small(class = "text-muted d-block text-center",
+                 style = "font-size: 0.7rem;",
+                 sprintf("%d milestone%s reached", n_completed, if (n_completed != 1) "s" else ""))
   )
 }

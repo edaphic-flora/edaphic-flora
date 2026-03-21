@@ -1,7 +1,6 @@
 # R/data.R - Reference data loading
 
-library(sf)
-library(ecoregions)
+# sf and ecoregions loaded conditionally in app.R (dev only)
 library(dplyr)
 
 # ---------------------------

@@ -19,17 +19,19 @@ library(dplyr)
 library(ggplot2)
 library(DT)
 library(tidyr)
-library(ggtern)
-library(tidygeocoder)
-library(sf)
-library(ecoregions)
-library(maps)
-library(mapdata)
 library(polished)
 library(plotly)
 library(leaflet)
 library(shinycssloaders)
 library(shinyjs)
+
+# Heavy packages: load only when needed
+# sf + ecoregions: only in dev (prod uses pre-computed grid, no sf required)
+# ggtern, maps, mapdata, tidygeocoder: loaded on first use via requireNamespace()
+if (Sys.getenv("ENV", "prod") == "dev") {
+  library(sf)
+  library(ecoregions)
+}
 
 # --- Load modules
 source("R/db.R")
@@ -42,14 +44,14 @@ source("R/mod_help.R")
 source("R/mod_welcome.R")
 source("R/mod_admin.R")
 # source("R/mod_data_management.R")  # Removed — export moved to Analysis sidebar
-source("R/mod_find_plants.R")
+# source("R/mod_find_plants.R")      # Deprecated — replaced by My Garden
 source("R/mod_my_garden.R")
 source("R/mod_data_entry.R")
 source("R/ecoregion_ref.R")
 source("R/mod_analysis.R")
 
-# --- Initialize
-db_migrate()
+# --- Initialize (skip migrations in prod — schema is stable)
+if (Sys.getenv("ENV", "prod") == "dev") db_migrate()
 onStop(function() poolClose(pool))
 
 species_db <- load_species_db()
@@ -63,7 +65,7 @@ common_name_db <- tryCatch(load_common_name_index(pool), error = function(e) {
 species_search_index <- build_species_search_index(species_db, common_name_db)
 
 # Ecoregions: use full shapefile in dev, lightweight grid lookup in prod
-is_prod <- Sys.getenv("ENV", "dev") != "dev"
+is_prod <- Sys.getenv("ENV", "prod") != "dev"
 eco_sf <- NULL
 eco_grid <- NULL
 
@@ -204,9 +206,7 @@ base_ui <- page_navbar(
     tags$meta(name = "viewport", content = "width=device-width, initial-scale=1, maximum-scale=5"),
      tags$link(rel = "stylesheet",
                href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
-     # Brand fonts: Baumans (logo), Montserrat (headings), Rokkitt (body) - loaded via bslib but backup here
-     tags$link(rel = "stylesheet",
-               href = "https://fonts.googleapis.com/css2?family=Baumans&family=Montserrat:wght@400;500;600;700&family=Rokkitt:wght@300;400;500;600&display=swap"),
+     # Fonts loaded by bslib (Montserrat, Rokkitt, JetBrains Mono) + @import in theme.R (Baumans)
      tags$style(HTML("
        /* Navbar zip code input styling */
        #nav_zipcode {

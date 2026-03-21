@@ -178,10 +178,8 @@ welcomeServer <- function(id, pool, data_changed) {
           div(class = "col-6 border-end", stat_box(stats$users, "Contributors", "users")),
           div(class = "col-6", stat_box(stats$ecoregions, "Ecoregions", "map"))
         ),
-        # Show seed database banner when below site threshold
-        if (!meets_site) {
-          seed_database_ui(stats$samples)
-        }
+        # Community progress tracker (escalating milestones)
+        seed_database_ui(stats$samples)
       )
     })
 

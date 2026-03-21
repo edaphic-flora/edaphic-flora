@@ -447,7 +447,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           div(class = "mb-3",
               dateInput(ns("date_step3"), "Sample Date", value = isolate(input$date)),
               textAreaInput(ns("notes_step3"), "Notes", value = isolate(input$notes),
-                            height = "80px", placeholder = "General notes about this soil sample...")
+                            height = "80px", placeholder = "General notes about this soil sample..."),
+              tags$small(class = "text-muted", "Max 1,000 characters")
           ),
 
           hr(),
@@ -1575,10 +1576,29 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         paste0("my_edaphic_data_", format(Sys.Date(), "%Y%m%d"), ".csv")
       },
       content = function(file) {
+        # Export rate limiting
+        u <- current_user()
+        if (!is.null(u) && !db_check_export_rate(u$user_uid, pool)) {
+          showNotification(
+            "You've reached the daily export limit (10 per day). Please try again tomorrow.",
+            type = "error", duration = 8)
+          writeLines("Export rate limit exceeded", file)
+          return()
+        }
+
         entries <- all_user_entries()
         # Remove internal columns
         entries <- entries %>% select(-created_by)
         write.csv(entries, file, row.names = FALSE)
+
+        # Audit log
+        if (!is.null(u)) {
+          tryCatch(
+            db_audit_log("export", "soil_samples", user_id = u$user_uid,
+                         details = sprintf("exported own data (%d rows)", nrow(entries))),
+            error = function(e) NULL
+          )
+        }
       }
     )
 
@@ -2058,6 +2078,14 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
+      # --- Submission rate limiting ---
+      if (!db_check_submission_rate(u$user_uid, pool)) {
+        showNotification(
+          "You've reached the daily submission limit (20 samples per day). Please try again tomorrow.",
+          type = "error", duration = 8)
+        return()
+      }
+
       # Check for batch upload and/or manual species selection
       pld <- plant_list_data()
       has_batch <- !is.null(pld) && nrow(pld$valid) > 0
@@ -2091,6 +2119,83 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         return()
       }
 
+      # --- Value range validation (hard rejections) ---
+      # Helper: check if value is non-null and non-NA
+      val_present <- function(x) !is.null(x) && !is.na(x)
+
+      # pH: must be 2.0-14.0
+      if (val_present(input$ph)) {
+        if (input$ph < 2.0 || input$ph > 14.0) {
+          showNotification("pH must be between 2.0 and 14.0", type = "error")
+          return()
+        }
+      }
+
+      # Organic matter: must be 0-50%
+      if (val_present(input$organic_matter)) {
+        if (input$organic_matter < 0 || input$organic_matter > 50) {
+          showNotification("Organic matter must be between 0% and 50%", type = "error")
+          return()
+        }
+      }
+
+      # CEC: must be 0-200
+      if (val_present(input$cec)) {
+        if (input$cec < 0 || input$cec > 200) {
+          showNotification("CEC must be between 0 and 200 meq/100g", type = "error")
+          return()
+        }
+      }
+
+      # Texture percentages: each must be 0-100
+      if (val_present(input$sand) && (input$sand < 0 || input$sand > 100)) {
+        showNotification("Sand percentage must be between 0 and 100", type = "error")
+        return()
+      }
+      if (val_present(input$silt) && (input$silt < 0 || input$silt > 100)) {
+        showNotification("Silt percentage must be between 0 and 100", type = "error")
+        return()
+      }
+      if (val_present(input$clay) && (input$clay < 0 || input$clay > 100)) {
+        showNotification("Clay percentage must be between 0 and 100", type = "error")
+        return()
+      }
+
+      # Texture sum: if all three provided, must sum to 90-110 (lab rounding tolerance)
+      if (val_present(input$sand) && val_present(input$silt) && val_present(input$clay)) {
+        texture_sum <- input$sand + input$silt + input$clay
+        if (texture_sum < 90 || texture_sum > 110) {
+          showNotification(
+            sprintf("Sand + Silt + Clay = %.1f%%. Must sum to 90-110%% (allowing for lab rounding).", texture_sum),
+            type = "error")
+          return()
+        }
+      }
+
+      # All ppm nutrient values: must be 0-100,000
+      ppm_fields <- c("nitrate", "phosphorus", "potassium", "calcium", "magnesium",
+                       "sulfur", "iron", "manganese", "zinc", "boron", "copper", "soluble_salts")
+      ppm_labels <- c("Nitrate", "Phosphorus", "Potassium", "Calcium", "Magnesium",
+                       "Sulfur", "Iron", "Manganese", "Zinc", "Boron", "Copper", "Soluble Salts")
+      for (i in seq_along(ppm_fields)) {
+        val <- input[[ppm_fields[i]]]
+        if (val_present(val)) {
+          if (val < 0 || val > 100000) {
+            showNotification(
+              sprintf("%s must be between 0 and 100,000 ppm", ppm_labels[i]),
+              type = "error")
+            return()
+          }
+        }
+      }
+
+      # --- Notes length limit ---
+      if (!is.null(input$notes) && nchar(input$notes) > 1000) {
+        showNotification("Notes must be 1,000 characters or fewer.", type = "error")
+        return()
+      }
+
+      # --- Existing texture sum check (tighten for pct mode) ---
       if (input$texture_input_type == "pct") {
         if (abs((input$sand + input$silt + input$clay) - 100) > 0.1) {
           showNotification("Soil texture percentages must sum to 100%", type = "error")
@@ -2111,6 +2216,42 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         if (lon < -180 || lon > 180) {
           showNotification("Longitude must be between -180 and 180 degrees", type = "error")
           return()
+        }
+      }
+
+      # --- Soft warnings for unusual values (warn but don't block) ---
+      if (val_present(input$ph)) {
+        if (input$ph < 3.5 || input$ph > 9.5) {
+          showNotification("This pH value is unusually extreme", type = "warning", duration = 8)
+        }
+      }
+      if (val_present(input$organic_matter) && input$organic_matter > 20) {
+        showNotification("Organic matter above 20% is uncommon outside of peat soils", type = "warning", duration = 8)
+      }
+      if (val_present(input$cec) && input$cec > 60) {
+        showNotification("CEC above 60 is uncommon \u2014 verify units are meq/100g", type = "warning", duration = 8)
+      }
+      # Check all ppm fields for very high values
+      for (i in seq_along(ppm_fields)) {
+        val <- input[[ppm_fields[i]]]
+        if (val_present(val) && val > 5000) {
+          showNotification(
+            sprintf("%s value seems very high \u2014 verify units are in ppm", ppm_labels[i]),
+            type = "warning", duration = 8)
+        }
+      }
+
+      # --- Duplicate detection (warn but don't block) ---
+      all_species <- c(
+        if (has_batch) pld$valid$species else character(0),
+        if (has_manual) manual_species else character(0)
+      )
+      for (sp in all_species) {
+        dup_count <- db_check_duplicate(sp, u$user_uid, pool)
+        if (dup_count > 0) {
+          showNotification(
+            sprintf("You already submitted data for %s today. Submitting again will create a separate record.", sp),
+            type = "warning", duration = 8)
         }
       }
 

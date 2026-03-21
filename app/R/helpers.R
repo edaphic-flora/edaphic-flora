@@ -1,6 +1,5 @@
 # R/helpers.R - Helper functions for soil analysis
-
-library(sf)
+# sf loaded conditionally in app.R (dev only — prod uses grid lookup)
 
 # ---------------------------
 # Null-coalescing operator (canonical definition)
