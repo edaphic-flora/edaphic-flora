@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Alpha-D39B35" alt="Status: Alpha">
+  <img src="https://img.shields.io/badge/Status-Beta-7A9A86" alt="Status: Beta">
   <a href="https://buymeacoffee.com/toddtesterman"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-7A9A86?style=flat&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me A Coffee"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-7A9A86.svg" alt="License: AGPL v3"></a>
 </p>
@@ -20,7 +20,7 @@ Edaphic Flora is an open-source R Shiny application for recording and analyzing 
 
 ## Project Status
 
-**Alpha Release** — Currently in invite-only testing with select users. Core features are functional, but the application is under active development. Interested in early access? Contact edaphicflora@gmail.com.
+**Beta** — Open for early users. Core features are stable and actively used. We're collecting real soil data and building the community dataset. Create an account at [edaphicflora.shinyapps.io/edaphic-flora](https://edaphicflora.shinyapps.io/edaphic-flora/) or contact edaphicflora@gmail.com.
 
 ## Features
 
@@ -30,7 +30,10 @@ Edaphic Flora is an open-source R Shiny application for recording and analyzing 
 - **Geographic mapping** - Leaflet maps with automatic geocoding and EPA Level IV ecoregion detection
 - **USDA integration** - Reference data for soil/climate preferences and wetland indicators
 - **Species validation** - 360K+ accepted species from World Checklist of Vascular Plants (WCVP)
-- **Data management** - CSV import/export with bulk data handling
+- **Wildlife dashboard** - See what butterflies, moths, bees, and birds your garden plants support with interactive donut charts
+- **Native & invasive status** - State-level native status (BONAP) and invasive species badges for all 50 states
+- **Gap recommendations** - Discover which native plants to add for maximum wildlife impact
+- **Data quality guards** - Value validation, submission rate limiting, admin flagging system
 - **User accounts** - Firebase authentication with edit/delete capabilities for your own data
 
 ## Screenshots
@@ -128,10 +131,18 @@ edaphic-flora/
 │   │   ├── data.R            # Reference data loading
 │   │   ├── helpers.R         # Ecoregion lookup, texture classification
 │   │   ├── usda.R            # USDA reference data queries
-│   │   └── theme.R           # Custom theme and styling
+│   │   ├── theme.R           # Custom theme and styling
+│   │   ├── mod_welcome.R     # Landing page
+│   │   ├── mod_data_entry.R  # Data entry + user data
+│   │   ├── mod_analysis.R    # Analysis tab module
+│   │   ├── mod_my_garden.R   # Wildlife dashboard
+│   │   ├── mod_help.R        # Field Guide + FAQ
+│   │   ├── mod_admin.R       # Admin panel
+│   │   └── etl/              # Data loading pipelines
 │   ├── sql/                  # Database schema and migrations
 │   ├── species_accepted.csv  # WCVP species database (360K species)
 │   └── www/                  # Static assets
+├── scripts/                  # Data collection and maintenance scripts
 ├── renv/                     # R dependency management
 ├── renv.lock                 # Locked dependencies
 └── CLAUDE.md                 # Development architecture guide
@@ -162,10 +173,15 @@ The application uses a PostgreSQL database with the following main table:
 | `location_lat` | NUMERIC | Latitude |
 | `location_long` | NUMERIC | Longitude |
 | `ecoregion_l4` | TEXT | EPA Level IV ecoregion name |
+| `outcome` | TEXT | Plant performance outcome |
+| `sun_exposure` | TEXT | Sun exposure conditions |
+| `site_hydrology` | TEXT | Site hydrology conditions |
+| `flagged` | BOOLEAN | Admin data quality flag |
+| `flag_reason` | TEXT | Reason for flagging |
 | `created_by` | TEXT | User ID |
 | `created_at` | TIMESTAMP | Creation timestamp |
 
-Additional reference tables store USDA species characteristics and wetland indicators.
+Additional tables: `ref_taxon`, `ref_usda_traits`, `ref_wetland_indicator`, `ref_noxious_invasive`, `ref_state_distribution`, `ref_wildlife_plants`, `ref_wildlife_species`, `ref_wildlife_interactions`, `ref_specialist_bees_by_genus`, `ref_wildlife_state_presence`
 
 ## Contributing
 
@@ -189,6 +205,12 @@ For commercial licensing inquiries, contact: edaphicflora@gmail.com
 - [National Wetland Plant List (NWPL)](https://wetland-plants.usace.army.mil/) for wetland indicators
 - [EPA Ecoregions](https://www.epa.gov/eco-research/ecoregions) for geographic classification
 - [Invasive Plant Atlas](https://www.invasiveplantatlas.org/) for invasive species data
+- [BONAP (Biota of North America Program)](http://bonap.net/) for state-level native status
+- Tallamy & Shropshire for Lepidoptera host plant associations
+- Jarrod Fowler for specialist bee data
+- [Audubon](https://www.audubon.org/) for bird-plant associations
+- [GBIF (Global Biodiversity Information Facility)](https://www.gbif.org/) for wildlife occurrence data
+- [eBird (Cornell Lab of Ornithology)](https://ebird.org/) for bird occurrence data
 - [OpenStreetMap](https://www.openstreetmap.org/) for geocoding services
 - [Polished](https://polished.tech/) for authentication infrastructure
 
