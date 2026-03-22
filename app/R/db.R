@@ -1048,7 +1048,7 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
         GROUP BY gp.genus
       )
       SELECT * FROM genus_impact
-      ORDER BY is_keystone_genus DESC, new_wildlife_count DESC
+      ORDER BY new_wildlife_count DESC
       LIMIT %s
     ", state_join, life_form_clause, limit_placeholder)
 

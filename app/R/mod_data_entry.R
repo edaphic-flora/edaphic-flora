@@ -759,6 +759,17 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         updateNumericInput(session, "clay", value = soil_data$texture_clay)
       }
 
+      # Date and notes from the previous sample
+      if (!is.null(soil_data$date) && !is.na(soil_data$date)) {
+        d <- as.Date(soil_data$date)
+        updateDateInput(session, "date", value = d)
+        updateDateInput(session, "date_step3", value = d)
+      }
+      if (!is.null(soil_data$notes) && !is.na(soil_data$notes) && nzchar(soil_data$notes)) {
+        updateTextAreaInput(session, "notes", value = soil_data$notes)
+        updateTextAreaInput(session, "notes_step3", value = soil_data$notes)
+      }
+
       removeModal()
       wizard_step(2L)  # Auto-advance to review step
       showNotification("Soil data applied! Review values below, then continue to add plants.",
@@ -970,7 +981,13 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                        if (has_batch) "Add More Species (Optional)" else "Plant Species",
                        choices = NULL, multiple = TRUE,
                        options = list(maxItems = 20, maxOptions = 100,
-                                      placeholder = if (has_batch) "Add species to CSV list..." else "Type to search species...")),
+                                      placeholder = if (has_batch) "Add species to CSV list..." else "Type to search species...",
+                                      searchField = list("label", "value"),
+                                      render = I("{
+                                        option: function(item, escape) {
+                                          return '<div>' + escape(item.label) + '</div>';
+                                        }
+                                      }"))),
         uiOutput(ns("species_count_indicator")),
         if (!has_batch) {
           helpText(class = "text-muted small",
@@ -1037,13 +1054,10 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     })
 
     # --- Species dropdown population ---
-    observe({
+    # Use observeEvent to ensure it fires reliably when step changes to 3
+    observeEvent(list(wizard_step(), is_casual()), {
       step <- wizard_step()
-      pld <- plant_list_data()
-      has_batch <- !is.null(pld) && nrow(pld$valid) > 0
-
-      # Only send update when step 3 is active (the selectizeInput exists)
-      req(step == 3)
+      if (step != 3) return()
 
       # Use search index with common names if available, else fall back to plain species list
       choices <- if (!is.null(species_search_index) && length(species_search_index) > 0) {
@@ -1052,16 +1066,14 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         sort(species_db$taxon_name)
       }
 
-      updateSelectizeInput(session, "species",
-                           choices = choices,
-                           selected = character(0),
-                           server = TRUE,
-                           options = list(
-                             maxItems = 20,
-                             maxOptions = 100,
-                             placeholder = if (has_batch) "Type common or Latin name..." else "Type common or Latin name..."
-                           ))
-    })
+      # Delay slightly to ensure the renderUI has flushed the selectizeInput to the browser
+      later::later(function() {
+        updateSelectizeInput(session, "species",
+                             choices = choices,
+                             selected = character(0),
+                             server = TRUE)
+      }, delay = 0.3)
+    }, ignoreInit = FALSE, ignoreNULL = FALSE)
 
     # --- Texture class dropdown ---
     observe({
@@ -1204,19 +1216,46 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         if (has_percentages) {
           # If we have percentages, use percentage mode
           updateRadioButtons(session, "texture_input_type", selected = "pct")
-          if (!is.null(data$texture_sand)) updateNumericInput(session, "sand", value = data$texture_sand)
-          if (!is.null(data$texture_silt)) updateNumericInput(session, "silt", value = data$texture_silt)
-          if (!is.null(data$texture_clay)) updateNumericInput(session, "clay", value = data$texture_clay)
+          if (!is.null(data$texture_sand)) {
+            updateNumericInput(session, "sand", value = data$texture_sand)
+            updateNumericInput(session, "sand_step2", value = data$texture_sand)
+          }
+          if (!is.null(data$texture_silt)) {
+            updateNumericInput(session, "silt", value = data$texture_silt)
+            updateNumericInput(session, "silt_step2", value = data$texture_silt)
+          }
+          if (!is.null(data$texture_clay)) {
+            updateNumericInput(session, "clay", value = data$texture_clay)
+            updateNumericInput(session, "clay_step2", value = data$texture_clay)
+          }
         } else if (has_class) {
-          # If we only have class (no percentages), use classification mode
-          updateRadioButtons(session, "texture_input_type", selected = "class")
-          updateSelectInput(session, "texture_class", selected = data$texture_class)
+          # If we only have class (no percentages), derive approximate midpoints
+          updateRadioButtons(session, "texture_input_type", selected = "pct")
+          approx <- get_texture_percentages(data$texture_class, soil_texture_classes)
+          if (!is.null(approx)) {
+            updateNumericInput(session, "sand", value = round(approx$sand, 1))
+            updateNumericInput(session, "sand_step2", value = round(approx$sand, 1))
+            updateNumericInput(session, "silt", value = round(approx$silt, 1))
+            updateNumericInput(session, "silt_step2", value = round(approx$silt, 1))
+            updateNumericInput(session, "clay", value = round(approx$clay, 1))
+            updateNumericInput(session, "clay_step2", value = round(approx$clay, 1))
+            showNotification(
+              sprintf("Texture set to approximate midpoints for %s. Adjust if your lab provided exact percentages.",
+                      data$texture_class),
+              type = "message", duration = 6)
+          } else {
+            # Unknown class — fall back to dropdown
+            updateRadioButtons(session, "texture_input_type", selected = "class")
+            updateSelectInput(session, "texture_class", selected = data$texture_class)
+          }
         }
 
         # Date
         if (!is.null(data$sample_date)) {
           tryCatch({
-            updateDateInput(session, "date", value = as.Date(data$sample_date))
+            d <- as.Date(data$sample_date)
+            updateDateInput(session, "date", value = d)
+            updateDateInput(session, "date_step3", value = d)
           }, error = function(e) {})
         }
 
@@ -1233,6 +1272,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           current_notes <- input$notes
           new_notes <- if (nzchar(current_notes)) paste(current_notes, notes_text, sep = "\n") else notes_text
           updateTextAreaInput(session, "notes", value = new_notes)
+          updateTextAreaInput(session, "notes_step3", value = new_notes)
         }
 
         # Handle extraction warnings
@@ -1293,58 +1333,90 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
             sp <- species_list[i]
             sp_id <- gsub("[^a-zA-Z0-9]", "_", sp)  # Safe ID
 
-            div(
-              class = "border rounded p-2 mb-2 bg-light",
-              tags$strong(class = "d-block mb-2 text-truncate", title = sp,
-                          sprintf("%d. %s", i, sp)),
-              layout_column_wrap(
-                width = 1/2,
-                textInput(ns(paste0("cultivar_", sp_id)), "Cultivar",
-                          placeholder = "e.g., 'Forest Pansy'"),
-                div(
-                  selectInput(ns(paste0("outcome_", sp_id)), "Outcome",
-                              choices = c("Select..." = "", "Thriving" = "Thriving",
-                                          "Established" = "Established",
-                                          "Struggling" = "Struggling",
-                                          "Failed/Died" = "Failed/Died"),
-                              selected = ""),
-                  tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
-                             "How is this plant performing?")
-                )
-              ),
-              layout_column_wrap(
-                width = 1/2,
-                div(
-                  selectInput(ns(paste0("sun_", sp_id)), "Sun Exposure",
-                              choices = c("Select..." = "", "Full Sun" = "Full Sun",
-                                          "Part Sun" = "Part Sun",
-                                          "Part Shade" = "Part Shade",
-                                          "Full Shade" = "Full Shade"),
-                              selected = ""),
-                  tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
-                             "Light at planting site")
+            tagList(
+              div(
+                class = "border rounded p-2 mb-2 bg-light",
+                tags$strong(class = "d-block mb-2 text-truncate", title = sp,
+                            sprintf("%d. %s", i, sp)),
+                layout_column_wrap(
+                  width = 1/2,
+                  textInput(ns(paste0("cultivar_", sp_id)), "Cultivar",
+                            placeholder = "e.g., 'Forest Pansy'"),
+                  div(
+                    selectInput(ns(paste0("outcome_", sp_id)), "Outcome",
+                                choices = c("Select..." = "", "Thriving" = "Thriving",
+                                            "Established" = "Established",
+                                            "Struggling" = "Struggling",
+                                            "Failed/Died" = "Failed/Died"),
+                                selected = ""),
+                    tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                               "How is this plant performing?")
+                  )
                 ),
-                div(
-                  selectInput(ns(paste0("hydrology_", sp_id)), "Site Hydrology",
-                              choices = c("Select..." = "", "Dry/Xeric" = "Dry",
-                                          "Mesic" = "Mesic",
-                                          "Wet/Hydric" = "Wet"),
-                              selected = ""),
-                  tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
-                             "Soil moisture conditions")
-                )
+                layout_column_wrap(
+                  width = 1/2,
+                  div(
+                    selectInput(ns(paste0("sun_", sp_id)), "Sun Exposure",
+                                choices = c("Select..." = "", "Full Sun" = "Full Sun",
+                                            "Part Sun" = "Part Sun",
+                                            "Part Shade" = "Part Shade",
+                                            "Full Shade" = "Full Shade"),
+                                selected = ""),
+                    tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                               "Light at planting site")
+                  ),
+                  div(
+                    selectInput(ns(paste0("hydrology_", sp_id)), "Site Hydrology",
+                                choices = c("Select..." = "", "Dry/Xeric" = "Dry",
+                                            "Mesic" = "Mesic",
+                                            "Wet/Hydric" = "Wet"),
+                                selected = ""),
+                    tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                               "Soil moisture conditions")
+                  )
+                ),
+                textInput(ns(paste0("inat_", sp_id)), "iNaturalist URL",
+                          placeholder = "https://www.inaturalist.org/observations/..."),
+                tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
+                           "Optional. Helps verify plant ID for data quality. Mark on iNaturalist as ",
+                           tags$em("Captive/Cultivated"), " for planted specimens or ",
+                           tags$em("Wild"), " if it appeared spontaneously.")
               ),
-              textInput(ns(paste0("inat_", sp_id)), "iNaturalist URL",
-                        placeholder = "https://www.inaturalist.org/observations/..."),
-              tags$small(class = "text-muted", style = "margin-top: -10px; display: block;",
-                         "Optional. Helps verify plant ID for data quality. Mark on iNaturalist as ",
-                         tags$em("Captive/Cultivated"), " for planted specimens or ",
-                         tags$em("Wild"), " if it appeared spontaneously.")
+              # "Apply to all" checkbox after first species when multiple selected
+              if (i == 1 && length(species_list) > 1) {
+                div(class = "mb-2 ps-2",
+                  checkboxInput(ns("apply_to_all"),
+                    tags$span(style = "font-size: 0.85rem;",
+                      "Apply outcome, sun, and hydrology to all species"),
+                    value = FALSE)
+                )
+              }
             )
           })
         )
       )
     })
+
+    # --- Apply first species' details to all others ---
+    observeEvent(input$apply_to_all, {
+      if (!isTRUE(input$apply_to_all)) return()
+      species_list <- input$species
+      if (is.null(species_list) || length(species_list) < 2) return()
+
+      first_id <- gsub("[^a-zA-Z0-9]", "_", species_list[1])
+      src_outcome <- input[[paste0("outcome_", first_id)]] %||% ""
+      src_sun <- input[[paste0("sun_", first_id)]] %||% ""
+      src_hydro <- input[[paste0("hydrology_", first_id)]] %||% ""
+
+      for (sp in species_list[-1]) {
+        sp_id <- gsub("[^a-zA-Z0-9]", "_", sp)
+        if (nzchar(src_outcome)) updateSelectInput(session, paste0("outcome_", sp_id), selected = src_outcome)
+        if (nzchar(src_sun)) updateSelectInput(session, paste0("sun_", sp_id), selected = src_sun)
+        if (nzchar(src_hydro)) updateSelectInput(session, paste0("hydrology_", sp_id), selected = src_hydro)
+      }
+
+      showNotification("Applied to all species", type = "message", duration = 3)
+    }, ignoreInit = TRUE)
 
     # --- Entry count (user's own entries) ---
     output$entry_count <- renderText({
@@ -1666,8 +1738,13 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     # --- Texture validation ---
     output$texture_validation <- renderUI({
       req(input$texture_input_type == "pct")
-      total <- input$sand + input$silt + input$clay
-      texture <- classify_texture(input$sand, input$silt, input$clay, soil_texture_classes)
+      # Read from step 2 inputs if they exist, otherwise fall back to step 3
+      sand_val <- input$sand_step2 %||% input$sand
+      silt_val <- input$silt_step2 %||% input$silt
+      clay_val <- input$clay_step2 %||% input$clay
+      req(!is.null(sand_val), !is.null(silt_val), !is.null(clay_val))
+      total <- sand_val + silt_val + clay_val
+      texture <- classify_texture(sand_val, silt_val, clay_val, soil_texture_classes)
 
       if (abs(total - 100) > 0.1) {
         div(class = "alert alert-danger py-2 mt-2",

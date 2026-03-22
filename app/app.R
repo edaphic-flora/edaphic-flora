@@ -24,10 +24,11 @@ library(plotly)
 library(leaflet)
 library(shinycssloaders)
 library(shinyjs)
+library(tidygeocoder)
+# ggtern loaded on-demand in texture plot only (it masks ggplot2 functions)
 
 # Heavy packages: load only when needed
 # sf + ecoregions: only in dev (prod uses pre-computed grid, no sf required)
-# ggtern, maps, mapdata, tidygeocoder: loaded on first use via requireNamespace()
 if (Sys.getenv("ENV", "prod") == "dev") {
   library(sf)
   library(ecoregions)
@@ -50,8 +51,8 @@ source("R/mod_data_entry.R")
 source("R/ecoregion_ref.R")
 source("R/mod_analysis.R")
 
-# --- Initialize (skip migrations in prod — schema is stable)
-if (Sys.getenv("ENV", "prod") == "dev") db_migrate()
+# --- Initialize (migrations are idempotent — safe to run every startup)
+db_migrate()
 onStop(function() poolClose(pool))
 
 species_db <- load_species_db()

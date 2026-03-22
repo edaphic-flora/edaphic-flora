@@ -1229,6 +1229,19 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         return(pl)
       }
 
+      # Filter to rows with both pH and OM values
+      dat <- dat[!is.na(dat$ph) & !is.na(dat$organic_matter), ]
+      if (nrow(dat) == 0) {
+        p <- ggplot() +
+          annotate("text", x = 7, y = 50,
+                   label = "No samples have both pH and\norganic matter values",
+                   color = edaphic_colors$muted, size = 5, lineheight = 1.2) +
+          xlim(0, 14) + ylim(0, 100) +
+          labs(x = "Soil pH", y = "Organic Matter (%)") +
+          theme_edaphic()
+        return(ggplotly(p) %>% config(displayModeBar = FALSE))
+      }
+
       cor_val <- cor(dat$ph, dat$organic_matter, use = "complete.obs")
       has_outcome <- sum(!is.na(dat$outcome)) > 0
 
@@ -1473,11 +1486,15 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       dat <- dat[!is.na(dat$texture_sand) & !is.na(dat$texture_silt) & !is.na(dat$texture_clay), ]
       if (nrow(dat) == 0) return(NULL)
 
+      if (!requireNamespace("ggtern", quietly = TRUE)) {
+        return(NULL)
+      }
+
       has_outcome <- "outcome" %in% names(dat) && sum(!is.na(dat$outcome)) >= 2
 
-      p <- ggtern(dat, aes(x = texture_sand, y = texture_silt, z = texture_clay)) +
-        theme_bw() + theme_showarrows() +
-        xlab("Sand (%)") + ylab("Silt (%)") + zlab("Clay (%)")
+      p <- ggtern::ggtern(dat, ggplot2::aes(x = texture_sand, y = texture_silt, z = texture_clay)) +
+        ggtern::theme_bw() + ggtern::theme_showarrows() +
+        ggplot2::xlab("Sand (%)") + ggplot2::ylab("Silt (%)") + ggtern::zlab("Clay (%)")
 
       if (has_outcome) {
         outcome_order <- c("Thriving", "Established", "Struggling", "Failed/Died")
@@ -1485,31 +1502,31 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                             "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
         dat$outcome <- factor(dat$outcome, levels = outcome_order)
         p <- p +
-          geom_point(aes(color = outcome), size = 4, alpha = 0.8) +
-          scale_color_manual(values = outcome_colors, breaks = outcome_order, na.value = "#95a5a6") +
-          labs(title = paste("Soil Texture -", input$analysis_species),
+          ggplot2::geom_point(ggplot2::aes(color = outcome), size = 4, alpha = 0.8) +
+          ggplot2::scale_color_manual(values = outcome_colors, breaks = outcome_order, na.value = "#95a5a6") +
+          ggplot2::labs(title = paste("Soil Texture -", input$analysis_species),
                subtitle = paste(nrow(dat), "samples (colored by outcome)"),
                color = "Outcome")
       } else {
         p <- p +
-          geom_point(aes(color = texture_class), size = 4, alpha = 0.7) +
+          ggplot2::geom_point(ggplot2::aes(color = texture_class), size = 4, alpha = 0.7) +
           scale_color_edaphic() +
-          labs(title = paste("Soil Texture -", input$analysis_species),
+          ggplot2::labs(title = paste("Soil Texture -", input$analysis_species),
                subtitle = paste(nrow(dat), "samples"),
                color = "Texture")
       }
 
       p <- p +
-        theme(
-          tern.panel.background = element_rect(fill = "#f8f9fa"),
-          tern.panel.grid.major = element_line(color = "#dee2e6"),
-          plot.title = element_text(size = 14, face = "bold", color = edaphic_colors$dark),
-          plot.subtitle = element_text(color = edaphic_colors$muted),
+        ggplot2::theme(
+          tern.panel.background = ggplot2::element_rect(fill = "#f8f9fa"),
+          tern.panel.grid.major = ggplot2::element_line(color = "#dee2e6"),
+          plot.title = ggplot2::element_text(size = 14, face = "bold", color = edaphic_colors$dark),
+          plot.subtitle = ggplot2::element_text(color = edaphic_colors$muted),
           legend.position = "right"
         ) +
-        scale_T_continuous(breaks = seq(0, 100, by = 20)) +
-        scale_L_continuous(breaks = seq(0, 100, by = 20)) +
-        scale_R_continuous(breaks = seq(0, 100, by = 20))
+        ggtern::scale_T_continuous(breaks = seq(0, 100, by = 20)) +
+        ggtern::scale_L_continuous(breaks = seq(0, 100, by = 20)) +
+        ggtern::scale_R_continuous(breaks = seq(0, 100, by = 20))
 
       print(p)
     })
