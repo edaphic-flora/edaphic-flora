@@ -443,21 +443,33 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       )
     })
 
-    # --- Sidebar: Species List ---
+    # --- Sidebar: Species List (grouped by genus) ---
     output$species_list <- renderUI({
       sp <- garden_species()
       if (length(sp) == 0) {
         return(div(class = "text-muted text-center small py-3", "No plants yet"))
       }
 
-      tags$ul(class = "list-unstyled",
-        lapply(sp, function(s) {
-          cn <- get_common_name(s)
-          tags$li(class = "py-1 border-bottom",
-            div(
+      # Group species by genus (first word of scientific name)
+      genera <- sapply(strsplit(sp, " "), `[`, 1)
+      genus_groups <- split(sp, genera)
+      # Sort genera alphabetically
+      genus_groups <- genus_groups[order(names(genus_groups))]
+
+      tagList(
+        lapply(names(genus_groups), function(genus) {
+          species_in_genus <- genus_groups[[genus]]
+          genus_cn <- get_genus_common_name(genus, common_name_db)
+          genus_label <- if (!is.null(genus_cn)) genus_cn else genus
+
+          if (length(species_in_genus) == 1) {
+            # Single species in genus — show inline, no dropdown
+            s <- species_in_genus[1]
+            cn <- get_common_name(s)
+            div(class = "py-1 border-bottom",
               if (!is.null(cn)) {
                 tagList(
-                  tags$span(style = "font-size: 0.9rem;", cn),
+                  tags$span(style = "font-size: 0.85rem;", cn),
                   tags$br(),
                   tags$small(class = "species-name text-muted", s)
                 )
@@ -465,7 +477,46 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                 tags$span(class = "species-name", style = "font-size: 0.85rem;", s)
               }
             )
-          )
+          } else {
+            # Multiple species — collapsible genus group
+            group_id <- paste0("genus_group_", gsub("[^a-zA-Z]", "", genus))
+            div(class = "border-bottom",
+              # Genus header (clickable)
+              div(class = "py-1 d-flex align-items-center",
+                  style = "cursor: pointer;",
+                  onclick = sprintf(
+                    "var el=document.getElementById('%s'); var arr=document.getElementById('%s_arr');
+                     if(el.style.display==='none'){el.style.display='block';arr.className='fa fa-chevron-up';}
+                     else{el.style.display='none';arr.className='fa fa-chevron-down';}", group_id, group_id),
+                tags$i(id = paste0(group_id, "_arr"), class = "fa fa-chevron-down",
+                       style = "font-size: 0.6rem; color: #7A9A86; width: 12px;"),
+                tags$span(style = "font-size: 0.85rem; font-weight: 500; margin-left: 4px;",
+                          genus_label),
+                tags$span(class = "badge rounded-pill bg-light text-muted ms-auto",
+                          style = "font-size: 0.7rem;",
+                          length(species_in_genus))
+              ),
+              # Species list (collapsed by default)
+              div(id = group_id, style = "display: none; padding-left: 16px;",
+                lapply(species_in_genus, function(s) {
+                  cn <- get_common_name(s)
+                  epithet <- paste(strsplit(s, " ")[[1]][-1], collapse = " ")
+                  div(class = "py-1",
+                      style = "font-size: 0.8rem; border-bottom: 1px solid #f5f2e9;",
+                    if (!is.null(cn)) {
+                      tagList(
+                        tags$span(cn),
+                        tags$br(),
+                        tags$small(class = "species-name text-muted", s)
+                      )
+                    } else {
+                      tags$span(class = "species-name", s)
+                    }
+                  )
+                })
+              )
+            )
+          }
         })
       )
     })
@@ -958,8 +1009,20 @@ myGardenServer <- function(id, pool, current_user, data_changed,
 
           # Pre-fetch native species for this genus (rendered as static HTML)
           species_panel_id <- paste0("gap_native_", gsub("[^a-zA-Z]", "", genus), "_", i)
+          species_df <- if (!is.null(user_state) && nzchar(user_state)) {
+            db_get_native_species_for_genus(genus, user_state, pool)
+          } else {
+            data.frame()
+          }
+
+          # When only 1 native species in user's state, show that species' name
+          # instead of the genus common name (e.g., "Bearberry" not "Manzanitas")
+          if (nrow(species_df) == 1 && !is.na(species_df$common_name[1]) &&
+              nzchar(species_df$common_name[1])) {
+            genus_common <- tools::toTitleCase(tolower(species_df$common_name[1]))
+          }
+
           native_content <- if (!is.null(user_state) && nzchar(user_state)) {
-            species_df <- db_get_native_species_for_genus(genus, user_state, pool)
             if (nrow(species_df) > 0) {
               tagList(
                 tags$small(class = "text-muted d-block mb-2",
@@ -1029,12 +1092,6 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                     } else {
                       tags$strong(class = "species-name",
                                   tags$em(genus), " species")
-                    },
-                    if (isTRUE(r$is_keystone_genus)) {
-                      tags$span(class = "badge",
-                                style = "background: #D39B35; font-size: 0.7rem;",
-                                title = "Keystone genus \u2014 disproportionately important for wildlife",
-                                "Keystone")
                     },
                     lf_badge
                   ),
@@ -1129,7 +1186,10 @@ GENUS_COMMON_OVERRIDES <- list(
   Wisteria = "Wisterias",
   Celastrus = "Bittersweets",
   Parthenocissus = "Virginia Creepers",
-  Lonicera = "Honeysuckles"
+  Lonicera = "Honeysuckles",
+  Tsuga = "Hemlocks",
+  Ulmus = "Elms",
+  Diospyros = "Persimmons"
 )
 
 #' Get a genus-level common name (plural) from common_name_db

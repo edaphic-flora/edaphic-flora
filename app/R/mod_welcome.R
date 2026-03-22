@@ -42,32 +42,25 @@ welcomeUI <- function(id) {
               h4(class = "mt-3", "How It Works"),
               # Visual step cards
               div(class = "row g-2 mb-3 stagger-reveal",
-                div(class = "col-md-6 col-lg-3",
+                div(class = "col-md-4",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("flask", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(class = "step-card-title", "1. Submit Data"),
-                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Enter soil test results")
+                        div(class = "step-card-title", "1. Submit Soil Data"),
+                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Upload a lab report or enter results manually")
                     )
                 ),
-                div(class = "col-md-6 col-lg-3",
-                    div(class = "text-center p-2 h-100 step-card",
-                        icon("map-marker-alt", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(class = "step-card-title", "2. Add Location"),
-                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Geocode for ecoregions")
-                    )
-                ),
-                div(class = "col-md-6 col-lg-3",
+                div(class = "col-md-4",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("chart-line", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(class = "step-card-title", "3. Analyze"),
-                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "View patterns & profiles")
+                        div(class = "step-card-title", "2. Explore Analysis"),
+                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "See pH, nutrients, and performance patterns")
                     )
                 ),
-                div(class = "col-md-6 col-lg-3",
+                div(class = "col-md-4",
                     div(class = "text-center p-2 h-100 step-card",
                         icon("seedling", class = "fa-lg mb-1", style = "color: #7A9A86;"),
-                        div(class = "step-card-title", "4. Discover"),
-                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "See your garden's wildlife impact")
+                        div(class = "step-card-title", "3. Grow Your Impact"),
+                        tags$small(class = "text-muted", style = "font-size: 0.8rem;", "Discover what wildlife your garden supports")
                     )
                 )
               ),
