@@ -55,7 +55,10 @@ source("R/mod_analysis.R")
 db_migrate()
 onStop(function() poolClose(pool))
 
-species_db <- load_species_db()
+species_db <- tryCatch(load_species_db(), error = function(e) {
+  message("CRITICAL: Species database failed to load: ", e$message)
+  NULL
+})
 zipcode_db <- tryCatch(load_zipcode_db(), error = function(e) NULL)
 
 # Common name search index (from ref_usda_traits)
@@ -63,7 +66,13 @@ common_name_db <- tryCatch(load_common_name_index(pool), error = function(e) {
   message("Warning: Could not load common names: ", e$message)
   data.frame(scientific_name = character(), common_name = character(), stringsAsFactors = FALSE)
 })
-species_search_index <- build_species_search_index(species_db, common_name_db)
+species_search_index <- tryCatch(
+  build_species_search_index(species_db, common_name_db),
+  error = function(e) {
+    message("Warning: Could not build species search index: ", e$message)
+    character(0)
+  }
+)
 
 # Ecoregions: use full shapefile in dev, lightweight grid lookup in prod
 is_prod <- Sys.getenv("ENV", "prod") != "dev"
@@ -145,7 +154,7 @@ is_dev <- (app_env == "dev")
 # --- Beta features config
 # Note: "Reuse previous soil data" is now always available (no longer location-based)
 BETA_FEATURES <- list(
-  batch_plant_upload = TRUE,          # CSV upload for bulk plant entry (enabled for alpha)
+  batch_plant_upload = TRUE,          # CSV upload for bulk plant entry
   outcome_reminders = FALSE           # Email reminders for outcome updates (not implemented)
 )
 
@@ -353,6 +362,14 @@ base_ui <- page_navbar(
        Shiny.addCustomMessageHandler('closeUserDropdown', function(msg) {
          var dd = document.querySelector('.navbar .dropdown-toggle');
          if (dd) { bootstrap.Dropdown.getOrCreateInstance(dd).hide(); }
+       });
+       // Species selectize readiness check — server asks, client confirms widget exists
+       Shiny.addCustomMessageHandler('checkSelectizeReady', function(data) {
+         var el = document.getElementById(data.id);
+         Shiny.setInputValue(data.callback, {
+           ready: !!(el && el.selectize),
+           attempt: data.attempt
+         }, {priority: 'event'});
        });
        // Analysis tab scroll arrows
        $(document).on('click', '.tab-scroll-left', function() {

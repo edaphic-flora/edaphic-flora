@@ -156,10 +156,11 @@ build_source_attribution <- function(state_code = NULL) {
               " (Cornell Lab of Ornithology).")
     )
     geo_note <- tags$p(class = "mb-1", style = "font-size: 0.85rem;",
-      "Species totals reflect the full eastern US research database. ",
-      sprintf("Badges on each family card indicate confirmed presence in %s ", state_code),
-      "based on GBIF and eBird occurrence records. Families marked ",
-      tags$em("Partial"), " have some species confirmed; others may be present but lack records.")
+      sprintf("Wildlife totals are filtered to species confirmed in %s ", state_code),
+      "based on GBIF and eBird occurrence records. ",
+      "Only families with at least one species recorded in your state are shown. ",
+      "Plant\u2013wildlife interaction data is strongest for the eastern US; ",
+      "western states may show lower coverage as research expands.")
   } else {
     occurrence_sources <- NULL
     geo_note <- tags$p(class = "mb-1", style = "font-size: 0.85rem;",
@@ -291,44 +292,16 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (!is.null(st) && nzchar(st) && state_has_presence_data()) st else NULL
     })
 
-    # --- Reactive: all wildlife species (for total counts) ---
+    # --- Reactive: all wildlife species (for total counts, state-filtered when available) ---
     all_wildlife <- reactive({
-      db_get_all_wildlife_species(pool)
+      db_get_all_wildlife_species(pool, effective_state())
     })
 
-    # --- Reactive: wildlife coverage for user's garden ---
+    # --- Reactive: wildlife coverage for user's garden (state-filtered when available) ---
     wildlife_coverage <- reactive({
       sp <- garden_species()
       if (length(sp) == 0) return(data.frame())
-      db_get_wildlife_coverage(sp, pool)
-    })
-
-    # --- Reactive: families with confirmed state presence (for badges) ---
-    family_state_presence <- reactive({
-      eff_st <- effective_state()
-      if (is.null(eff_st)) return(list())
-      tryCatch({
-        result <- dbGetQuery(pool, "
-          SELECT COALESCE(ws.family, 'Unknown') AS family,
-            COUNT(DISTINCT ws.wildlife_id)::int AS total_species,
-            COUNT(DISTINCT wsp.wildlife_id)::int AS confirmed_species
-          FROM ref_wildlife_species ws
-          LEFT JOIN ref_wildlife_state_presence wsp
-            ON wsp.wildlife_id = ws.wildlife_id
-            AND wsp.state_code = $1
-          GROUP BY ws.family
-        ", params = list(eff_st))
-        stats::setNames(
-          lapply(seq_len(nrow(result)), function(i) {
-            list(confirmed = result$confirmed_species[i],
-                 total = result$total_species[i])
-          }),
-          result$family
-        )
-      }, error = function(e) {
-        message("Error fetching family state presence: ", e$message)
-        list()
-      })
+      db_get_wildlife_coverage(sp, pool, effective_state())
     })
 
     # --- Reactive: per-family summary stats ---
@@ -685,7 +658,6 @@ myGardenServer <- function(id, pool, current_user, data_changed,
 
       summary <- coverage_summary()
       cov <- wildlife_coverage()
-      st_pres <- family_state_presence()
       eff_st <- effective_state()
 
       low_data_callout <- NULL
@@ -708,14 +680,13 @@ myGardenServer <- function(id, pool, current_user, data_changed,
         NULL
       }
 
-      # Calculate totals per type (with state filtering)
+      # Calculate totals per type (already state-filtered by SQL)
       type_totals <- list()
       for (wtype in names(summary)) {
         s <- summary[[wtype]]
-        s_filtered <- filter_by_state_presence(s, st_pres, eff_st)
         type_totals[[wtype]] <- list(
-          covered = sum(s_filtered$species_covered),
-          total = sum(s_filtered$total_species)
+          covered = sum(s$species_covered),
+          total = sum(s$total_species)
         )
       }
 
@@ -807,26 +778,12 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       }
     })
 
-    # --- Helper: filter summary_df to families with state presence ---
-    filter_by_state_presence <- function(summary_df, st_pres, eff_st) {
-      if (is.null(eff_st) || !nzchar(eff_st) || length(st_pres) == 0) return(summary_df)
-      keep <- sapply(summary_df$family, function(fam) {
-        fp <- st_pres[[fam]]
-        !is.null(fp) && fp$confirmed > 0
-      })
-      excluded <- sum(!keep)
-      result <- summary_df[keep, , drop = FALSE]
-      attr(result, "excluded_count") <- excluded
-      result
-    }
-
     # --- Butterflies Tab ---
     output$butterfly_content <- renderUI({
       sp <- garden_species()
       if (length(sp) == 0) return(empty_garden_ui(ns, "butterfly"))
 
       summary <- coverage_summary()
-      st_pres <- family_state_presence()
       eff_st <- effective_state()
       bfly_parts <- Filter(Negate(is.null), summary[c("Butterfly", "Skipper")])
       combined <- if (length(bfly_parts) > 0) do.call(rbind, bfly_parts) else data.frame()
@@ -835,14 +792,8 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                    "No butterfly data found for your garden plants."))
       }
       combined <- combined[order(-combined$species_covered), ]
-      combined <- filter_by_state_presence(combined, st_pres, eff_st)
-      if (nrow(combined) == 0) {
-        return(div(class = "text-muted text-center py-4",
-                   sprintf("No butterfly families with confirmed presence in %s.", eff_st)))
-      }
       tagList(
-        render_family_section(combined, "butterfly", ns,
-                              state_presence = st_pres, state_code = eff_st),
+        render_family_section(combined, "butterfly", ns, state_code = eff_st),
         build_source_attribution(eff_st)
       )
     })
@@ -853,7 +804,6 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (length(sp) == 0) return(empty_garden_ui(ns, "moth"))
 
       summary <- coverage_summary()
-      st_pres <- family_state_presence()
       eff_st <- effective_state()
       moth_df <- summary[["Moth"]]
       if (is.null(moth_df) || nrow(moth_df) == 0) {
@@ -861,14 +811,8 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                    "No moth data found for your garden plants."))
       }
       moth_df <- moth_df[order(-moth_df$species_covered), ]
-      moth_df <- filter_by_state_presence(moth_df, st_pres, eff_st)
-      if (nrow(moth_df) == 0) {
-        return(div(class = "text-muted text-center py-4",
-                   sprintf("No moth families with confirmed presence in %s.", eff_st)))
-      }
       tagList(
-        render_family_section(moth_df, "moth", ns,
-                              state_presence = st_pres, state_code = eff_st),
+        render_family_section(moth_df, "moth", ns, state_code = eff_st),
         build_source_attribution(eff_st)
       )
     })
@@ -879,7 +823,6 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (length(sp) == 0) return(empty_garden_ui(ns, "bee"))
 
       summary <- coverage_summary()
-      st_pres <- family_state_presence()
       eff_st <- effective_state()
       bee_df <- summary[["Bee"]]
       if (is.null(bee_df) || nrow(bee_df) == 0) {
@@ -887,14 +830,8 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                    "No specialist bee data found for your garden plants."))
       }
       bee_df <- bee_df[order(-bee_df$species_covered), ]
-      bee_df <- filter_by_state_presence(bee_df, st_pres, eff_st)
-      if (nrow(bee_df) == 0) {
-        return(div(class = "text-muted text-center py-4",
-                   sprintf("No specialist bee families with confirmed presence in %s.", eff_st)))
-      }
       tagList(
-        render_family_section(bee_df, "bee", ns,
-                              state_presence = st_pres, state_code = eff_st),
+        render_family_section(bee_df, "bee", ns, state_code = eff_st),
         build_source_attribution(eff_st)
       )
     })
@@ -905,7 +842,6 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       if (length(sp) == 0) return(empty_garden_ui(ns, "bird"))
 
       summary <- coverage_summary()
-      st_pres <- family_state_presence()
       eff_st <- effective_state()
       bird_df <- summary[["Bird"]]
       if (is.null(bird_df) || nrow(bird_df) == 0) {
@@ -913,14 +849,8 @@ myGardenServer <- function(id, pool, current_user, data_changed,
                    "No bird data found for your garden plants."))
       }
       bird_df <- bird_df[order(-bird_df$species_covered), ]
-      bird_df <- filter_by_state_presence(bird_df, st_pres, eff_st)
-      if (nrow(bird_df) == 0) {
-        return(div(class = "text-muted text-center py-4",
-                   sprintf("No bird families with confirmed presence in %s.", eff_st)))
-      }
       tagList(
-        render_family_section(bird_df, "bird", ns,
-                              state_presence = st_pres, state_code = eff_st),
+        render_family_section(bird_df, "bird", ns, state_code = eff_st),
         build_source_attribution(eff_st)
       )
     })
@@ -930,16 +860,12 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       summary <- coverage_summary()
       cov <- wildlife_coverage()
       gap_genera <- family_gap_genera()
-      st_pres <- family_state_presence()
-      eff_st <- effective_state()
 
       render_tab_donuts <- function(type_keys, prefix) {
         parts <- Filter(Negate(is.null), summary[type_keys])
         combined <- if (length(parts) > 0) do.call(rbind, parts) else data.frame()
         if (nrow(combined) == 0) return()
         combined <- combined[order(-combined$species_covered), ]
-        combined <- filter_by_state_presence(combined, st_pres, eff_st)
-        if (nrow(combined) == 0) return()
 
         output[[paste0(prefix, "_summary_donut")]] <- renderPlotly({
           render_donut(sum(combined$species_covered), sum(combined$total_species), "")
@@ -1282,16 +1208,20 @@ empty_garden_ui <- function(ns, prefix) {
 }
 
 #' Render a family section with summary donut and per-family grid
-render_family_section <- function(summary_df, prefix, ns,
-                                  state_presence = list(), state_code = NULL) {
+render_family_section <- function(summary_df, prefix, ns, state_code = NULL) {
   if (is.null(summary_df) || nrow(summary_df) == 0) {
     return(div(class = "text-muted text-center py-4", "No data available"))
   }
 
   total_covered <- sum(summary_df$species_covered)
   total_all <- sum(summary_df$total_species)
-  has_state_data <- !is.null(state_code) && nzchar(state_code) && length(state_presence) > 0
-  excluded_count <- attr(summary_df, "excluded_count") %||% 0
+  has_state <- !is.null(state_code) && nzchar(state_code)
+
+  summary_label <- if (has_state) {
+    sprintf("%d of %d species in %s supported by your garden", total_covered, total_all, state_code)
+  } else {
+    sprintf("%d of %d species supported", total_covered, total_all)
+  }
 
   tagList(
     # Summary donut
@@ -1301,7 +1231,7 @@ render_family_section <- function(summary_df, prefix, ns,
                      height = "220px", width = "100%")
       ),
       h6(class = "mt-2", style = "font-family: 'Montserrat', sans-serif;",
-         sprintf("%d of %d species supported", total_covered, total_all))
+         summary_label)
     ),
 
     # Per-family donut grid with enriched cards
@@ -1316,36 +1246,6 @@ render_family_section <- function(summary_df, prefix, ns,
         wiki_url <- family_wiki_url(fam)
         inat_url <- family_inat_url(fam)
 
-        # State presence badge
-        presence_badge <- NULL
-        if (has_state_data) {
-          fp <- state_presence[[fam]]
-          if (!is.null(fp) && fp$confirmed > 0) {
-            ratio <- fp$confirmed / max(fp$total, 1)
-            if (ratio >= 0.75) {
-              presence_badge <- tags$span(class = "badge",
-                style = "background: #7A9A86; font-size: 0.6rem; font-weight: 500;",
-                sprintf("In %s", state_code))
-            } else {
-              presence_badge <- tags$span(class = "badge",
-                style = "background: #D39B35; font-size: 0.6rem; font-weight: 500;",
-                sprintf("Partial in %s", state_code))
-            }
-          }
-        }
-
-        # Tooltip for count
-        count_title <- if (has_state_data) {
-          fp <- state_presence[[fam]]
-          if (!is.null(fp)) {
-            sprintf("%d of %d species confirmed in %s", fp$confirmed, fp$total, state_code)
-          } else {
-            ""
-          }
-        } else {
-          ""
-        }
-
         div(class = "col-lg-3 col-md-4 col-sm-6 col-12",
           card(class = "h-100",
             card_body(class = "p-2 text-center",
@@ -1358,10 +1258,8 @@ render_family_section <- function(summary_df, prefix, ns,
                      display_name,
                      tags$i(class = "fa fa-external-link-alt ms-1",
                             style = "font-size: 0.6rem; opacity: 0.4;")),
-              tags$small(class = "text-muted d-block", title = count_title,
+              tags$small(class = "text-muted d-block",
                          sprintf("%d / %d", row$species_covered, row$total_species)),
-              # State presence badge
-              presence_badge,
               # Familiar species blurb
               if (!is.null(blurb)) {
                 tags$small(class = "text-muted d-block mt-1",
@@ -1378,16 +1276,6 @@ render_family_section <- function(summary_df, prefix, ns,
           )
         )
       })
-    ),
-
-    # Note about excluded families
-    if (excluded_count > 0) {
-      tags$small(class = "text-muted d-block mt-2 text-center",
-                 style = "font-size: 0.75rem;",
-                 sprintf("%d %s not shown (no confirmed presence in %s)",
-                         excluded_count,
-                         ifelse(excluded_count == 1, "family", "families"),
-                         state_code))
-    }
+    )
   )
 }

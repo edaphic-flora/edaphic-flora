@@ -230,12 +230,19 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       db_get_species_data(sp)
     })
 
+    # --- Cached reference summary (single DB lookup per species, used by badges + msg) ---
+    reference_summary <- reactive({
+      sp <- input$analysis_species %||% ""
+      if (!nzchar(sp)) return(NULL)
+      get_reference_summary(sp, pool)
+    })
+
     # --- Reference badges (USDA traits + NWPL) ---
     output$reference_badges <- renderUI({
       sp <- input$analysis_species %||% ""
       if (!nzchar(sp)) return(NULL)
 
-      ref <- get_reference_summary(sp, pool)
+      ref <- reference_summary()
 
       chip <- function(lbl, val, href = NULL) {
         if (is.null(val)) return(NULL)
@@ -305,8 +312,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
       if (n > 0) return(NULL)
 
-      ref <- get_reference_summary(sp, pool)
-      if (!ref$has_traits && !ref$has_nwpl) {
+      ref <- reference_summary()
+      if (is.null(ref) || (!ref$has_traits && !ref$has_nwpl)) {
         div(class = "text-muted small mt-2",
             icon("info-circle"), " No samples or reference data for this species.")
       } else {
@@ -1079,6 +1086,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$ph_plot <- renderPlotly({
+      req(input$analysis_tabs == "pH")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       show_usda <- tryCatch(isTRUE(input$show_usda_ref), error = function(e) TRUE)
@@ -1192,6 +1200,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$ph_om_plot <- renderPlotly({
+      req(input$analysis_tabs == "pH vs OM")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       show_usda <- tryCatch(isTRUE(input$show_usda_ref), error = function(e) TRUE)
@@ -1347,6 +1356,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$nutrient_plot <- renderPlotly({
+      req(input$analysis_tabs == "Nutrients")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       if (nrow(dat) == 0) return(NULL)
@@ -1417,6 +1427,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$heatmap_plot <- renderPlotly({
+      req(input$analysis_tabs == "Correlations")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       if (nrow(dat) < 3) return(NULL)
@@ -1481,6 +1492,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$texture_plot <- renderPlot({
+      req(input$analysis_tabs == "Soil Texture")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$texture_sand) & !is.na(dat$texture_silt) & !is.na(dat$texture_clay), ]
@@ -1588,6 +1600,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$map_plot <- renderLeaflet({
+      req(input$analysis_tabs == "Geography")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$location_lat) & !is.na(dat$location_long), ]
@@ -1859,6 +1872,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$ecoregion_dist_plot <- renderPlotly({
+      req(input$analysis_tabs == "Geography")
       req(input$analysis_species, input$analysis_species != "")
       dat <- ecoregion_data_by_level()
       if (is.null(dat) || nrow(dat) == 0) return(NULL)
@@ -1881,6 +1895,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     })
 
     output$ecoregion_success_plot <- renderPlotly({
+      req(input$analysis_tabs == "Geography")
       req(input$analysis_species, input$analysis_species != "")
       dat <- ecoregion_data_by_level()
       if (is.null(dat)) return(NULL)
@@ -2041,6 +2056,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
     # Performance outcome plot
     output$performance_outcome_plot <- renderPlotly({
+      req(input$analysis_tabs == "Performance")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$outcome), ]
@@ -2065,6 +2081,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
     # Performance sun plot
     output$performance_sun_plot <- renderPlotly({
+      req(input$analysis_tabs == "Performance")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$sun_exposure), ]
@@ -2101,6 +2118,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
     # Performance hydrology plot
     output$performance_hydro_plot <- renderPlotly({
+      req(input$analysis_tabs == "Performance")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$site_hydrology), ]
@@ -2236,6 +2254,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
     # Success factor plot
     output$success_factor_plot <- renderPlotly({
+      req(input$analysis_tabs == "Performance")
       req(input$analysis_species, input$analysis_species != "")
       req(input$success_factor_param)
       dat <- filtered_species_data()
@@ -2278,6 +2297,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
 
     # Success matrix plot
     output$success_matrix_plot <- renderPlotly({
+      req(input$analysis_tabs == "Performance")
       req(input$analysis_species, input$analysis_species != "")
       dat <- filtered_species_data()
       dat <- dat[!is.na(dat$outcome) & !is.na(dat$sun_exposure) & !is.na(dat$site_hydrology), ]

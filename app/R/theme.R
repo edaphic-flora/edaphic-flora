@@ -655,7 +655,7 @@ edaphic_css <- function() {
       pointer-events: none;
     }
 
-    /* Alpha banner - white background for contrast against limestone hero */
+    /* Beta banner - white background for contrast against limestone hero */
     .welcome-hero .alert-warning {
       background: white !important;
       border: 1px solid #D39B35 !important;

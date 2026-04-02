@@ -71,7 +71,7 @@ get_ebird_taxonomy <- function() {
   # Keep only species (not subspecies/groups)
   tax_df <- tax_df %>%
     filter(CATEGORY == "species") %>%
-    select(speciesCode = SPECIES_CODE, sciName = SCI_NAME, comName = PRIMARY_COM_NAME)
+    select(speciesCode = SPECIES_CODE, sciName = SCIENTIFIC_NAME, comName = COMMON_NAME)
 
   write_csv(tax_df, TAXONOMY_CACHE)
   message(sprintf("  Cached %d species to %s", nrow(tax_df), TAXONOMY_CACHE))

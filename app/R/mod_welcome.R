@@ -17,11 +17,11 @@ welcomeUI <- function(id) {
       card(
         card_header(
           class = "bg-transparent border-0 pt-2 welcome-hero",
-          # Alpha banner - slim single line
+          # Beta banner - slim single line
           div(class = "alert alert-warning mb-2 mx-3 py-1 px-3", style = "font-size: 0.85rem;",
               icon("flask", class = "me-1", style = "color: #7A9A86;"),
-              tags$strong("Alpha"), " \u2014 desktop optimized. ",
-              tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Alpha%20Feedback",
+              tags$strong("Beta"), " \u2014 desktop optimized. ",
+              tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Beta%20Feedback",
                      style = "color: #7A9A86; font-weight: 500;",
                      "Send feedback", icon("envelope", class = "ms-1 fa-xs"))
           ),
@@ -113,11 +113,29 @@ welcomeUI <- function(id) {
       card(
         card_header(icon("chart-simple"), "Database Stats"),
         card_body(
-          # Alpha test data notice
+          # Beta test data notice
           div(class = "alert alert-info py-2 px-2 mb-3", style = "font-size: 0.75rem;",
               icon("info-circle"), " ",
-              tags$strong("Alpha Note:"), " Current data is simulated for testing. ",
-              "Real community data will replace this as users contribute."),
+              tags$strong("Beta Note:"), " Community data is growing. ",
+              "Contribute soil samples to improve species coverage."),
+          # Stats skeleton (shown instantly in initial HTML, replaced by server)
+          div(id = ns("stats_skeleton"),
+              div(class = "row g-0 border-bottom pb-2 mb-2",
+                  lapply(list(
+                    list(icon = "flask", label = "Samples"),
+                    list(icon = "seedling", label = "Species"),
+                    list(icon = "users", label = "Contributors"),
+                    list(icon = "map", label = "Ecoregions")
+                  ), function(s) {
+                    div(class = paste0("col-6", if (s$icon %in% c("flask", "users")) " border-end" else "",
+                                       if (s$icon %in% c("flask", "seedling")) " border-bottom" else ""),
+                        div(class = "stat-card",
+                            div(class = "stat-number placeholder-glow",
+                                span(class = "placeholder col-4")),
+                            div(class = "stat-label", icon(s$icon), " ", s$label)))
+                  })
+              )
+          ),
           uiOutput(ns("stats")),
           div(class = "text-muted text-center mb-1", style = "font-size: 0.7rem;",
               icon("map-location-dot"), " Sample Locations"),
@@ -134,25 +152,48 @@ welcomeUI <- function(id) {
 
 welcomeServer <- function(id, pool, data_changed) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
 
-    # Database stats
-    output$stats <- renderUI({
-      data_changed()
-      stats <- tryCatch({
-        samples_q <- dbGetQuery(pool, "SELECT COUNT(*)::int as n FROM soil_samples")
-        species_q <- dbGetQuery(pool, "SELECT COUNT(DISTINCT species)::int as n FROM soil_samples")
-        users_q <- dbGetQuery(pool, "SELECT COUNT(DISTINCT created_by)::int as n FROM soil_samples")
-        eco_q <- dbGetQuery(pool, "SELECT COUNT(DISTINCT ecoregion_l4)::int as n FROM soil_samples WHERE ecoregion_l4 IS NOT NULL")
-        list(
-          samples = if (nrow(samples_q) > 0) samples_q$n[1] else 0,
-          species = if (nrow(species_q) > 0) species_q$n[1] else 0,
-          users = if (nrow(users_q) > 0) users_q$n[1] else 0,
-          ecoregions = if (nrow(eco_q) > 0) eco_q$n[1] else 0
-        )
+    # Cached stats — starts NULL, populated after initial page render
+    cached_stats <- reactiveVal(NULL)
+
+    # Defer DB query until after first page render so skeleton shows immediately
+    session$onFlushed(function() {
+      later::later(function() {
+        fetch_stats()
+      }, delay = 0.1)
+    }, once = TRUE)
+
+    # Also re-fetch when data changes (e.g., after new submission)
+    observeEvent(data_changed(), {
+      fetch_stats()
+    }, ignoreInit = TRUE)
+
+    fetch_stats <- function() {
+      tryCatch({
+        res <- dbGetQuery(pool, "
+          SELECT COUNT(*)::int AS samples,
+                 COUNT(DISTINCT species)::int AS species,
+                 COUNT(DISTINCT created_by)::int AS users,
+                 COUNT(DISTINCT CASE WHEN ecoregion_l4 IS NOT NULL THEN ecoregion_l4 END)::int AS ecoregions
+          FROM soil_samples
+        ")
+        cached_stats(list(
+          samples = res$samples[1] %||% 0L,
+          species = res$species[1] %||% 0L,
+          users = res$users[1] %||% 0L,
+          ecoregions = res$ecoregions[1] %||% 0L
+        ))
       }, error = function(e) {
         message("Welcome stats error: ", e$message)
-        list(samples = 0, species = 0, users = 0, ecoregions = 0)
+        cached_stats(list(samples = 0, species = 0, users = 0, ecoregions = 0))
       })
+    }
+
+    # Replace skeleton with real stats once query returns
+    output$stats <- renderUI({
+      stats <- cached_stats()
+      if (is.null(stats)) return(NULL)
 
       stat_box <- function(value, label, icon_name) {
         div(class = "stat-card",
@@ -160,18 +201,19 @@ welcomeServer <- function(id, pool, data_changed) {
             div(class = "stat-label", icon(icon_name), " ", label))
       }
 
-      # Check site-wide threshold
-      meets_site <- stats$samples >= MIN_TOTAL_SAMPLES_FOR_SITE_STATS
-
       tagList(
-        # 2x2 grid layout for stats with staggered reveal
+        # Hide the static skeleton
+        tags$script(HTML(sprintf(
+          "document.getElementById('%s').style.display='none';",
+          ns("stats_skeleton")
+        ))),
+        # Real stats
         div(class = "row g-0 border-bottom pb-2 mb-2 stagger-reveal",
           div(class = "col-6 border-end border-bottom", stat_box(stats$samples, "Samples", "flask")),
           div(class = "col-6 border-bottom", stat_box(stats$species, "Species", "seedling")),
           div(class = "col-6 border-end", stat_box(stats$users, "Contributors", "users")),
           div(class = "col-6", stat_box(stats$ecoregions, "Ecoregions", "map"))
         ),
-        # Community progress tracker (escalating milestones)
         seed_database_ui(stats$samples)
       )
     })
