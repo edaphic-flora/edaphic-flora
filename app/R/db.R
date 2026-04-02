@@ -842,7 +842,7 @@ db_get_user_garden_species <- function(user_id, pool) {
 #' @return Data frame with columns: garden_species, plant_species_code, wildlife_id, wildlife_type,
 #'         wildlife_family, wildlife_common_name, wildlife_scientific_name, interaction_type,
 #'         specialist_generalist, functional_group
-db_get_wildlife_coverage <- function(species_list, pool) {
+db_get_wildlife_coverage <- function(species_list, pool, state_code = NULL) {
   if (length(species_list) == 0) return(data.frame())
   tryCatch({
     # Stage garden species in temp table for join
@@ -857,7 +857,15 @@ db_get_wildlife_coverage <- function(species_list, pool) {
                    append = TRUE, temporary = TRUE, row.names = FALSE)
     }
 
-    dbGetQuery(con, "
+    # When state_code is provided, filter to wildlife confirmed in that state
+    state_join <- ""
+    params <- list()
+    if (!is.null(state_code) && nzchar(state_code) && grepl("^[A-Z]{2}$", state_code)) {
+      state_join <- "JOIN ref_wildlife_state_presence wsp ON wsp.wildlife_id = ws.wildlife_id AND wsp.state_code = $1"
+      params <- list(state_code)
+    }
+
+    dbGetQuery(con, sprintf("
       SELECT DISTINCT
         g.species AS garden_species,
         wp.species_code AS plant_species_code,
@@ -875,7 +883,8 @@ db_get_wildlife_coverage <- function(species_list, pool) {
       JOIN ref_wildlife_plants wp ON wp.taxon_id = t.id
       JOIN ref_wildlife_interactions wi ON wi.plant_species_code = wp.species_code
       JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
-    ")
+      %s
+    ", state_join), params = params)
   }, error = function(e) {
     message("Error fetching wildlife coverage: ", e$message)
     data.frame()
@@ -928,13 +937,23 @@ db_get_wildlife_summary <- function(coverage_df, all_species_df = NULL) {
 
 #' Get all wildlife species (for total counts per family)
 #' @param pool Database connection pool
+#' @param state_code Optional 2-letter state code to filter to species confirmed in that state
 #' @return Data frame with wildlife_id, wildlife_type, family
-db_get_all_wildlife_species <- function(pool) {
+db_get_all_wildlife_species <- function(pool, state_code = NULL) {
   tryCatch({
-    dbGetQuery(pool, "
-      SELECT wildlife_id, wildlife_type, COALESCE(family, 'Unknown') AS family
-      FROM ref_wildlife_species
-    ")
+    if (!is.null(state_code) && nzchar(state_code) && grepl("^[A-Z]{2}$", state_code)) {
+      dbGetQuery(pool, "
+        SELECT DISTINCT ws.wildlife_id, ws.wildlife_type, COALESCE(ws.family, 'Unknown') AS family
+        FROM ref_wildlife_species ws
+        JOIN ref_wildlife_state_presence wsp ON wsp.wildlife_id = ws.wildlife_id
+          AND wsp.state_code = $1
+      ", params = list(state_code))
+    } else {
+      dbGetQuery(pool, "
+        SELECT wildlife_id, wildlife_type, COALESCE(family, 'Unknown') AS family
+        FROM ref_wildlife_species
+      ")
+    }
   }, error = function(e) {
     message("Error fetching all wildlife species: ", e$message)
     data.frame()
@@ -975,11 +994,20 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
     query_params <- list()
     param_idx <- 0L
 
+    # When state is set, filter plants to native-in-state AND wildlife to confirmed-in-state
+    wildlife_state_join <- ""
     if (!is.null(user_state) && nzchar(user_state)) {
       param_idx <- param_idx + 1L
       state_join <- sprintf("
         JOIN ref_state_distribution sd ON sd.taxon_id = wp.taxon_id
           AND sd.state_code = $%d AND sd.native_status = 'Native'
+      ", param_idx)
+      query_params <- c(query_params, list(user_state))
+
+      param_idx <- param_idx + 1L
+      wildlife_state_join <- sprintf("
+        JOIN ref_wildlife_state_presence wsp ON wsp.wildlife_id = ws.wildlife_id
+          AND wsp.state_code = $%d
       ", param_idx)
       query_params <- c(query_params, list(user_state))
     }
@@ -1045,12 +1073,13 @@ db_get_wildlife_gap_recs <- function(covered_codes, user_state, pool,
         FROM gap_plants gp
         JOIN ref_wildlife_interactions wi ON wi.plant_species_code = gp.species_code
         JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
+        %s
         GROUP BY gp.genus
       )
       SELECT * FROM genus_impact
       ORDER BY new_wildlife_count DESC
       LIMIT %s
-    ", state_join, life_form_clause, limit_placeholder)
+    ", state_join, life_form_clause, wildlife_state_join, limit_placeholder)
 
     dbGetQuery(con, query, params = query_params)
   }, error = function(e) {

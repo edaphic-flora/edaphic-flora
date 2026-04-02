@@ -977,11 +977,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       has_batch <- !is.null(pld) && nrow(pld$valid) > 0
 
       tagList(
+        uiOutput(ns("species_load_error")),
         selectizeInput(ns("species"),
                        if (has_batch) "Add More Species (Optional)" else "Plant Species",
                        choices = NULL, multiple = TRUE,
                        options = list(maxItems = 20, maxOptions = 100,
-                                      placeholder = if (has_batch) "Add species to CSV list..." else "Type to search species...",
+                                      placeholder = if (has_batch) "Add species to CSV list..." else "Loading species...",
                                       searchField = list("label", "value"),
                                       render = I("{
                                         option: function(item, escape) {
@@ -1054,31 +1055,116 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     })
 
     # --- Species dropdown population ---
-    # Use observeEvent to ensure it fires reliably when step changes to 3
+    # Stores resolved choices so the readiness callback can access them
+    species_choices <- reactiveVal(NULL)
+
+    # Use observeEvent to fire when step changes to 3
     observeEvent(list(wizard_step(), is_casual()), {
       step <- wizard_step()
       if (step != 3) return()
 
-      # Use search index with common names if available, else fall back to plain species list
+      # Resolve choices: search index > species_db fallback > empty
       choices <- if (!is.null(species_search_index) && length(species_search_index) > 0) {
         species_search_index
-      } else {
+      } else if (!is.null(species_db) && is.data.frame(species_db) &&
+                 "taxon_name" %in% names(species_db) && nrow(species_db) > 0) {
         sort(species_db$taxon_name)
+      } else {
+        character(0)
       }
 
-      # Delay slightly to ensure the renderUI has flushed the selectizeInput to the browser
-      later::later(function() {
-        updateSelectizeInput(session, "species",
-                             choices = choices,
-                             selected = character(0),
-                             server = TRUE)
-      }, delay = 0.3)
+      if (length(choices) == 0) {
+        output$species_load_error <- renderUI({
+          div(class = "alert alert-danger py-2",
+              icon("exclamation-triangle"),
+              " Species database unavailable. Please reload the page.")
+        })
+        return()
+      }
+
+      species_choices(choices)
+
+      # Wait for nested renderUI flush chain (wizard_content -> species_input_section),
+      # then verify the selectize widget exists on the client before sending choices.
+      session$onFlushed(function() {
+        session$onFlushed(function() {
+          later::later(function() {
+            session$sendCustomMessage("checkSelectizeReady", list(
+              id = ns("species"),
+              callback = ns("species_selectize_ready"),
+              attempt = 1L
+            ))
+          }, delay = 0.05)
+        }, once = TRUE)
+      }, once = TRUE)
     }, ignoreInit = FALSE, ignoreNULL = FALSE)
+
+    # Client confirms selectize widget readiness — populate or retry
+    observeEvent(input$species_selectize_ready, {
+      msg <- input$species_selectize_ready
+      choices <- species_choices()
+      if (is.null(choices) || length(choices) == 0) return()
+
+      if (isTRUE(msg$ready)) {
+        tryCatch({
+          updateSelectizeInput(session, "species",
+                               choices = choices,
+                               selected = character(0),
+                               server = TRUE)
+          output$species_load_error <- renderUI(NULL)
+        }, error = function(e) {
+          message("Species dropdown update failed: ", e$message)
+          showNotification("Species search failed to load.", type = "error", duration = 10)
+        })
+      } else if (msg$attempt < 5L) {
+        # Widget not ready yet — retry after a short delay
+        attempt <- msg$attempt + 1L
+        later::later(function() {
+          session$sendCustomMessage("checkSelectizeReady", list(
+            id = ns("species"),
+            callback = ns("species_selectize_ready"),
+            attempt = attempt
+          ))
+        }, delay = 0.2)
+      } else {
+        # All retries exhausted — show error with retry button
+        output$species_load_error <- renderUI({
+          div(class = "alert alert-warning py-2 d-flex align-items-center justify-content-between",
+              span(icon("exclamation-triangle"), " Species search didn't load."),
+              actionButton(ns("retry_species_load"), "Retry",
+                           class = "btn-sm btn-outline-warning",
+                           icon = icon("redo")))
+        })
+      }
+    }, ignoreInit = TRUE)
+
+    # Retry button re-triggers the loading flow
+    observeEvent(input$retry_species_load, {
+      output$species_load_error <- renderUI(NULL)
+      step <- wizard_step()
+      wizard_step(2L)
+      later::later(function() { wizard_step(step) }, delay = 0.1)
+    })
 
     # --- Texture class dropdown ---
     observe({
       updateSelectInput(session, "texture_class", choices = soil_texture_classes$Texture)
     })
+
+    # When user selects a texture class on step 2, compute approximate percentages
+    observeEvent(input$texture_class_step2, {
+      req(input$texture_class_step2)
+      approx <- get_texture_percentages(input$texture_class_step2, soil_texture_classes)
+      if (!is.null(approx)) {
+        updateNumericInput(session, "sand_step2", value = round(approx$sand, 1))
+        updateNumericInput(session, "silt_step2", value = round(approx$silt, 1))
+        updateNumericInput(session, "clay_step2", value = round(approx$clay, 1))
+        updateNumericInput(session, "sand", value = round(approx$sand, 1))
+        updateNumericInput(session, "silt", value = round(approx$silt, 1))
+        updateNumericInput(session, "clay", value = round(approx$clay, 1))
+        updateRadioButtons(session, "texture_input_type", selected = "class")
+      }
+    }, ignoreInit = TRUE)
 
     # --- Species count indicator ---
     output$species_count_indicator <- renderUI({
@@ -2170,7 +2256,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       has_manual <- !is.null(manual_species) && length(manual_species) > 0
 
       # Validate manual species if any
-      if (has_manual) {
+      if (has_manual && !is.null(species_db) && is.data.frame(species_db) &&
+          "taxon_name" %in% names(species_db)) {
         invalid_species <- manual_species[!manual_species %in% species_db$taxon_name]
         if (length(invalid_species) > 0) {
           showNotification(
@@ -2184,7 +2271,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
       # Must have at least one species from either source
       if (!has_batch && !has_manual) {
-        showNotification("Please select at least one species or upload a plant list.", type = "error")
+        if (is.null(species_choices()) || length(species_choices()) == 0) {
+          showNotification("Species list failed to load. Please reload the page and try again.",
+                           type = "error", duration = 10)
+        } else {
+          showNotification("Please select at least one species or upload a plant list.", type = "error")
+        }
         return()
       }
 

@@ -18,14 +18,31 @@ GRID_MATCH_TOLERANCE <- 0.001
 # ---------------------------
 
 load_species_db <- function() {
-  # Prefer RDS (faster loading, smaller memory footprint during parse)
-  rds_path <- "species_accepted.rds"
-  csv_path <- "species_accepted.csv"
+  tryCatch({
+    # Prefer RDS (faster loading, smaller memory footprint during parse)
+    rds_path <- "species_accepted.rds"
+    csv_path <- "species_accepted.csv"
 
-  if (file.exists(rds_path)) {
-    return(readRDS(rds_path))
-  }
-  read.csv(csv_path, stringsAsFactors = FALSE)
+    db <- if (file.exists(rds_path)) {
+      readRDS(rds_path)
+    } else if (file.exists(csv_path)) {
+      read.csv(csv_path, stringsAsFactors = FALSE)
+    } else {
+      warning("Species database not found: neither ", rds_path, " nor ", csv_path, " exist")
+      return(NULL)
+    }
+
+    if (!is.data.frame(db) || !"taxon_name" %in% names(db) || nrow(db) == 0) {
+      warning("Species database has invalid structure or is empty")
+      return(NULL)
+    }
+
+    message(sprintf("Loaded species database: %d species", nrow(db)))
+    db
+  }, error = function(e) {
+    warning("Failed to load species database: ", e$message)
+    NULL
+  })
 }
 
 # ---------------------------
@@ -217,6 +234,12 @@ load_common_name_index <- function(pool) {
 #' @param common_name_db Common name index (from load_common_name_index)
 #' @return Named character vector: names=labels, values=scientific names
 build_species_search_index <- function(species_db, common_name_db) {
+  if (is.null(species_db) || !is.data.frame(species_db) ||
+      !"taxon_name" %in% names(species_db) || nrow(species_db) == 0) {
+    warning("Cannot build species search index: species_db is NULL or invalid")
+    return(character(0))
+  }
+
   all_species <- sort(unique(species_db$taxon_name))
 
   if (is.null(common_name_db) || nrow(common_name_db) == 0) {
