@@ -857,37 +857,208 @@ db_get_wildlife_coverage <- function(species_list, pool, state_code = NULL) {
                    append = TRUE, temporary = TRUE, row.names = FALSE)
     }
 
-    # When state_code is provided, filter to wildlife confirmed in that state
+    # Three-class matching:
+    #   - Invasive in scope (federal noxious or state-listed): EXCLUDED entirely from
+    #     wildlife coverage. Per product rule, invasives never count as wildlife support.
+    #   - Native or unknown: GENUS-level join (covers cases where the wildlife table
+    #     only documents one congener but the data is genus-applicable).
+    #   - Introduced (non-invasive): strict SPECIES-level match — credited only for
+    #     interactions documented for that exact species (e.g. parsley → Black Swallowtail).
+    nativity_scope <- ""  # appended to ref_state_distribution lookups; empty = anywhere in US
+    invasive_state_clause <- "(ni.state_code IS NULL OR ni.state_code = 'US')"
+    params <- list()
+    next_param <- 1L
+    has_state <- !is.null(state_code) && nzchar(state_code) && grepl("^[A-Z]{2}$", state_code)
+    if (has_state) {
+      nativity_scope <- sprintf("AND sd.state_code = $%d", next_param)
+      invasive_state_clause <- sprintf("(ni.state_code IS NULL OR ni.state_code = 'US' OR ni.state_code = $%d)", next_param)
+      params <- c(params, list(state_code))
+      next_param <- next_param + 1L
+    }
+
+    state_join <- ""
+    if (has_state) {
+      state_join <- sprintf("JOIN ref_wildlife_state_presence wsp ON wsp.wildlife_id = cov.wildlife_id AND wsp.state_code = $%d", next_param)
+      params <- c(params, list(state_code))
+    }
+
+    query_sql <- sprintf("
+      WITH garden_taxon AS (
+        -- ref_taxon.scientific_name carries authority (e.g. 'Acer platanoides L.'),
+        -- so match on the genus+species prefix only — same pattern as the BONAP ETL.
+        SELECT g.species, t.id AS taxon_id
+        FROM tmp_garden_species g
+        LEFT JOIN ref_taxon t ON
+          lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2))
+          = lower(g.species)
+      ),
+      garden_classified AS (
+        SELECT
+          gt.species,
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM ref_noxious_invasive ni
+              WHERE ni.taxon_id = gt.taxon_id
+                AND %s
+            ) THEN 'invasive'
+            WHEN EXISTS (
+              SELECT 1 FROM ref_state_distribution sd
+              WHERE sd.taxon_id = gt.taxon_id
+                AND sd.native_status = 'Native'
+                %s
+            ) THEN 'native'
+            WHEN NOT EXISTS (
+              SELECT 1 FROM ref_state_distribution sd
+              WHERE sd.taxon_id = gt.taxon_id
+                %s
+            ) THEN 'unknown'
+            ELSE 'introduced'
+          END AS native_class
+        FROM garden_taxon gt
+      ),
+      native_cov AS (
+        -- genus-level inheritance for species native or undocumented in scope
+        SELECT
+          g.species AS garden_species,
+          wp.species_code AS plant_species_code,
+          ws.wildlife_id,
+          ws.wildlife_type,
+          COALESCE(ws.family, 'Unknown') AS wildlife_family,
+          ws.common_name AS wildlife_common_name,
+          ws.scientific_name AS wildlife_scientific_name,
+          wi.interaction_type,
+          ws.specialist_generalist,
+          ws.functional_group
+        FROM garden_classified g
+        JOIN ref_taxon t ON lower(split_part(t.scientific_name, ' ', 1))
+                          = lower(split_part(g.species, ' ', 1))
+        JOIN ref_wildlife_plants wp ON wp.taxon_id = t.id
+        JOIN ref_wildlife_interactions wi ON wi.plant_species_code = wp.species_code
+        JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
+        WHERE g.native_class IN ('native', 'unknown')
+      ),
+      intro_cov AS (
+        -- species-level match only for known introduced species
+        SELECT
+          g.species AS garden_species,
+          wp.species_code AS plant_species_code,
+          ws.wildlife_id,
+          ws.wildlife_type,
+          COALESCE(ws.family, 'Unknown') AS wildlife_family,
+          ws.common_name AS wildlife_common_name,
+          ws.scientific_name AS wildlife_scientific_name,
+          wi.interaction_type,
+          ws.specialist_generalist,
+          ws.functional_group
+        FROM garden_classified g
+        JOIN ref_taxon t ON
+          lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2))
+          = lower(g.species)
+        JOIN ref_wildlife_plants wp ON wp.taxon_id = t.id
+        JOIN ref_wildlife_interactions wi ON wi.plant_species_code = wp.species_code
+        JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
+        WHERE g.native_class = 'introduced'
+      )
+      SELECT DISTINCT
+        cov.garden_species,
+        cov.plant_species_code,
+        cov.wildlife_id,
+        cov.wildlife_type,
+        cov.wildlife_family,
+        cov.wildlife_common_name,
+        cov.wildlife_scientific_name,
+        cov.interaction_type,
+        cov.specialist_generalist,
+        cov.functional_group
+      FROM (
+        SELECT * FROM native_cov
+        UNION ALL
+        SELECT * FROM intro_cov
+      ) cov
+      %s
+    ", invasive_state_clause, nativity_scope, nativity_scope, state_join)
+    if (length(params) > 0) {
+      dbGetQuery(con, query_sql, params = params)
+    } else {
+      dbGetQuery(con, query_sql)
+    }
+  }, error = function(e) {
+    message("Error fetching wildlife coverage: ", e$message)
+    data.frame()
+  })
+}
+
+#' Get species-level documented wildlife counts for a set of garden species.
+#' Used by the Introduced Plants panel to show what (if any) wildlife each
+#' non-native plant supports without inheriting genus-level associations.
+#' @param species_list Character vector of "Genus species" names.
+#' @param pool Database pool.
+#' @param state_code Two-letter state code (optional). When provided, wildlife is
+#'   restricted to species confirmed in that state via ref_wildlife_state_presence.
+#' @return Data frame: species, lep_count, bee_count, bird_count, total_count.
+#'   Always one row per input species; counts are 0 when no species-level evidence exists.
+db_get_species_level_wildlife_counts <- function(species_list, pool, state_code = NULL) {
+  empty <- data.frame(
+    species = character(0), lep_count = integer(0),
+    bee_count = integer(0), bird_count = integer(0), total_count = integer(0),
+    stringsAsFactors = FALSE
+  )
+  if (length(species_list) == 0) return(empty)
+  tryCatch({
+    con <- poolCheckout(pool)
+    on.exit(poolReturn(con), add = TRUE)
+
+    dbExecute(con, "DROP TABLE IF EXISTS tmp_intro_species")
+    dbExecute(con, "CREATE TEMP TABLE tmp_intro_species (species TEXT)")
+    dbWriteTable(con, "tmp_intro_species",
+                 data.frame(species = species_list, stringsAsFactors = FALSE),
+                 append = TRUE, temporary = TRUE, row.names = FALSE)
+
+    has_state <- !is.null(state_code) && nzchar(state_code) && grepl("^[A-Z]{2}$", state_code)
     state_join <- ""
     params <- list()
-    if (!is.null(state_code) && nzchar(state_code) && grepl("^[A-Z]{2}$", state_code)) {
+    if (has_state) {
       state_join <- "JOIN ref_wildlife_state_presence wsp ON wsp.wildlife_id = ws.wildlife_id AND wsp.state_code = $1"
       params <- list(state_code)
     }
 
-    dbGetQuery(con, sprintf("
-      SELECT DISTINCT
-        g.species AS garden_species,
-        wp.species_code AS plant_species_code,
-        ws.wildlife_id,
-        ws.wildlife_type,
-        COALESCE(ws.family, 'Unknown') AS wildlife_family,
-        ws.common_name AS wildlife_common_name,
-        ws.scientific_name AS wildlife_scientific_name,
-        wi.interaction_type,
-        ws.specialist_generalist,
-        ws.functional_group
-      FROM tmp_garden_species g
-      JOIN ref_taxon t ON lower(split_part(t.scientific_name, ' ', 1))
-                        = lower(split_part(g.species, ' ', 1))
-      JOIN ref_wildlife_plants wp ON wp.taxon_id = t.id
-      JOIN ref_wildlife_interactions wi ON wi.plant_species_code = wp.species_code
-      JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
-      %s
-    ", state_join), params = params)
+    sql <- sprintf("
+      WITH per_species AS (
+        SELECT
+          g.species,
+          ws.wildlife_id,
+          ws.wildlife_type
+        FROM tmp_intro_species g
+        JOIN ref_taxon t ON
+          lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2))
+          = lower(g.species)
+        JOIN ref_wildlife_plants wp ON wp.taxon_id = t.id
+        JOIN ref_wildlife_interactions wi ON wi.plant_species_code = wp.species_code
+        JOIN ref_wildlife_species ws ON ws.wildlife_id = wi.wildlife_id
+        %s
+      )
+      SELECT
+        g.species,
+        COALESCE(COUNT(DISTINCT CASE WHEN ps.wildlife_type IN ('Moth','Butterfly','Skipper')
+                                     THEN ps.wildlife_id END), 0)::int AS lep_count,
+        COALESCE(COUNT(DISTINCT CASE WHEN ps.wildlife_type = 'Bee'
+                                     THEN ps.wildlife_id END), 0)::int AS bee_count,
+        COALESCE(COUNT(DISTINCT CASE WHEN ps.wildlife_type = 'Bird'
+                                     THEN ps.wildlife_id END), 0)::int AS bird_count,
+        COALESCE(COUNT(DISTINCT ps.wildlife_id), 0)::int AS total_count
+      FROM tmp_intro_species g
+      LEFT JOIN per_species ps ON ps.species = g.species
+      GROUP BY g.species
+    ", state_join)
+
+    if (length(params) > 0) {
+      dbGetQuery(con, sql, params = params)
+    } else {
+      dbGetQuery(con, sql)
+    }
   }, error = function(e) {
-    message("Error fetching wildlife coverage: ", e$message)
-    data.frame()
+    message("Error fetching species-level wildlife counts: ", e$message)
+    empty
   })
 }
 
