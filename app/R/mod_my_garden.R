@@ -208,6 +208,9 @@ myGardenUI <- function(id) {
           uiOutput(ns("species_list"))
         ),
 
+        # Introduced + invasive collapsible sections
+        uiOutput(ns("nonnative_sections")),
+
         hr(),
 
         # Home location
@@ -309,6 +312,75 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       cov <- wildlife_coverage()
       all_ws <- all_wildlife()
       db_get_wildlife_summary(cov, all_ws)
+    })
+
+    # --- Reactive: classify every garden species (non-natives only listed) ---
+    # Composes the existing cached helpers and attaches species-level wildlife counts.
+    # Splits into introduced (non-invasive) and invasive views downstream.
+    nonnative_summary <- reactive({
+      sp <- garden_species()
+      prefs <- user_prefs()
+      st <- effective_state()
+      empty <- data.frame(
+        species = character(0), common_name = character(0),
+        native_status = character(0), state_code = character(0),
+        state_name = character(0),
+        is_invasive_in_state = logical(0), is_federal = logical(0),
+        invasive_designation = character(0), other_states = integer(0),
+        lep_count = integer(0), bee_count = integer(0),
+        bird_count = integer(0), total_count = integer(0),
+        stringsAsFactors = FALSE
+      )
+      if (length(sp) == 0) return(empty)
+
+      rows <- lapply(sp, function(s) {
+        nat <- get_native_status_for_user(s, prefs, pool)
+        if (!nat$status %in% c("introduced", "introduced_na", "both")) return(NULL)
+        inv <- get_invasive_status(s, nat$state_code, pool)
+        data.frame(
+          species = s,
+          common_name = get_common_name(s) %||% NA_character_,
+          native_status = nat$status,
+          state_code = nat$state_code %||% NA_character_,
+          state_name = nat$state_name %||% NA_character_,
+          is_invasive_in_state = isTRUE(inv$in_user_state) || isTRUE(inv$is_federal),
+          is_federal = isTRUE(inv$is_federal),
+          invasive_designation = inv$user_state_designation %||% NA_character_,
+          other_states = length(setdiff(inv$states_listed, toupper(nat$state_code %||% ""))),
+          stringsAsFactors = FALSE
+        )
+      })
+      rows <- Filter(Negate(is.null), rows)
+      if (length(rows) == 0) return(empty)
+      df <- do.call(rbind, rows)
+
+      counts <- db_get_species_level_wildlife_counts(df$species, pool, st)
+      df <- merge(df, counts, by = "species", all.x = TRUE, sort = FALSE)
+      df$lep_count[is.na(df$lep_count)] <- 0L
+      df$bee_count[is.na(df$bee_count)] <- 0L
+      df$bird_count[is.na(df$bird_count)] <- 0L
+      df$total_count[is.na(df$total_count)] <- 0L
+
+      df <- df[order(-df$total_count, df$species), , drop = FALSE]
+      rownames(df) <- NULL
+      df
+    })
+
+    introduced_plants <- reactive({
+      df <- nonnative_summary()
+      df[!df$is_invasive_in_state, , drop = FALSE]
+    })
+
+    invasive_plants <- reactive({
+      df <- nonnative_summary()
+      df[df$is_invasive_in_state, , drop = FALSE]
+    })
+
+    # Native + unknown garden species — what shows in the main sidebar species list.
+    native_garden_species <- reactive({
+      all_sp <- garden_species()
+      flagged <- nonnative_summary()$species
+      setdiff(all_sp, flagged)
     })
 
     # --- Reactive: gap recommendations (depends on life_form filter) ---
@@ -417,10 +489,16 @@ myGardenServer <- function(id, pool, current_user, data_changed,
     })
 
     # --- Sidebar: Species List (grouped by genus) ---
+    # Shows native + unclassified plants only. Introduced and invasive plants
+    # are surfaced in the dropdowns below.
     output$species_list <- renderUI({
-      sp <- garden_species()
-      if (length(sp) == 0) {
+      if (length(garden_species()) == 0) {
         return(div(class = "text-muted text-center small py-3", "No plants yet"))
+      }
+      sp <- native_garden_species()
+      if (length(sp) == 0) {
+        return(div(class = "text-muted text-center small py-3 fst-italic",
+                   "All recorded plants are non-native — see below."))
       }
 
       # Group species by genus (first word of scientific name)
@@ -630,11 +708,17 @@ myGardenServer <- function(id, pool, current_user, data_changed,
     }
 
     # --- Helper: get garden plants that support a given family ---
+    # Excludes introduced (non-invasive) species by name per product rule —
+    # their interactions still contribute to the family count, but the species
+    # itself shouldn't appear in the per-family plant list.
     get_plants_for_family <- function(family, coverage_df) {
       if (is.null(coverage_df) || nrow(coverage_df) == 0) return(character())
       fam_rows <- coverage_df[coverage_df$wildlife_family == family, ]
       plants <- unique(fam_rows$garden_species)
-      # Convert to common names where available
+      # Drop any species classified as introduced (non-invasive). Invasives are
+      # already excluded upstream in db_get_wildlife_coverage.
+      hidden <- introduced_plants()$species
+      plants <- setdiff(plants, hidden)
       sapply(plants, function(p) {
         cn <- get_common_name(p)
         if (!is.null(cn)) cn else p
@@ -852,6 +936,19 @@ myGardenServer <- function(id, pool, current_user, data_changed,
       tagList(
         render_family_section(bird_df, "bird", ns, state_code = eff_st),
         build_source_attribution(eff_st)
+      )
+    })
+
+    # --- Sidebar: Introduced + Invasive collapsible dropdowns ---
+    output$nonnative_sections <- renderUI({
+      if (length(garden_species()) == 0) return(NULL)
+      intro_df <- introduced_plants()
+      inv_df   <- invasive_plants()
+      if (nrow(intro_df) == 0 && nrow(inv_df) == 0) return(NULL)
+
+      tagList(
+        if (nrow(inv_df) > 0) render_sidebar_dropdown("invasive", inv_df, ns),
+        if (nrow(intro_df) > 0) render_sidebar_dropdown("introduced", intro_df, ns)
       )
     })
 
@@ -1204,6 +1301,98 @@ empty_garden_ui <- function(ns, prefix) {
     p("Submit soil data for your plants to see wildlife coverage."),
     actionButton(ns(paste0(prefix, "_add_plant")), "Add a Plant",
                  class = "btn-primary mt-3", icon = icon("plus"))
+  )
+}
+
+#' Render a sidebar dropdown for non-native plants ('introduced' or 'invasive').
+#' Sized and styled to fit alongside the existing genus-grouped species list.
+#' @param kind 'introduced' or 'invasive' — drives header label, color, and footer copy.
+#' @param df Data frame from `introduced_plants()` / `invasive_plants()`.
+#' @param ns Namespace function.
+render_sidebar_dropdown <- function(kind, df, ns) {
+  is_invasive <- identical(kind, "invasive")
+  group_id <- paste0("nonnative_", kind, "_group")
+  header_color <- if (is_invasive) "#b02a37" else "#7A6A55"
+  header_icon <- if (is_invasive) "exclamation-triangle" else "plane-arrival"
+  header_label <- if (is_invasive) "Invasive" else "Introduced"
+
+  rows <- lapply(seq_len(nrow(df)), function(i) {
+    row <- df[i, , drop = FALSE]
+    cn <- if (!is.na(row$common_name)) row$common_name else NULL
+    state_url <- get_state_invasive_url(row$state_code)
+
+    label_block <- if (!is.null(cn)) {
+      tagList(
+        tags$span(style = "font-size: 0.85rem;", cn),
+        tags$br(),
+        tags$small(class = "species-name text-muted", row$species)
+      )
+    } else {
+      tags$span(class = "species-name", style = "font-size: 0.85rem;", row$species)
+    }
+
+    detail_block <- if (is_invasive) {
+      # Invasive: show designation + removal-info link, no wildlife counts
+      designation <- if (isTRUE(row$is_federal)) "Federal Noxious Weed"
+                     else (row$invasive_designation %||% "Invasive")
+      tagList(
+        tags$small(class = "d-block mt-1", style = "color: #b02a37;",
+          icon("ban", class = "me-1"), designation),
+        if (!is.null(state_url)) {
+          tags$small(class = "d-block",
+            tags$a(href = state_url, target = "_blank",
+              style = "color: #b02a37; text-decoration: none; font-size: 0.7rem;",
+              icon("book-open", class = "me-1"),
+              "Removal & management",
+              icon("up-right-from-square", class = "ms-1",
+                   style = "font-size: 0.6rem;"))
+          )
+        }
+      )
+    } else {
+      # Introduced (non-invasive): raw lep / bee / bird counts under the species name
+      parts <- c()
+      if (row$lep_count > 0)  parts <- c(parts, sprintf("%d lep", row$lep_count))
+      if (row$bee_count > 0)  parts <- c(parts, sprintf("%d bee", row$bee_count))
+      if (row$bird_count > 0) parts <- c(parts, sprintf("%d bird", row$bird_count))
+      label <- if (length(parts) > 0) {
+        sprintf("supports %s species", paste(parts, collapse = ", "))
+      } else {
+        "no documented species-level wildlife"
+      }
+      tags$small(class = "d-block text-muted mt-1",
+        style = "font-size: 0.7rem;",
+        icon("paw", class = "me-1", style = "color: #7A9A86;"),
+        label)
+    }
+
+    div(class = "py-1 px-1",
+        style = "font-size: 0.8rem; border-bottom: 1px solid #f5f2e9;",
+      label_block,
+      detail_block
+    )
+  })
+
+  div(class = "border-bottom",
+    div(class = "py-1 d-flex align-items-center",
+        style = sprintf("cursor: pointer; color: %s;", header_color),
+        onclick = sprintf(
+          "var el=document.getElementById('%s'); var arr=document.getElementById('%s_arr');
+           if(el.style.display==='none'){el.style.display='block';arr.className='fa fa-chevron-up';}
+           else{el.style.display='none';arr.className='fa fa-chevron-down';}", group_id, group_id),
+      tags$i(id = paste0(group_id, "_arr"), class = "fa fa-chevron-down",
+             style = sprintf("font-size: 0.6rem; color: %s; width: 12px;", header_color)),
+      tags$i(class = paste0("fa fa-", header_icon, " ms-1 me-1"),
+             style = sprintf("font-size: 0.7rem; color: %s;", header_color)),
+      tags$span(style = "font-size: 0.85rem; font-weight: 500;",
+                header_label),
+      tags$span(class = "badge rounded-pill ms-auto",
+                style = sprintf("font-size: 0.7rem; background-color: %s; color: #FFFFFF;", header_color),
+                nrow(df))
+    ),
+    div(id = group_id, style = "display: none; padding-left: 16px;",
+      rows
+    )
   )
 }
 
