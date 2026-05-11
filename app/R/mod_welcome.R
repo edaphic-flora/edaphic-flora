@@ -35,9 +35,10 @@ welcomeUI <- function(id) {
         card_body(
           div(class = "px-md-4",
               h4("What is Edaphic Flora?"),
-              p("Edaphic Flora helps gardeners, horticulturists, and researchers understand the relationship ",
-                "between soil conditions and plant success. By collecting real-world soil data from locations ",
-                "where specific plants grow, we build a reference database that can guide planting decisions."),
+              p("An open-source soil database for gardeners, researchers, and land managers. ",
+                "By collecting lab-quality soil tests from the real sites where plants are growing — ",
+                "paired with how those plants are doing — Edaphic Flora builds a clearer picture of ",
+                "which soil conditions a species actually thrives or struggles in."),
 
               h4(class = "mt-3", "How It Works"),
               # Visual step cards
