@@ -15,6 +15,9 @@ analysisUI <- function(id) {
       sidebar = sidebar(
         title = "Select Species",
         width = 300,
+        # One-line orientation for first-time visitors landing on an empty tab.
+        tags$small(class = "text-muted d-block mb-2",
+                   "Type a species name to explore soil patterns and plant performance from the community."),
         selectizeInput(ns("analysis_species"), "Species", choices = NULL, width = "100%",
                        options = list(
                          create = TRUE, persist = FALSE, maxOptions = 50,
