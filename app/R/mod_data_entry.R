@@ -978,7 +978,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                        if (has_batch) "Add More Species (Optional)" else "Plant Species",
                        choices = NULL, multiple = TRUE,
                        options = list(maxItems = 20, maxOptions = 100,
-                                      placeholder = if (has_batch) "Add species to CSV list..." else "Loading species...",
+                                      placeholder = if (has_batch) "Add species to CSV list..." else "Type a species name...",
                                       searchField = list("label", "value"),
                                       render = I("{
                                         option: function(item, escape) {
@@ -2227,7 +2227,11 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
     }
 
-    observeEvent(input$submit, {
+    # Defensive wrapper: any uncaught R error inside this observer would kill
+    # the Shiny worker (user sees "disconnected from server"). We trap here,
+    # log to console (which shows up in shinyapps.io logs), and surface a
+    # friendly notification so the user can recover instead of refreshing.
+    safe_submit_body <- function() {
       # Sync step 2 and step 3 fields to hidden inputs before validation
       sync_step2_to_hidden()
       sync_step3_to_hidden()
@@ -2443,6 +2447,16 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
 
       # Proceed with submit
       perform_submit(reuse_soil_data = NULL)
+    }
+
+    observeEvent(input$submit, {
+      tryCatch(safe_submit_body(), error = function(e) {
+        message("submit observer error: ", conditionMessage(e))
+        showNotification(
+          paste("Something went wrong saving this entry:", conditionMessage(e),
+                "— please try again, or contact edaphicflora@gmail.com if it keeps happening."),
+          type = "error", duration = 12)
+      })
     })
 
     # Reactive flag set by the duplicate-confirm modal to bypass the check
@@ -2452,7 +2466,12 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
     observeEvent(input$confirm_duplicate, {
       removeModal()
       duplicate_acknowledged(TRUE)
-      perform_submit(reuse_soil_data = NULL)
+      tryCatch(perform_submit(reuse_soil_data = NULL), error = function(e) {
+        message("perform_submit (post-confirm) error: ", conditionMessage(e))
+        showNotification(
+          paste("Save failed:", conditionMessage(e)),
+          type = "error", duration = 10)
+      })
     })
 
   })
