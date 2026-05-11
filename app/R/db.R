@@ -1484,8 +1484,16 @@ db_get_native_species_for_genus <- function(genus, state_code, pool) {
 # User Disable / Ban
 # ---------------------------
 
-#' Check whether a user is banned. Fail-CLOSED: on DB error, treat as disabled
-#' to err on the side of blocking abuse during DB hiccups.
+#' Check whether a user is banned.
+#'
+#' Failure mode handling:
+#'  - "relation does not exist" (table not yet migrated) → return FALSE.
+#'    If the ban infrastructure isn't deployed, nobody can be banned by
+#'    definition. Treating this as "banned" was a deploy-time foot-gun that
+#'    locked out every user on first launch because the shiny_app role
+#'    couldn't CREATE TABLE.
+#'  - Any other DB error → fail CLOSED (treat as banned) so a Postgres
+#'    hiccup doesn't let an active spam attack through unchecked.
 db_is_user_disabled <- function(user_id, pool = NULL) {
   if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
   p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
@@ -1495,8 +1503,13 @@ db_is_user_disabled <- function(user_id, pool = NULL) {
       params = list(user_id))
     nrow(res) > 0
   }, error = function(e) {
-    message("db_is_user_disabled error: ", e$message)
-    # Fail closed — if we can't verify, treat as suspicious
+    msg <- conditionMessage(e)
+    if (grepl("disabled_users.*does not exist|relation .* does not exist",
+              msg, ignore.case = TRUE)) {
+      # Table not deployed — assume nobody is banned.
+      return(FALSE)
+    }
+    message("db_is_user_disabled error: ", msg)
     TRUE
   })
 }
