@@ -4,9 +4,13 @@
 # ---------------------------
 # Null-coalescing operator (canonical definition)
 # ---------------------------
-# Robust version: handles NULL, empty, all-NA, data frames, lists
+# Robust version: handles NULL, empty, all-NA, data frames, lists.
+# Environments / R6 / Pool objects pass through as-is — they're not values
+# we'd ever want to coalesce, and applying is.na/[ to them crashes (which
+# previously took down the Shiny worker on submit).
 `%||%` <- function(a, b) {
  if (is.null(a)) return(b)
+ if (is.environment(a)) return(a)
  if (is.data.frame(a)) a <- as.list(a[1, , drop = TRUE])
  if (is.list(a)) a <- unlist(a, use.names = FALSE)
  if (!length(a) || all(is.na(a))) return(b)

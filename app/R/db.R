@@ -1496,7 +1496,7 @@ db_get_native_species_for_genus <- function(genus, state_code, pool) {
 #'    hiccup doesn't let an active spam attack through unchecked.
 db_is_user_disabled <- function(user_id, pool = NULL) {
   if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
-  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  p <- if (is.null(pool)) get("pool", envir = .GlobalEnv, inherits = TRUE) else pool
   tryCatch({
     res <- dbGetQuery(p,
       "SELECT 1 FROM disabled_users WHERE user_id = $1 LIMIT 1",
@@ -1516,7 +1516,7 @@ db_is_user_disabled <- function(user_id, pool = NULL) {
 
 db_disable_user <- function(user_id, reason, admin_uid, pool = NULL) {
   if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
-  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  p <- if (is.null(pool)) get("pool", envir = .GlobalEnv, inherits = TRUE) else pool
   tryCatch({
     dbExecute(p,
       "INSERT INTO disabled_users (user_id, disabled_by, reason) VALUES ($1, $2, $3)
@@ -1531,7 +1531,7 @@ db_disable_user <- function(user_id, reason, admin_uid, pool = NULL) {
 
 db_enable_user <- function(user_id, pool = NULL) {
   if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
-  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  p <- if (is.null(pool)) get("pool", envir = .GlobalEnv, inherits = TRUE) else pool
   tryCatch({
     dbExecute(p, "DELETE FROM disabled_users WHERE user_id = $1", params = list(user_id))
     TRUE
@@ -1539,7 +1539,7 @@ db_enable_user <- function(user_id, pool = NULL) {
 }
 
 db_list_disabled_users <- function(pool = NULL) {
-  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  p <- if (is.null(pool)) get("pool", envir = .GlobalEnv, inherits = TRUE) else pool
   tryCatch({
     dbGetQuery(p,
       "SELECT user_id, disabled_at, disabled_by, reason
@@ -1551,7 +1551,7 @@ db_list_disabled_users <- function(pool = NULL) {
 #' bulk-moderation flow when reacting to spam — much faster than per-row flagging.
 db_flag_samples_by_user <- function(user_id, reason, pool = NULL) {
   if (is.null(user_id) || !nzchar(user_id)) return(0L)
-  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  p <- if (is.null(pool)) get("pool", envir = .GlobalEnv, inherits = TRUE) else pool
   tryCatch({
     n <- dbExecute(p,
       "UPDATE soil_samples
