@@ -1,0 +1,10 @@
+name: edaphic-flora
+title:
+username: toddtesterman
+account: toddtesterman
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16446218
+bundleId: 11980923
+url: https://toddtesterman.shinyapps.io/edaphic-flora/
+version: 1
