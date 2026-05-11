@@ -1,0 +1,4 @@
+# rsconnect bundle exclusions for app/R/ — see app/.rscignore for the mechanism.
+
+# ETL scripts only run during data-prep, not at request time.
+etl

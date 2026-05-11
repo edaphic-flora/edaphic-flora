@@ -1,0 +1,16 @@
+# rsconnect bundle exclusions for app/data/ — see app/.rscignore for the
+# mechanism. Bare filenames match files in this directory; bare subdir names
+# skip recursion into them.
+
+# Reference CSVs where prod loads the smaller RDS sibling.
+ecoregion_grid.csv
+zipcode_lookup.csv
+
+# Heavy artefact only loaded in dev (sf / ecoregions disabled in prod).
+ecoregions_simplified.rds
+
+# No live code references in app/.
+wcvp_species_min.rds
+
+# Raw data is ETL-only; entire subtree skipped.
+raw

@@ -598,7 +598,10 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         uiOutput(ns("pdf_extract_status")),
         helpText(class = "text-muted small",
                  "Upload a soil report to auto-fill the form. ",
-                 "Supports PDF, RTF, TXT, and images (PNG, JPG).")
+                 "Supports PDF, RTF, TXT, and images (PNG, JPG). Max 15 MB. ",
+                 tags$br(),
+                 tags$em("Tip: rename the file to remove personal info (your name, address) ",
+                         "before uploading — the filename is logged."))
       )
     })
 

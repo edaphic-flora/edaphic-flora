@@ -1,0 +1,29 @@
+# rsconnect bundle exclusions for app/ (top level only).
+#
+# IMPORTANT: rsconnect 1.x's .rscignore is per-directory and uses literal
+# string match (no globs, no recursion). Each subdirectory that needs
+# filtering must have its own .rscignore with bare filenames/subdir names.
+# See app/data/.rscignore, app/data/raw/.rscignore, app/R/.rscignore.
+#
+# Verify a change worked:
+#   Rscript -e "rsconnect::listBundleFiles('app')$contents"
+
+# --- Reference CSV; smaller RDS sibling is what prod loads ---
+species_accepted.csv
+
+# --- Generator + dev scripts at app root ---
+generate_ecoregion_grid.R
+generate_simplified_ecoregions.R
+generate_zipcode_db.R
+fetch_usda_data.R
+
+# --- Dev-only subdirs (entire trees skipped, no recursion needed) ---
+scripts
+docs
+
+# --- Legacy ignore files that no current rsconnect version honors ---
+.rsconnectignore
+.rconnectignore
+
+# --- Local-only template (real .Renviron must ship; example does not) ---
+.renviron.example
