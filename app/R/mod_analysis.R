@@ -372,11 +372,10 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         sprintf("%.1f - %.1f", min(dat$ph, na.rm = TRUE), max(dat$ph, na.rm = TRUE))
       } else "-"
 
+      # Sidebar no longer renders an Early Access banner — the pane-level
+      # threshold_pane_banner shows it above the chart tabs, where it's
+      # harder to miss and travels with screenshots.
       tagList(
-        # Early access banner when below threshold
-        if (!stats_check$meets_threshold && n_samples > 0) {
-          early_access_ui(stats_check$n_samples, stats_check$n_contributors)
-        },
         div(class = "small",
           div(class = "d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom",
             span(class = "fw-bold", style = "color: #7A9A86;", paste(n_samples, "samples")),
