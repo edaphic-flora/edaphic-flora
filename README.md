@@ -20,7 +20,7 @@ Edaphic Flora is an open-source R Shiny application for recording and analyzing 
 
 ## Project Status
 
-**Beta** — Open for early users. Core features are stable and actively used. We're collecting real soil data and building the community dataset. Create an account at [toddtesterman.shinyapps.io/edaphic-flora](https://toddtesterman.shinyapps.io/edaphic-flora/) or contact edaphicflora@gmail.com.
+**Beta** — Open for early users. Core features are stable and actively used. We're collecting real soil data and building the community dataset. Create an account at [edaphicflora.shinyapps.io/edaphic-flora](https://edaphicflora.shinyapps.io/edaphic-flora/) or contact edaphicflora@gmail.com.
 
 ## Features
 
