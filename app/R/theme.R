@@ -1089,8 +1089,10 @@ edaphic_css <- function() {
     }
 
     .tab-scroll-arrows .btn {
-      width: 36px;
-      height: 36px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
       border-radius: 50%;
       background: #7A9A86;
       color: white;

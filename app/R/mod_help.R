@@ -13,6 +13,81 @@ helpUI <- function(id) {
     icon = icon("circle-question"),
     align = "right",
 
+    # About — trust signal for first-time visitors: who built this and why.
+    nav_panel(
+      title = "About",
+      icon = icon("circle-info"),
+      layout_columns(
+        col_widths = 12,
+        card(
+          card_header(icon("circle-info"), "About Edaphic Flora"),
+          card_body(
+            class = "px-md-5",
+
+            p(class = "lead",
+              "Real soil data for real growing conditions — better data from the ground up."),
+
+            h4(class = "mt-3", "Who runs this"),
+            p("Edaphic Flora is built and maintained by ",
+              tags$strong("Todd Testerman"),
+              ", a solo developer. The project started as a way to track his own garden’s ",
+              "soil tests alongside what was thriving and what wasn’t, and grew into a shared ",
+              "database for anyone interested in the same question."),
+            p("Questions, bug reports, and feature ideas all go to ",
+              tags$a(href = "mailto:edaphicflora@gmail.com", "edaphicflora@gmail.com"),
+              " — there’s a real person on the other end."),
+
+            h4(class = "mt-4", "Why it exists"),
+            p("The goal is precision: a clearer picture of which soil conditions a species ",
+              "actually thrives or struggles in. Real soils vary widely — sandy, clayey, acidic, ",
+              "alkaline, low or high in any given nutrient — and plant performance shifts with ",
+              "them. By collecting lab-quality soil tests from the real sites where plants are ",
+              "growing, paired with how those plants are doing, the database lets useful ",
+              "patterns emerge as it grows."),
+
+            h4(class = "mt-4", "Open-source and beta"),
+            p("The whole app is open-source under AGPL-3.0 — the code, the schema, the ",
+              "data ETL, all on GitHub. The app itself is in active beta, which means rough ",
+              "edges and occasional changes. Submitted soil data is shared publicly under ",
+              "CC BY-NC 4.0 so others can build on it."),
+            div(class = "d-flex flex-wrap gap-2 mt-3",
+              tags$a(href = "https://github.com/edaphic-flora/edaphic-flora",
+                     target = "_blank",
+                     class = "btn btn-sm",
+                     style = "background-color: #7A9A86; color: white; font-family: 'Montserrat', sans-serif; font-weight: 600;",
+                     icon("github"), " Source on GitHub"),
+              tags$a(href = "https://edaphic-flora.github.io/",
+                     target = "_blank",
+                     class = "btn btn-sm btn-outline-secondary",
+                     style = "font-family: 'Montserrat', sans-serif; font-weight: 600;",
+                     icon("globe"), " Project site"),
+              tags$a(href = "https://buymeacoffee.com/toddtesterman",
+                     target = "_blank",
+                     class = "btn btn-sm btn-outline-secondary",
+                     style = "font-family: 'Montserrat', sans-serif; font-weight: 600;",
+                     icon("mug-hot"), " Buy me a coffee")
+            ),
+
+            h4(class = "mt-4", "Privacy and data"),
+            p("The full ",
+              tags$a(href = "privacy.html", target = "_blank", "privacy policy"),
+              " and ",
+              tags$a(href = "terms.html", target = "_blank", "terms of service"),
+              " are available, but the short version: your account email stays private, ",
+              "submitted soil data is published to the community under CC BY-NC 4.0, ",
+              "and you can delete your account by emailing the address above."),
+
+            hr(class = "my-4"),
+            div(class = "text-center text-muted small",
+              "Edaphic Flora · Beta · ",
+              tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Feedback",
+                     "Send feedback")
+            )
+          )
+        )
+      )
+    ),
+
     # Field Guide
     nav_panel(
       title = "Field Guide",
