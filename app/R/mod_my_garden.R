@@ -256,6 +256,32 @@ myGardenUI <- function(id) {
 # Server
 # ---------------------------
 
+# State code → display name. Used by nonnative_summary to label the user's
+# home state in the introduced/invasive panels. Same table as
+# get_native_status_for_user in usda.R; duplicated here so the batch path
+# does not have to call that function.
+.my_garden_state_names <- c(
+  AL = "Alabama", AK = "Alaska", AZ = "Arizona", AR = "Arkansas", CA = "California",
+  CO = "Colorado", CT = "Connecticut", DE = "Delaware", FL = "Florida", GA = "Georgia",
+  HI = "Hawaii", ID = "Idaho", IL = "Illinois", IN = "Indiana", IA = "Iowa",
+  KS = "Kansas", KY = "Kentucky", LA = "Louisiana", ME = "Maine", MD = "Maryland",
+  MA = "Massachusetts", MI = "Michigan", MN = "Minnesota", MS = "Mississippi", MO = "Missouri",
+  MT = "Montana", NE = "Nebraska", NV = "Nevada", NH = "New Hampshire", NJ = "New Jersey",
+  NM = "New Mexico", NY = "New York", NC = "North Carolina", ND = "North Dakota", OH = "Ohio",
+  OK = "Oklahoma", OR = "Oregon", PA = "Pennsylvania", RI = "Rhode Island", SC = "South Carolina",
+  SD = "South Dakota", TN = "Tennessee", TX = "Texas", UT = "Utah", VT = "Vermont",
+  VA = "Virginia", WA = "Washington", WV = "West Virginia", WI = "Wisconsin", WY = "Wyoming",
+  DC = "District of Columbia", PR = "Puerto Rico", VI = "Virgin Islands"
+)
+
+# Coerce a (possibly mixed-NA) logical/character column to a plain logical
+# vector with NA → FALSE. Used to normalize the EXISTS column from Postgres.
+isTRUE_vec <- function(x) {
+  if (is.logical(x)) return(!is.na(x) & x)
+  res <- as.logical(x)
+  !is.na(res) & res
+}
+
 myGardenServer <- function(id, pool, current_user, data_changed,
                             user_prefs, common_name_db, experience_level = NULL,
                             zipcode_db = NULL, prefs_changed = NULL) {
@@ -315,8 +341,9 @@ myGardenServer <- function(id, pool, current_user, data_changed,
     })
 
     # --- Reactive: classify every garden species (non-natives only listed) ---
-    # Composes the existing cached helpers and attaches species-level wildlife counts.
-    # Splits into introduced (non-invasive) and invasive views downstream.
+    # Single batched DB call (db_get_garden_classification_batch) replaces the
+    # old per-species loop, which was N × ~4 round-trips. Native classification
+    # and invasive flags are computed vectorized in R from the raw fields.
     nonnative_summary <- reactive({
       sp <- garden_species()
       prefs <- user_prefs()
@@ -332,27 +359,75 @@ myGardenServer <- function(id, pool, current_user, data_changed,
         stringsAsFactors = FALSE
       )
       if (length(sp) == 0) return(empty)
+      if (is.null(prefs) || is.null(prefs$home_state) || !nzchar(prefs$home_state)) {
+        # Mirrors the old behavior: no home state → no_prefs status → filtered out.
+        return(empty)
+      }
 
-      rows <- lapply(sp, function(s) {
-        nat <- get_native_status_for_user(s, prefs, pool)
-        if (!nat$status %in% c("introduced", "introduced_na", "both")) return(NULL)
-        inv <- get_invasive_status(s, nat$state_code, pool)
-        data.frame(
-          species = s,
-          common_name = get_common_name(s) %||% NA_character_,
-          native_status = nat$status,
-          state_code = nat$state_code %||% NA_character_,
-          state_name = nat$state_name %||% NA_character_,
-          is_invasive_in_state = isTRUE(inv$in_user_state) || isTRUE(inv$is_federal),
-          is_federal = isTRUE(inv$is_federal),
-          invasive_designation = inv$user_state_designation %||% NA_character_,
-          other_states = length(setdiff(inv$states_listed, toupper(nat$state_code %||% ""))),
-          stringsAsFactors = FALSE
-        )
-      })
-      rows <- Filter(Negate(is.null), rows)
-      if (length(rows) == 0) return(empty)
-      df <- do.call(rbind, rows)
+      home_state <- toupper(prefs$home_state)
+      state_name <- .my_garden_state_names[home_state] %||% home_state
+
+      raw <- db_get_garden_classification_batch(sp, home_state, pool)
+      if (nrow(raw) == 0) return(empty)
+
+      # Map state-level native_status (Native/Introduced/Both) to the same
+      # status codes get_native_status_for_user returns, with NA fallback to
+      # the parsed NA-level string from ref_usda_traits.
+      classify <- function(state_status, na_str) {
+        if (!is.na(state_status) && nzchar(state_status)) {
+          return(switch(state_status,
+                        Native     = "native",
+                        Introduced = "introduced",
+                        Both       = "both",
+                        "unknown"))
+        }
+        # Fall back to NA-level. parse_native_status_na is defined in usda.R
+        # and handles NA/empty input gracefully.
+        parsed <- parse_native_status_na(na_str)
+        switch(parsed$status,
+               native     = "native_na",
+               introduced = "introduced_na",
+               both       = "native_na",   # parity with old code's both→native_na
+               "unknown")
+      }
+      raw$native_class <- mapply(classify,
+                                 raw$state_native_status,
+                                 raw$na_native_status_str,
+                                 USE.NAMES = FALSE)
+
+      # Filter to non-natives (matches old loop's `if (!nat$status %in% …) NULL`).
+      raw <- raw[raw$native_class %in% c("introduced", "introduced_na", "both"), , drop = FALSE]
+      if (nrow(raw) == 0) return(empty)
+
+      # Vectorized invasive flags. is_invasive_in_state is true when listed in
+      # user's state OR federally noxious. Designation prefers federal,
+      # falling back to user-state record. other_states excludes user state.
+      is_federal <- isTRUE_vec(raw$is_federal_invasive)
+      listed_in_state <- !is.na(raw$user_state_invasive_designation) &
+                         nzchar(raw$user_state_invasive_designation)
+      is_invasive_in_state <- is_federal | listed_in_state
+      designation <- ifelse(is_federal & !is.na(raw$federal_designation),
+                            raw$federal_designation,
+                            raw$user_state_invasive_designation)
+      other_states_count <- vapply(raw$invasive_state_codes, function(codes) {
+        length(setdiff(codes, home_state))
+      }, integer(1))
+
+      df <- data.frame(
+        species = raw$species,
+        common_name = vapply(raw$species,
+                             function(s) get_common_name(s) %||% NA_character_,
+                             character(1), USE.NAMES = FALSE),
+        native_status = raw$native_class,
+        state_code = home_state,
+        state_name = state_name,
+        is_invasive_in_state = is_invasive_in_state,
+        is_federal = is_federal,
+        invasive_designation = ifelse(is.na(designation) | !nzchar(designation),
+                                      NA_character_, designation),
+        other_states = as.integer(other_states_count),
+        stringsAsFactors = FALSE
+      )
 
       counts <- db_get_species_level_wildlife_counts(df$species, pool, st)
       df <- merge(df, counts, by = "species", all.x = TRUE, sort = FALSE)

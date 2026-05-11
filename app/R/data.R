@@ -271,6 +271,44 @@ build_species_search_index <- function(species_db, common_name_db) {
 }
 
 # ---------------------------
+# Welcome Stats Cache (process-wide, shared across sessions)
+# ---------------------------
+
+# A single mutable env so all sessions read the same numbers without paying
+# for a fresh COUNT(DISTINCT …) query each render. Refreshed at startup and
+# whenever data_changed fires. See mod_welcome.R for the read path.
+welcome_stats_env <- new.env(parent = emptyenv())
+welcome_stats_env$value <- NULL
+
+refresh_welcome_stats <- function(pool) {
+  res <- tryCatch({
+    DBI::dbGetQuery(pool, "
+      SELECT COUNT(*)::int AS samples,
+             COUNT(DISTINCT species)::int AS species,
+             COUNT(DISTINCT created_by)::int AS users,
+             COUNT(DISTINCT CASE WHEN ecoregion_l4 IS NOT NULL THEN ecoregion_l4 END)::int AS ecoregions
+      FROM soil_samples
+      WHERE flagged IS NULL OR flagged = FALSE
+    ")
+  }, error = function(e) {
+    message("refresh_welcome_stats error: ", e$message)
+    NULL
+  })
+
+  if (!is.null(res) && nrow(res) > 0) {
+    welcome_stats_env$value <- list(
+      samples    = as.integer(res$samples[1]),
+      species    = as.integer(res$species[1]),
+      users      = as.integer(res$users[1]),
+      ecoregions = as.integer(res$ecoregions[1])
+    )
+  }
+  invisible(welcome_stats_env$value)
+}
+
+get_welcome_stats <- function() welcome_stats_env$value
+
+# ---------------------------
 # Soil Texture Classes
 # ---------------------------
 

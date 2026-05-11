@@ -185,7 +185,9 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
     observe({
       data_changed()
       sp <- tryCatch({
-        res <- dbGetQuery(pool, "SELECT DISTINCT species FROM soil_samples ORDER BY species")
+        res <- dbGetQuery(pool, "SELECT DISTINCT species FROM soil_samples
+                                 WHERE flagged IS NULL OR flagged = FALSE
+                                 ORDER BY species")
         if (nrow(res) > 0) res$species else character(0)
       }, error = function(e) character(0))
 
@@ -418,6 +420,14 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       dat <- species_data()
       if (nrow(dat) == 0) return(dat)
 
+      # Gate behind public-stats threshold so a single n=1 submission can't
+      # render aggregate charts (pH, nutrients, texture, map, performance) that
+      # look authoritative. The Early Access banner in species_summary explains
+      # what's missing. USDA reference views still render via separate paths.
+      if (!species_stats_check()$meets_threshold) {
+        return(dat[0, , drop = FALSE])
+      }
+
       if (nzchar(input$filter_outcome %||% "")) {
         dat <- dat[!is.na(dat$outcome) & dat$outcome == input$filter_outcome, , drop = FALSE]
       }
@@ -443,8 +453,19 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (!nzchar(sp)) return(NULL)
 
       total <- nrow(species_data())
-      filtered <- nrow(filtered_species_data())
+      if (total == 0) return(NULL)
 
+      # If gated below threshold, filtered_species_data returns empty — show
+      # honest "early access" message instead of misleading "0 of N".
+      if (!species_stats_check()$meets_threshold) {
+        return(span(class = "small text-warning",
+                    icon("flask"),
+                    sprintf(" %d sample%s — charts unlock at %d",
+                            total, if (total == 1) "" else "s",
+                            MIN_SAMPLES_FOR_PUBLIC_STATS)))
+      }
+
+      filtered <- nrow(filtered_species_data())
       if (total == filtered) {
         span(class = "small text-muted", icon("check"), sprintf(" Showing all %d", total))
       } else {
@@ -552,6 +573,7 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
         dbGetQuery(pool, "
           SELECT species, COUNT(*) as n
           FROM soil_samples
+          WHERE flagged IS NULL OR flagged = FALSE
           GROUP BY species
           HAVING COUNT(*) >= 10
           ORDER BY COUNT(*) DESC
@@ -1555,16 +1577,20 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
                           "Struggling" = "#B8956A", "Failed/Died" = "#A66A62")
       has_outcome <- sum(!is.na(dat$outcome)) > 0
 
+      # Defensive: every interpolated field is server-controlled (validated
+      # selectInput choices or numeric), but escape anyway so a future
+      # addition (e.g. cultivar, notes) doesn't introduce XSS via this popup.
+      esc <- function(x) htmltools::htmlEscape(x, attribute = FALSE)
       dat$popup <- paste0(
-        "<strong>", dat$species, "</strong><br>",
-        "<b>pH:</b> ", dat$ph, "<br>",
-        "<b>OM:</b> ", dat$organic_matter, "%<br>",
-        "<b>Texture:</b> ", dat$texture_class, "<br>",
-        ifelse(!is.na(dat$outcome), paste0("<b>Outcome:</b> ", dat$outcome, "<br>"), ""),
-        ifelse(!is.na(dat$sun_exposure), paste0("<b>Sun:</b> ", dat$sun_exposure, "<br>"), ""),
-        ifelse(!is.na(dat$site_hydrology), paste0("<b>Hydrology:</b> ", dat$site_hydrology, "<br>"), ""),
-        "<b>Date:</b> ", dat$date,
-        ifelse(!is.na(dat$ecoregion_l4), paste0("<br><b>Ecoregion:</b> ", dat$ecoregion_l4), "")
+        "<strong>", esc(dat$species), "</strong><br>",
+        "<b>pH:</b> ", esc(dat$ph), "<br>",
+        "<b>OM:</b> ", esc(dat$organic_matter), "%<br>",
+        "<b>Texture:</b> ", esc(dat$texture_class), "<br>",
+        ifelse(!is.na(dat$outcome), paste0("<b>Outcome:</b> ", esc(dat$outcome), "<br>"), ""),
+        ifelse(!is.na(dat$sun_exposure), paste0("<b>Sun:</b> ", esc(dat$sun_exposure), "<br>"), ""),
+        ifelse(!is.na(dat$site_hydrology), paste0("<b>Hydrology:</b> ", esc(dat$site_hydrology), "<br>"), ""),
+        "<b>Date:</b> ", esc(dat$date),
+        ifelse(!is.na(dat$ecoregion_l4), paste0("<br><b>Ecoregion:</b> ", esc(dat$ecoregion_l4)), "")
       )
 
       if (has_outcome) {

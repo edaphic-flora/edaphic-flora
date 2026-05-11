@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last updated: January 2025**
+**Last updated: 2026-05-11**
 
 Welcome to Edaphic Flora! By using this application, you agree to these terms.
 

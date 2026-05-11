@@ -10,7 +10,7 @@ library(pool)
 # Column Whitelist
 # ---------------------------
 SOIL_SAMPLE_COLUMNS <- c(
-  "species", "cultivar", "ph", "organic_matter", "organic_matter_class",
+  "species", "cultivar", "ph", "organic_matter",
   "nitrate_ppm", "ammonium_ppm", "phosphorus_ppm", "potassium_ppm",
   "calcium_ppm", "magnesium_ppm", "sulfur_ppm", "iron_ppm", "manganese_ppm",
   "zinc_ppm", "boron_ppm", "copper_ppm", "soluble_salts_ppm",
@@ -42,7 +42,23 @@ pool <- dbPool(
 # Schema Migration (idempotent)
 # ---------------------------
 
+# Bump this whenever the DDL block in db_migrate() changes. The fast-path
+# check below short-circuits when the DB already records this version,
+# turning the 66-statement migration into a single SELECT round-trip.
+SCHEMA_VERSION <- 3L
+
 db_migrate <- function() {
+  # Fast path: one round-trip. If schema_version table reports the current
+  # version, skip the full DDL block entirely.
+  current_version <- tryCatch({
+    res <- dbGetQuery(pool, "SELECT version FROM schema_version LIMIT 1")
+    if (nrow(res) > 0) as.integer(res$version[1]) else 0L
+  }, error = function(e) NA_integer_)
+
+  if (!is.na(current_version) && current_version >= SCHEMA_VERSION) {
+    return(TRUE)
+  }
+
   tryCatch({
     dbExecute(pool, "
       CREATE TABLE IF NOT EXISTS soil_samples (
@@ -91,8 +107,10 @@ db_migrate <- function() {
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS copper_ppm NUMERIC")
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS cec_meq NUMERIC")
 
-    # Qualitative organic matter class (added 2025-01)
-    dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS organic_matter_class VARCHAR(50)")
+    # organic_matter_class dropped 2026-05-11 — descriptors aren't comparable
+    # across lab methods. Storage is numeric % only; users convert descriptors
+    # via their lab's own chart before entry.
+    dbExecute(pool, "ALTER TABLE soil_samples DROP COLUMN IF EXISTS organic_matter_class")
 
     # Level III ecoregion columns (added 2025-01)
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS ecoregion_l3 VARCHAR(255)")
@@ -263,6 +281,32 @@ db_migrate <- function() {
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE")
     dbExecute(pool, "ALTER TABLE soil_samples ADD COLUMN IF NOT EXISTS flag_reason TEXT")
 
+    # Admin kill-switch: ban a user from new submissions / exports / extractions.
+    # Existing samples are not auto-removed — admin can bulk-flag separately.
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS disabled_users (
+        user_id TEXT PRIMARY KEY,
+        disabled_at TIMESTAMPTZ DEFAULT now(),
+        disabled_by TEXT,
+        reason TEXT
+      )
+    ")
+
+    # Record current schema version so future startups can short-circuit.
+    # Single-row table enforced by id=1 CHECK; upsert keeps it idempotent.
+    dbExecute(pool, "
+      CREATE TABLE IF NOT EXISTS schema_version (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        version INTEGER NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT schema_version_single_row CHECK (id = 1)
+      )
+    ")
+    dbExecute(pool,
+      "INSERT INTO schema_version (id, version) VALUES (1, $1)
+       ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version, updated_at = now()",
+      params = list(SCHEMA_VERSION))
+
     TRUE
   }, error = function(e) {
     # Ignore permission errors - schema likely already exists in production
@@ -277,9 +321,14 @@ db_migrate <- function() {
 # Query Functions
 # ---------------------------
 
-db_get_all_samples <- function(limit = NULL) {
+#' Fetch all samples. Defaults to filtering out flagged rows so callers don't
+#' accidentally leak moderated data to public surfaces (exports, charts,
+#' similar-species matching). Admin callers pass include_flagged = TRUE.
+db_get_all_samples <- function(limit = NULL, include_flagged = FALSE) {
   tryCatch({
-    sql <- paste("SELECT", SOIL_SAMPLE_SELECT, "FROM soil_samples ORDER BY created_at DESC")
+    where_clause <- if (include_flagged) "" else " WHERE flagged IS NULL OR flagged = FALSE"
+    sql <- paste0("SELECT ", SOIL_SAMPLE_SELECT, " FROM soil_samples",
+                  where_clause, " ORDER BY created_at DESC")
     if (!is.null(limit) && is.numeric(limit) && limit > 0) {
       sql <- paste(sql, "LIMIT", as.integer(limit))
     }
@@ -304,9 +353,14 @@ db_get_species_data <- function(species, limit = NULL) {
   })
 }
 
-db_get_unique_species <- function() {
+db_get_unique_species <- function(include_flagged = FALSE) {
   tryCatch({
-    res <- dbGetQuery(pool, "SELECT DISTINCT species FROM soil_samples ORDER BY species")
+    sql <- if (include_flagged) {
+      "SELECT DISTINCT species FROM soil_samples ORDER BY species"
+    } else {
+      "SELECT DISTINCT species FROM soil_samples WHERE flagged IS NULL OR flagged = FALSE ORDER BY species"
+    }
+    res <- dbGetQuery(pool, sql)
     res$species
   }, error = function(e) {
     message("Error fetching unique species: ", e$message)
@@ -447,6 +501,7 @@ db_log_extraction <- function(user_id, filename = NULL, tokens_used = NULL) {
 }
 
 db_can_extract <- function(user_id, daily_limit = 5) {
+  if (db_is_user_disabled(user_id)) return(FALSE)
   count <- db_get_extraction_count_today(user_id)
   count < daily_limit
 }
@@ -514,7 +569,7 @@ db_get_user_soil_profiles <- function(user_id, limit = 10) {
     # Use the most recent entry for each unique soil test
     query <- "
       SELECT DISTINCT ON (ph, organic_matter, texture_class)
-        id, date, created_at, ph, organic_matter, organic_matter_class,
+        id, date, created_at, ph, organic_matter,
         texture_class, texture_sand, texture_silt, texture_clay,
         nitrate_ppm, ammonium_ppm, phosphorus_ppm, potassium_ppm,
         calcium_ppm, magnesium_ppm, sulfur_ppm, cec_meq, soluble_salts_ppm,
@@ -542,7 +597,7 @@ db_get_soil_data_by_id <- function(entry_id) {
 
   tryCatch({
     query <- "
-      SELECT ph, organic_matter, organic_matter_class,
+      SELECT ph, organic_matter,
              texture_class, texture_sand, texture_silt, texture_clay,
              nitrate_ppm, ammonium_ppm, phosphorus_ppm, potassium_ppm,
              calcium_ppm, magnesium_ppm, sulfur_ppm, cec_meq, soluble_salts_ppm,
@@ -832,6 +887,139 @@ db_get_user_garden_species <- function(user_id, pool) {
   }, error = function(e) {
     message("Error fetching garden species: ", e$message)
     character()
+  })
+}
+
+#' Batch-classify a list of garden species for the My Garden non-native panel.
+#'
+#' Replaces the per-species N+1 loop in `nonnative_summary` (which fired
+#' 3-5 round-trips per species via get_native_status_for_user/get_invasive_status).
+#' This issues a single round-trip that returns the raw fields needed to
+#' compute native_class + invasive flags downstream in R.
+#'
+#' @param species_list Character vector of "Genus species" names.
+#' @param state_code Two-letter US state code (user's home state). If NULL/blank
+#'   the function returns an empty frame — matches old behavior, since
+#'   nonnative_summary collapses to empty without a home state.
+#' @param pool Database connection pool.
+#' @return Data frame, one row per input species, with:
+#'   species, taxon_id, state_native_status, state_native_source,
+#'   na_native_status_str, is_federal_invasive (logical),
+#'   federal_designation, user_state_invasive_designation,
+#'   invasive_state_codes (list-column of character vectors).
+db_get_garden_classification_batch <- function(species_list, state_code, pool) {
+  empty <- data.frame(
+    species = character(0),
+    taxon_id = integer(0),
+    state_native_status = character(0),
+    state_native_source = character(0),
+    na_native_status_str = character(0),
+    is_federal_invasive = logical(0),
+    federal_designation = character(0),
+    user_state_invasive_designation = character(0),
+    invasive_state_codes = I(list()),
+    stringsAsFactors = FALSE
+  )
+  if (length(species_list) == 0) return(empty)
+  if (is.null(state_code) || !nzchar(state_code)) return(empty)
+  state_code <- toupper(state_code)
+  if (!grepl("^[A-Z]{2}$", state_code)) return(empty)
+
+  tryCatch({
+    con <- poolCheckout(pool)
+    on.exit(poolReturn(con), add = TRUE)
+
+    dbExecute(con, "DROP TABLE IF EXISTS tmp_garden_class")
+    dbExecute(con, "CREATE TEMP TABLE tmp_garden_class (species TEXT)")
+    dbWriteTable(con, "tmp_garden_class",
+                 data.frame(species = species_list, stringsAsFactors = FALSE),
+                 append = TRUE, temporary = TRUE, row.names = FALSE)
+
+    # Resolve each garden species to a taxon_id using the same 3-step
+    # fallback chain as resolve_taxon_id():
+    #   (1) ref_taxon.usda_symbol exact match,
+    #   (2) genus+species match on ref_taxon.scientific_name,
+    #   (3) genus+species match via ref_synonym.
+    # The synonym subselect references ref_synonym; if the table is missing
+    # the whole query fails and the tryCatch returns the empty frame,
+    # which preserves the old behavior of "unmatched → not classified".
+    query <- "
+      WITH garden_taxon AS (
+        SELECT
+          g.species,
+          COALESCE(
+            (SELECT id FROM ref_taxon
+               WHERE usda_symbol = upper(g.species) LIMIT 1),
+            (SELECT id FROM ref_taxon
+               WHERE lower(split_part(scientific_name, ' ', 1) || ' ' ||
+                           split_part(scientific_name, ' ', 2)) = lower(g.species)
+               LIMIT 1),
+            (SELECT t.id FROM ref_synonym s
+               JOIN ref_taxon t ON t.id = s.taxon_id
+               WHERE lower(split_part(s.synonym_name, ' ', 1) || ' ' ||
+                           split_part(s.synonym_name, ' ', 2)) = lower(g.species)
+               LIMIT 1)
+          ) AS taxon_id
+        FROM tmp_garden_class g
+      )
+      SELECT
+        gt.species,
+        gt.taxon_id,
+        (SELECT native_status FROM ref_state_distribution
+           WHERE taxon_id = gt.taxon_id AND state_code = $1
+           LIMIT 1) AS state_native_status,
+        (SELECT source FROM ref_state_distribution
+           WHERE taxon_id = gt.taxon_id AND state_code = $1
+           LIMIT 1) AS state_native_source,
+        (SELECT native_status FROM ref_usda_traits
+           WHERE taxon_id = gt.taxon_id AND native_status IS NOT NULL
+           LIMIT 1) AS na_native_status_str,
+        EXISTS (
+          SELECT 1 FROM ref_noxious_invasive
+          WHERE taxon_id = gt.taxon_id
+            AND (state_code IS NULL OR state_code = 'US')
+        ) AS is_federal_invasive,
+        (SELECT designation FROM ref_noxious_invasive
+           WHERE taxon_id = gt.taxon_id
+             AND (state_code IS NULL OR state_code = 'US')
+           LIMIT 1) AS federal_designation,
+        (SELECT designation FROM ref_noxious_invasive
+           WHERE taxon_id = gt.taxon_id AND state_code = $1
+           LIMIT 1) AS user_state_invasive_designation,
+        ARRAY(
+          SELECT DISTINCT state_code FROM ref_noxious_invasive
+          WHERE taxon_id = gt.taxon_id
+            AND state_code IS NOT NULL
+            AND state_code <> 'US'
+        ) AS invasive_state_codes
+      FROM garden_taxon gt
+    "
+
+    res <- dbGetQuery(con, query, params = list(state_code))
+
+    # RPostgres returns Postgres text[] either as a list-column of character
+    # vectors (modern versions) or as a character column holding the array
+    # literal "{AA,BB}" (older versions). Normalize to a list of plain
+    # character vectors either way.
+    res$invasive_state_codes <- if (is.list(res$invasive_state_codes)) {
+      lapply(res$invasive_state_codes, function(x) {
+        if (is.null(x)) return(character(0))
+        x <- x[!is.na(x) & nzchar(x)]
+        as.character(x)
+      })
+    } else {
+      lapply(res$invasive_state_codes, function(x) {
+        if (is.na(x) || !nzchar(x) || x == "{}") return(character(0))
+        inner <- sub("^\\{", "", sub("\\}$", "", x))
+        if (!nzchar(inner)) return(character(0))
+        parts <- strsplit(inner, ",", fixed = TRUE)[[1]]
+        gsub("^\"|\"$", "", parts)
+      })
+    }
+    res
+  }, error = function(e) {
+    message("db_get_garden_classification_batch error: ", e$message)
+    empty
   })
 }
 
@@ -1293,16 +1481,89 @@ db_get_native_species_for_genus <- function(genus, state_code, pool) {
 }
 
 # ---------------------------
+# User Disable / Ban
+# ---------------------------
+
+#' Check whether a user is banned. Fail-CLOSED: on DB error, treat as disabled
+#' to err on the side of blocking abuse during DB hiccups.
+db_is_user_disabled <- function(user_id, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  tryCatch({
+    res <- dbGetQuery(p,
+      "SELECT 1 FROM disabled_users WHERE user_id = $1 LIMIT 1",
+      params = list(user_id))
+    nrow(res) > 0
+  }, error = function(e) {
+    message("db_is_user_disabled error: ", e$message)
+    # Fail closed — if we can't verify, treat as suspicious
+    TRUE
+  })
+}
+
+db_disable_user <- function(user_id, reason, admin_uid, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  tryCatch({
+    dbExecute(p,
+      "INSERT INTO disabled_users (user_id, disabled_by, reason) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE SET
+         disabled_by = EXCLUDED.disabled_by,
+         reason = EXCLUDED.reason,
+         disabled_at = now()",
+      params = list(user_id, admin_uid %||% NA, reason %||% NA))
+    TRUE
+  }, error = function(e) { message("db_disable_user error: ", e$message); FALSE })
+}
+
+db_enable_user <- function(user_id, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  tryCatch({
+    dbExecute(p, "DELETE FROM disabled_users WHERE user_id = $1", params = list(user_id))
+    TRUE
+  }, error = function(e) { message("db_enable_user error: ", e$message); FALSE })
+}
+
+db_list_disabled_users <- function(pool = NULL) {
+  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  tryCatch({
+    dbGetQuery(p,
+      "SELECT user_id, disabled_at, disabled_by, reason
+       FROM disabled_users ORDER BY disabled_at DESC")
+  }, error = function(e) { data.frame() })
+}
+
+#' Flag every soil_samples row from a given user in one shot. Used by the admin
+#' bulk-moderation flow when reacting to spam — much faster than per-row flagging.
+db_flag_samples_by_user <- function(user_id, reason, pool = NULL) {
+  if (is.null(user_id) || !nzchar(user_id)) return(0L)
+  p <- pool %||% get("pool", envir = .GlobalEnv, inherits = TRUE)
+  tryCatch({
+    n <- dbExecute(p,
+      "UPDATE soil_samples
+       SET flagged = TRUE,
+           flag_reason = COALESCE(flag_reason, $2)
+       WHERE created_by = $1 AND (flagged IS NULL OR flagged = FALSE)",
+      params = list(user_id, reason %||% "Bulk flagged: user disabled"))
+    as.integer(n)
+  }, error = function(e) {
+    message("db_flag_samples_by_user error: ", e$message); 0L
+  })
+}
+
+# ---------------------------
 # Submission Rate Limiting
 # ---------------------------
 
-#' Check if a user is under the daily submission limit
+#' Check if a user is under the daily submission limit AND not banned.
 #' @param user_id Firebase UID
 #' @param pool Database connection pool
 #' @param max_per_day Maximum submissions per 24 hours (default 20)
-#' @return TRUE if under limit, FALSE if over
+#' @return TRUE if allowed to submit, FALSE if blocked
 db_check_submission_rate <- function(user_id, pool, max_per_day = 20) {
   if (is.null(user_id) || !nzchar(user_id)) return(FALSE)
+  if (db_is_user_disabled(user_id, pool)) return(FALSE)
   tryCatch({
     result <- dbGetQuery(pool,
       "SELECT COUNT(*)::int AS n FROM soil_samples
@@ -1311,8 +1572,9 @@ db_check_submission_rate <- function(user_id, pool, max_per_day = 20) {
     result$n[1] < max_per_day
   }, error = function(e) {
     message("Error checking submission rate: ", e$message)
-    # Fail open on DB error — don't block legitimate users
-    TRUE
+    # Fail CLOSED on DB error — pre-launch we'd rather inconvenience a legit
+    # user during a DB hiccup than let a spam burst through unmetered.
+    FALSE
   })
 }
 
@@ -1350,6 +1612,7 @@ db_check_duplicate <- function(species, user_id, pool) {
 #' @return TRUE if under limit, FALSE if over
 db_check_export_rate <- function(user_id, pool, max_per_day = 10) {
   if (is.null(user_id) || !nzchar(user_id)) return(TRUE)
+  if (db_is_user_disabled(user_id, pool)) return(FALSE)
   tryCatch({
     result <- dbGetQuery(pool,
       "SELECT COUNT(*)::int AS n FROM audit_log
@@ -1358,8 +1621,8 @@ db_check_export_rate <- function(user_id, pool, max_per_day = 10) {
     result$n[1] < max_per_day
   }, error = function(e) {
     message("Error checking export rate: ", e$message)
-    # Fail open on DB error
-    TRUE
+    # Fail CLOSED on DB error — see db_check_submission_rate for rationale.
+    FALSE
   })
 }
 

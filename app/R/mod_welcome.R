@@ -20,10 +20,10 @@ welcomeUI <- function(id) {
           # Beta banner - slim single line
           div(class = "alert alert-warning mb-2 mx-3 py-1 px-3", style = "font-size: 0.85rem;",
               icon("flask", class = "me-1", style = "color: #7A9A86;"),
-              tags$strong("Beta"), " \u2014 desktop optimized. ",
+              tags$strong("Beta"), " \u2014 ",
               tags$a(href = "mailto:edaphicflora@gmail.com?subject=Edaphic%20Flora%20Beta%20Feedback",
                      style = "color: #7A9A86; font-weight: 500;",
-                     "Send feedback", icon("envelope", class = "ms-1 fa-xs"))
+                     "send feedback", icon("envelope", class = "ms-1 fa-xs"))
           ),
           div(class = "text-center",
               tags$img(src = "readme_header.svg",
@@ -154,41 +154,21 @@ welcomeServer <- function(id, pool, data_changed) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # Cached stats — starts NULL, populated after initial page render
-    cached_stats <- reactiveVal(NULL)
+    # Read from the process-wide cache (primed at startup in app.R). This is a
+    # plain in-memory list lookup — no DB call, no network — so the home page
+    # renders the real numbers on first paint.
+    cached_stats <- reactiveVal(get_welcome_stats())
 
-    # Defer DB query until after first page render so skeleton shows immediately
-    session$onFlushed(function() {
-      later::later(function() {
-        fetch_stats()
-      }, delay = 0.1)
-    }, once = TRUE)
-
-    # Also re-fetch when data changes (e.g., after new submission)
+    # When data changes, refresh the global cache in the background and push
+    # the new numbers into the reactive when the query returns. The user
+    # never waits on this — they keep seeing the prior numbers until the
+    # async refresh lands.
     observeEvent(data_changed(), {
-      fetch_stats()
+      later::later(function() {
+        refresh_welcome_stats(pool)
+        cached_stats(get_welcome_stats())
+      }, delay = 0)
     }, ignoreInit = TRUE)
-
-    fetch_stats <- function() {
-      tryCatch({
-        res <- dbGetQuery(pool, "
-          SELECT COUNT(*)::int AS samples,
-                 COUNT(DISTINCT species)::int AS species,
-                 COUNT(DISTINCT created_by)::int AS users,
-                 COUNT(DISTINCT CASE WHEN ecoregion_l4 IS NOT NULL THEN ecoregion_l4 END)::int AS ecoregions
-          FROM soil_samples
-        ")
-        cached_stats(list(
-          samples = res$samples[1] %||% 0L,
-          species = res$species[1] %||% 0L,
-          users = res$users[1] %||% 0L,
-          ecoregions = res$ecoregions[1] %||% 0L
-        ))
-      }, error = function(e) {
-        message("Welcome stats error: ", e$message)
-        cached_stats(list(samples = 0, species = 0, users = 0, ecoregions = 0))
-      })
-    }
 
     # Replace skeleton with real stats once query returns
     output$stats <- renderUI({
@@ -214,7 +194,7 @@ welcomeServer <- function(id, pool, data_changed) {
           div(class = "col-6 border-end", stat_box(stats$users, "Contributors", "users")),
           div(class = "col-6", stat_box(stats$ecoregions, "Ecoregions", "map"))
         ),
-        seed_database_ui(stats$samples)
+        seed_database_ui(stats$users)
       )
     })
 
@@ -226,6 +206,7 @@ welcomeServer <- function(id, pool, data_changed) {
           SELECT location_lat, location_long, ecoregion_l4
           FROM soil_samples
           WHERE location_lat IS NOT NULL AND location_long IS NOT NULL
+            AND (flagged IS NULL OR flagged = FALSE)
         ")
       }, error = function(e) data.frame())
 

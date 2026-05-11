@@ -1,0 +1,10 @@
+analyte,rti_1,rti_2,rti_4,rti_6,rti_8,rti_10
+nitrate_n,0.3,0.9,1.8,3,6,12
+ammonia_n,,1,3,5,10,20
+phosphorus,0.2,0.5,1.0,1.9,2.9,4.8
+potassium,8,14,20,24,28,32
+calcium,100,150,200,300,400,500
+magnesium,0.5,1,2,5,10,20
+aluminum,0.5,1,2,5,10,20
+manganese,0.5,1,2,4,8,16
+iron,1.5,3,5,10,25,50

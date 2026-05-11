@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: January 2025**
+**Last updated: 2026-05-11**
 
 Edaphic Flora ("we," "our," or "us") is committed to protecting your privacy. This policy explains how we collect, use, and safeguard your information when you use our soil data application.
 
@@ -18,8 +18,7 @@ Edaphic Flora ("we," "our," or "us") is committed to protecting your privacy. Th
 - Outcome observations (thriving, struggling, etc.)
 
 ### Automatically Collected
-- Basic usage analytics (pages visited, features used)
-- Browser type and device information for compatibility
+- Server logs (request timestamps, errors) — kept short-term for operational debugging only; no third-party analytics, advertising, or tracking cookies are loaded.
 
 ## How We Use Your Information
 
@@ -59,9 +58,13 @@ We use the following services that may process your data:
 ## Your Rights
 
 You may:
-- **Access** your submitted data through the app
+- **Access** your submitted data through the app (My Data tab)
 - **Edit or delete** your own submissions at any time
-- **Request account deletion** by contacting us
+- **Request account deletion** by emailing edaphicflora@gmail.com — we typically action requests within 7 days
+
+## Moderation
+
+Admins may flag or hide individual submissions that appear erroneous, off-topic, or abusive. Repeated abuse or spam may result in an account being disabled (no new submissions, exports, or PDF extractions). Existing data from a disabled account is not auto-deleted; the data owner can still request deletion via email.
 
 ## Data Security
 

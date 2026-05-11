@@ -43,7 +43,7 @@ STATE_INVASIVE_URLS <- c(
   AR = "https://www.se-eppc.org/states/AR.cfm",
   CA = "https://www.cal-ipc.org/plants/inventory/",
   CO = "https://cwma.org/weed-information/",
-  CT = "https://cipwg.uconn.edu/invasive-plant-list/",
+  CT = "https://cipwg.uconn.edu/invasive_plant_list/",
   DE = "https://delawareinvasives.net/invasive-plants/",
   FL = "https://www.floridainvasives.org/",
   GA = "https://www.gaeppc.org/list/",
@@ -97,7 +97,7 @@ get_state_invasive_url <- function(state_code) {
 
 # Experience mode field definitions
 # Casual mode shows these fields only; everything else is hidden
-CASUAL_FIELDS <- c("ph", "organic_matter", "organic_matter_class",
+CASUAL_FIELDS <- c("ph", "organic_matter",
                     "nitrate", "phosphorus", "potassium", "texture_class")
 # Enthusiast mode shows all fields (no filtering)
 ENTHUSIAST_FIELDS <- "all"

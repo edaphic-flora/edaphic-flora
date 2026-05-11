@@ -55,6 +55,10 @@ source("R/mod_analysis.R")
 db_migrate()
 onStop(function() poolClose(pool))
 
+# Prime the welcome-stats cache so the home page renders instantly on first hit.
+# Subsequent refreshes happen in the background when data_changed fires.
+refresh_welcome_stats(pool)
+
 species_db <- tryCatch(load_species_db(), error = function(e) {
   message("CRITICAL: Species database failed to load: ", e$message)
   NULL
@@ -143,8 +147,8 @@ polished::polished_config(
  api_key   = Sys.getenv("POLISHED_API_KEY"),
  firebase_config   = firebase_cfg,
  sign_in_providers = c("google", "email"),
- is_invite_required = TRUE,
- is_email_verification_required = FALSE
+ is_invite_required = FALSE,
+ is_email_verification_required = TRUE
 )
 
 # --- Environment detection
@@ -561,10 +565,7 @@ edit_modal_ui <- modalDialog(
       selectInput("edit_site_hydrology", "Site Hydrology",
                   choices = c("Select..." = "", "Dry", "Mesic", "Wet")),
       numericInput("edit_ph", "pH", value = NA, min = 0, max = 14, step = 0.1),
-      numericInput("edit_organic_matter", "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1),
-      selectInput("edit_organic_matter_class", "OM Class (Qualitative)",
-                  choices = c("Select..." = "", "Very Low", "Low", "Medium Low",
-                              "Medium", "Medium High", "High", "Very High"))
+      numericInput("edit_organic_matter", "Organic Matter (%)", value = NA, min = 0, max = 100, step = 0.1)
     ),
 
     # Right column
@@ -755,6 +756,42 @@ custom_sign_in_ui <- tagList(
         font-weight: 600 !important;
       }
 
+      /* --- Value prop / description --- */
+      .sign-in-intro {
+        max-width: 460px;
+        text-align: center;
+        font-family: 'Rokkitt', Georgia, serif;
+        font-weight: 300;
+        color: #4A5550;
+        font-size: 1.05rem;
+        line-height: 1.55;
+        margin-bottom: 24px;
+        animation: fadeInUp 0.6s ease 0.18s backwards;
+        position: relative;
+        z-index: 1;
+      }
+      .sign-in-stats {
+        display: flex;
+        gap: 18px;
+        margin-top: 22px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.78rem;
+        color: #6b7670;
+        animation: fadeInUp 0.6s ease 0.35s backwards;
+        position: relative;
+        z-index: 1;
+      }
+      .sign-in-stats strong {
+        color: #7A9A86;
+        font-weight: 600;
+        font-size: 0.95rem;
+        display: block;
+      }
+      .sign-in-stat {
+        text-align: center;
+        min-width: 70px;
+      }
+
       /* --- Feature highlights --- */
       .sign-in-features {
         display: flex;
@@ -863,6 +900,10 @@ custom_sign_in_ui <- tagList(
   div(class = "sign-in-container",
     img(src = "logo_full_header.svg", class = "sign-in-logo", alt = "edaphic flora"),
     p(class = "sign-in-tagline", "Better data from the ground up."),
+    p(class = "sign-in-intro",
+      "An open-source soil database for gardeners, researchers, and land managers. ",
+      "Record real soil data, discover what wildlife your garden supports, and help build ",
+      "the reference general planting guides can't."),
     div(class = "sign-in-box",
       polished::sign_in_ui_default(
         color = "#7A9A86",
@@ -871,6 +912,18 @@ custom_sign_in_ui <- tagList(
         logo_bottom = NULL
       )
     ),
+    # Live community-stats teaser (cached at startup; refreshes on data_changed)
+    local({
+      s <- tryCatch(get_welcome_stats(), error = function(e) NULL)
+      if (is.null(s)) return(NULL)
+      fmt <- function(x) format(x, big.mark = ",")
+      div(class = "sign-in-stats",
+        div(class = "sign-in-stat", tags$strong(fmt(s$samples)), span("samples")),
+        div(class = "sign-in-stat", tags$strong(fmt(s$species)), span("species")),
+        div(class = "sign-in-stat", tags$strong(fmt(s$users)), span("contributors")),
+        div(class = "sign-in-stat", tags$strong(fmt(s$ecoregions)), span("ecoregions"))
+      )
+    }),
     # Feature highlights with inline SVG icons
     div(class = "sign-in-features",
       div(class = "sign-in-feature",
@@ -1103,6 +1156,11 @@ observeEvent(input$help_link_soil, {
    session$sendCustomMessage("scrollToAnchor", "guide-plant-performance")
  })
 
+ # Lab-gate off-ramp: data entry → analysis tab, for users without a lab report yet
+ observeEvent(input$`data_entry-browse_community_data`, {
+   nav_select("main_nav", "Analysis")
+ }, ignoreInit = TRUE)
+
  # Soil testing guide link from data entry module
  observeEvent(input$`data_entry-link_to_field_guide`, {
    nav_select("main_nav", "Field Guide")
@@ -1156,7 +1214,6 @@ observeEvent(input$help_link_soil, {
    updateSelectInput(session, "edit_site_hydrology", selected = entry$site_hydrology[1] %||% "")
    updateNumericInput(session, "edit_ph", value = entry$ph[1])
    updateNumericInput(session, "edit_organic_matter", value = entry$organic_matter[1])
-   updateSelectInput(session, "edit_organic_matter_class", selected = entry$organic_matter_class[1] %||% "")
    updateNumericInput(session, "edit_nitrate", value = entry$nitrate_ppm[1])
    updateNumericInput(session, "edit_phosphorus", value = entry$phosphorus_ppm[1])
    updateNumericInput(session, "edit_potassium", value = entry$potassium_ppm[1])
@@ -1182,6 +1239,13 @@ observeEvent(input$help_link_soil, {
      return()
    }
 
+   # Length cap matches the submission validator (mod_data_entry.R:2345).
+   # Without this check, an edit could store arbitrary-length notes.
+   if (!is.null(input$edit_notes) && nchar(input$edit_notes) > 1000) {
+     showNotification("Notes must be 1000 characters or fewer.", type = "error", duration = 6)
+     return()
+   }
+
    # Build update data
    update_data <- list(
      species = input$edit_species,
@@ -1191,7 +1255,6 @@ observeEvent(input$help_link_soil, {
      site_hydrology = if (nzchar(input$edit_site_hydrology)) input$edit_site_hydrology else NA,
      ph = input$edit_ph,
      organic_matter = input$edit_organic_matter,
-     organic_matter_class = if (nzchar(input$edit_organic_matter_class)) input$edit_organic_matter_class else NA,
      nitrate_ppm = input$edit_nitrate,
      phosphorus_ppm = input$edit_phosphorus,
      potassium_ppm = input$edit_potassium,

@@ -1,0 +1,9 @@
+rating,percent_min,percent_max,label,notes
+Very Low,0,1,<1,
+Low,1,2,1-2,
+Medium Low,3,4,3-4,Gap between L and ML (2-3%) — CAES chart rounds to nearest bin
+Medium,4,8,4-8,Overlaps ML upper bound at 4%
+Medium High,9,10,9-10,
+High,11,15,11-15,
+Very High,15,100,>15,
+Organic,20,100,>=20,Soil labeled ORGANIC texture (not a rating bin); supersedes mineral texture class
