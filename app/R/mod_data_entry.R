@@ -1220,9 +1220,16 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
 
       # Check rate limit (admin bypass)
-      if (!is_admin() && !db_can_extract(u$user_uid, pdf_extract_limit)) {
-        showNotification("Daily extraction limit reached. Try again tomorrow.", type = "warning")
-        return()
+      if (!is_admin()) {
+        if (db_is_user_disabled(u$user_uid)) {
+          showNotification("This account is disabled. Contact edaphicflora@gmail.com if you think this is a mistake.",
+                           type = "error", duration = 10)
+          return()
+        }
+        if (!db_can_extract(u$user_uid, pdf_extract_limit)) {
+          showNotification("Daily extraction limit reached. Try again tomorrow.", type = "warning")
+          return()
+        }
       }
 
       # Show processing notification
