@@ -12,7 +12,10 @@ extract_config <- list(
   api_key = Sys.getenv("ANTHROPIC_API_KEY"),
   daily_limit = as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "5")),
   model = "claude-sonnet-4-20250514",
-  max_tokens = 2000
+  max_tokens = 2000,
+  # 15 MB cap covers any realistic single-page soil report PDF or photo of one;
+  # rejects obvious abuse (large files OOM the worker via readBin into RAM).
+  max_file_size_bytes = 15L * 1024L * 1024L
 )
 
 # Supported file types
@@ -247,6 +250,21 @@ extract_soil_data <- function(file_path) {
       success = FALSE,
       error = paste0("Unsupported file format: .", ext,
                      ". Supported formats: PDF, RTF, TXT, PNG, JPG, GIF, WebP")
+    ))
+  }
+
+  # Reject oversize uploads before they hit readBin() and exhaust worker memory.
+  fsize <- tryCatch(file.info(file_path)$size, error = function(e) NA_real_)
+  if (is.na(fsize) || fsize <= 0) {
+    return(list(success = FALSE, error = "Could not read uploaded file."))
+  }
+  if (fsize > extract_config$max_file_size_bytes) {
+    mb <- round(fsize / (1024 * 1024), 1)
+    cap_mb <- round(extract_config$max_file_size_bytes / (1024 * 1024), 0)
+    return(list(
+      success = FALSE,
+      error = paste0("File too large (", mb, " MB). Maximum is ", cap_mb,
+                     " MB. Try a single-page PDF or a smaller scan/photo.")
     ))
   }
 

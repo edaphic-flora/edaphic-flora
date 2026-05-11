@@ -215,13 +215,68 @@ base_ui <- page_navbar(
 
  header = tagList(
    edaphic_css(),
+   # Branded splash overlay shown until Shiny WebSocket connects. Replaces the
+   # default gray screen during shinyapps.io cold-start (5–30s typical) so
+   # strangers don't think the app is broken. Hidden by JS in tags$head below.
+   tags$div(id = "app-loading-overlay",
+     tags$div(class = "app-loading-content",
+       tags$div(class = "app-loading-spinner"),
+       tags$div(class = "app-loading-text", "Loading edaphic flora…"),
+       tags$div(class = "app-loading-subtext",
+                "First-time loads can take 10–30 seconds while the soil database wakes up.")
+     )
+   ),
    tags$head(
      tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
     tags$meta(name = "viewport", content = "width=device-width, initial-scale=1, maximum-scale=5"),
+
+    # SEO + social-share preview cards. Absolute URLs are required for OG/Twitter
+    # crawlers; if the app moves to a custom domain, update these.
+    tags$meta(name = "description",
+              content = "Edaphic Flora is an open-source soil database for gardeners, researchers, and land managers. Real soil data from the ground up."),
+    tags$meta(property = "og:title", content = "Edaphic Flora — Real soil data from the ground up"),
+    tags$meta(property = "og:description",
+              content = "An open-source crowdsourced soil database for gardeners, researchers, and land managers. Submit soil samples, explore plant performance, and discover what wildlife your garden supports."),
+    tags$meta(property = "og:image",
+              content = "https://toddtesterman.shinyapps.io/edaphic-flora/screenshot_welcome.png"),
+    tags$meta(property = "og:url", content = "https://toddtesterman.shinyapps.io/edaphic-flora/"),
+    tags$meta(property = "og:type", content = "website"),
+    tags$meta(property = "og:site_name", content = "Edaphic Flora"),
+    tags$meta(name = "twitter:card", content = "summary_large_image"),
+    tags$meta(name = "twitter:title", content = "Edaphic Flora — Real soil data from the ground up"),
+    tags$meta(name = "twitter:description",
+              content = "An open-source crowdsourced soil database for gardeners, researchers, and land managers."),
+    tags$meta(name = "twitter:image",
+              content = "https://toddtesterman.shinyapps.io/edaphic-flora/screenshot_welcome.png"),
      tags$link(rel = "stylesheet",
                href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
      # Fonts loaded by bslib (Montserrat, Rokkitt, JetBrains Mono) + @import in theme.R (Baumans)
      tags$style(HTML("
+       /* Cold-start splash overlay — hidden once Shiny connects */
+       #app-loading-overlay {
+         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+         background: #F7F4E8; z-index: 999999;
+         display: flex; align-items: center; justify-content: center;
+         transition: opacity 0.4s ease-out;
+       }
+       #app-loading-overlay.app-loading-fade { opacity: 0; pointer-events: none; }
+       .app-loading-content { text-align: center; max-width: 360px; padding: 0 24px; }
+       .app-loading-spinner {
+         width: 56px; height: 56px; margin: 0 auto 24px;
+         border: 4px solid rgba(122, 154, 134, 0.2);
+         border-top-color: #7A9A86;
+         border-radius: 50%;
+         animation: app-loading-spin 1s linear infinite;
+       }
+       @keyframes app-loading-spin { to { transform: rotate(360deg); } }
+       .app-loading-text {
+         font-family: 'Montserrat', sans-serif; font-weight: 600;
+         font-size: 1.25rem; color: #373D3C; margin-bottom: 8px;
+       }
+       .app-loading-subtext {
+         font-family: 'Rokkitt', serif; font-size: 0.95rem;
+         color: #6c757d; line-height: 1.4;
+       }
        /* Navbar zip code input styling */
        #nav_zipcode {
          width: 75px !important;
@@ -334,6 +389,26 @@ base_ui <- page_navbar(
        }
      ")),
      tags$script(HTML("
+       // Hide cold-start splash once Shiny WebSocket is connected.
+       (function() {
+         function hideOverlay() {
+           var el = document.getElementById('app-loading-overlay');
+           if (el) {
+             el.classList.add('app-loading-fade');
+             setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+           }
+         }
+         function bind() {
+           if (window.jQuery && window.Shiny) {
+             jQuery(document).on('shiny:connected', hideOverlay);
+           } else {
+             setTimeout(bind, 50);
+           }
+         }
+         bind();
+         // Safety net: if connection never lands, drop the overlay anyway after 60s.
+         setTimeout(hideOverlay, 60000);
+       })();
        // Pro toggle: bind to Shiny input and handle server-sent updates
        $(document).on('change', '#pro_mode_toggle', function() {
          Shiny.setInputValue('pro_mode_toggle', this.checked, {priority: 'event'});
@@ -1097,8 +1172,11 @@ server_inner <- function(input, output, session) {
  adminServer("admin", pool, is_admin, current_user, data_changed)
  # dataManagementServer removed — export moved to Analysis sidebar
 
- # PDF extraction daily limit for non-admin users (hardcoded for free tier)
- pdf_extract_limit <- 3L
+ # PDF extraction daily limits — protect the Anthropic $10/mo spend cap.
+ # Per-user keeps any single user from monopolizing budget; global keeps a
+ # spike of strangers from blowing the monthly cap in one day.
+ pdf_extract_limit <- as.integer(Sys.getenv("PDF_EXTRACT_DAILY_LIMIT", "3"))
+ pdf_extract_global_limit <- as.integer(Sys.getenv("PDF_EXTRACT_GLOBAL_DAILY_LIMIT", "20"))
 
  # --- My Garden (Wildlife Dashboard) module ---
  myGardenServer("my_garden", pool, current_user, data_changed,
@@ -1114,7 +1192,7 @@ server_inner <- function(input, output, session) {
  dataEntryServer("data_entry", pool, species_db, zipcode_db, soil_texture_classes,
                  current_user, is_admin, data_changed, lookup_ecoregion, pdf_extract_limit,
                  BETA_FEATURES, user_prefs, species_search_index, common_name_db,
-                 experience_level, show_my_data_trigger)
+                 experience_level, show_my_data_trigger, pdf_extract_global_limit)
 
  # --- Analysis module ---
 analysisServer("analysis", pool, data_changed, state_grid, is_prod,

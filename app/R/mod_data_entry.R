@@ -143,7 +143,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                             current_user, is_admin, data_changed, lookup_ecoregion,
                             pdf_extract_limit, beta_features = list(), user_prefs = NULL,
                             species_search_index = NULL, common_name_db = NULL,
-                            experience_level = NULL, show_my_data_trigger = NULL) {
+                            experience_level = NULL, show_my_data_trigger = NULL,
+                            pdf_extract_global_limit = 20L) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -217,6 +218,23 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       switch(as.character(step),
         # Step 1: Soil Source
         "1" = tagList(
+          # Off-ramp banner — shown ABOVE the lab gate so visitors without a soil
+          # report can find the analysis tab without fighting through the form.
+          # (Buried small-text off-ramps lose ~50% of stranger traffic.)
+          div(class = "mb-3 p-3 rounded d-flex flex-column flex-md-row align-items-md-center gap-2",
+              style = "background-color: rgba(122, 154, 134, 0.12); border-left: 4px solid #7A9A86;",
+              div(class = "flex-grow-1",
+                  icon("compass", class = "me-1", style = "color: #7A9A86;"),
+                  tags$strong("Don't have a soil report yet?"),
+                  tags$span(class = "text-muted ms-1",
+                            "You can browse community soil data and species patterns without contributing.")
+              ),
+              actionLink(ns("browse_community_data"),
+                         label = tagList("Explore community data ", icon("arrow-right")),
+                         class = "btn btn-sm flex-shrink-0",
+                         style = "background-color: #7A9A86; color: white; font-family: 'Montserrat', sans-serif; font-weight: 600; white-space: nowrap;")
+          ),
+
           # Lab test confirmation gate
           div(class = "mb-3 p-3 border rounded lab-confirm-gate",
               style = "background-color: #F7F4E8; border-color: #D39B35 !important;",
@@ -231,14 +249,7 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                          " offices offer free or low-cost soil testing. Home test kits lack the accuracy needed for meaningful comparisons. ",
                          actionLink(ns("link_to_field_guide"), "See our soil testing guide",
                                     style = "color: #7A9A86; font-weight: 500;"),
-                         "."),
-              # Off-ramp for visitors without a lab report — sends them to community data.
-              div(class = "mt-2 pt-2 border-top",
-                  tags$small(class = "text-muted",
-                             "Don't have a soil report yet? ",
-                             actionLink(ns("browse_community_data"),
-                                        "Explore community data →",
-                                        style = "color: #7A9A86; font-weight: 500;")))
+                         ".")
           ),
 
           # Entry options (greyed out until lab test confirmed)
@@ -1224,6 +1235,14 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         if (db_is_user_disabled(u$user_uid)) {
           showNotification("This account is disabled. Contact edaphicflora@gmail.com if you think this is a mistake.",
                            type = "error", duration = 10)
+          return()
+        }
+        # Global cap protects the Anthropic spend ceiling — checked before per-user
+        # so we can give a distinct message ("we're at capacity" vs "you're at limit").
+        if (!db_can_globally_extract(pdf_extract_global_limit)) {
+          showNotification(
+            "Soil report extraction is at daily capacity for the community. Please try again tomorrow, or enter your data manually.",
+            type = "warning", duration = 10)
           return()
         }
         if (!db_can_extract(u$user_uid, pdf_extract_limit)) {

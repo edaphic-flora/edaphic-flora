@@ -513,6 +513,25 @@ db_get_remaining_extractions <- function(user_id, daily_limit = 5) {
   as.integer(max(0, daily_limit - count))
 }
 
+# Global daily cap protects the Anthropic spend ceiling — per-user caps don't
+# help if 100 strangers each hit their personal limit on the same day.
+db_get_global_extraction_count_today <- function() {
+  tryCatch({
+    result <- dbGetQuery(pool,
+      "SELECT COUNT(*) as count FROM pdf_extractions
+       WHERE extracted_at >= CURRENT_DATE")
+    as.integer(result$count[1])
+  }, error = function(e) {
+    message("Error getting global extraction count: ", e$message)
+    Inf  # Fail closed
+  })
+}
+
+db_can_globally_extract <- function(global_daily_limit = 20) {
+  count <- db_get_global_extraction_count_today()
+  count < global_daily_limit
+}
+
 # ---------------------------
 # Audit Logging
 # ---------------------------
