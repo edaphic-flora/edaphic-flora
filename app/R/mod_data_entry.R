@@ -53,9 +53,6 @@ dataEntryUI <- function(id) {
             # Soil Properties
             numericInput(ns("ph"), "pH", value = NA, min = 0, max = 14, step = 0.1),
             numericInput(ns("organic_matter"), "OM", value = NA, min = 0, max = 100, step = 0.1),
-            selectInput(ns("organic_matter_class"), "OM Class",
-                        choices = c("", "Very Low", "Low", "Medium Low", "Medium",
-                                    "Medium High", "High", "Very High")),
             numericInput(ns("cec"), "CEC", value = NA, min = 0, step = 0.1),
             numericInput(ns("soluble_salts"), "Salts", value = NA, min = 0),
             # Macronutrients
@@ -234,7 +231,14 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
                          " offices offer free or low-cost soil testing. Home test kits lack the accuracy needed for meaningful comparisons. ",
                          actionLink(ns("link_to_field_guide"), "See our soil testing guide",
                                     style = "color: #7A9A86; font-weight: 500;"),
-                         ".")
+                         "."),
+              # Off-ramp for visitors without a lab report — sends them to community data.
+              div(class = "mt-2 pt-2 border-top",
+                  tags$small(class = "text-muted",
+                             "Don't have a soil report yet? ",
+                             actionLink(ns("browse_community_data"),
+                                        "Explore community data →",
+                                        style = "color: #7A9A86; font-weight: 500;")))
           ),
 
           # Entry options (greyed out until lab test confirmed)
@@ -284,11 +288,8 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
               numericInput(ns("ph_step2"), NULL, value = sv("ph"), min = 0, max = 14, step = 0.1),
               tags$label(class = "form-label", `for` = ns("om_step2"), "Organic Matter (%)"),
               numericInput(ns("om_step2"), NULL, value = sv("organic_matter"), min = 0, max = 100, step = 0.1),
-              selectInput(ns("om_class_step2"), "Organic Matter (Qualitative)",
-                          choices = c("Select if no % available" = "",
-                                      "Very Low", "Low", "Medium Low", "Medium",
-                                      "Medium High", "High", "Very High"),
-                          selected = sv("organic_matter_class"))
+              tags$small(class = "text-muted d-block",
+                "Enter the numeric % from your soil report. If your lab only reports a qualitative descriptor (Low / Medium / High), check the lab's chart for the equivalent percentage.")
           ),
 
           # Macronutrients (N/P/K always shown)
@@ -523,7 +524,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       # Soil properties
       if (!is.null(input$ph_step2)) updateNumericInput(session, "ph", value = input$ph_step2)
       if (!is.null(input$om_step2)) updateNumericInput(session, "organic_matter", value = input$om_step2)
-      if (!is.null(input$om_class_step2)) updateSelectInput(session, "organic_matter_class", selected = input$om_class_step2)
       if (!is.null(input$cec_step2)) updateNumericInput(session, "cec", value = input$cec_step2)
       if (!is.null(input$salts_step2)) updateNumericInput(session, "soluble_salts", value = input$salts_step2)
       # Macronutrients
@@ -670,7 +670,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       pending_soil_data(list(
         ph = soil_data$ph,
         organic_matter = soil_data$organic_matter,
-        organic_matter_class = soil_data$organic_matter_class,
         cec = soil_data$cec_meq,
         soluble_salts = soil_data$soluble_salts_ppm,
         nitrate = soil_data$nitrate_ppm,
@@ -697,9 +696,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       }
       if (!is.null(soil_data$organic_matter) && !is.na(soil_data$organic_matter)) {
         updateNumericInput(session, "organic_matter", value = soil_data$organic_matter)
-      }
-      if (!is.null(soil_data$organic_matter_class) && !is.na(soil_data$organic_matter_class)) {
-        updateSelectInput(session, "organic_matter_class", selected = soil_data$organic_matter_class)
       }
       if (!is.null(soil_data$cec_meq) && !is.na(soil_data$cec_meq)) {
         updateNumericInput(session, "cec", value = soil_data$cec_meq)
@@ -1249,7 +1245,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         pending_soil_data(list(
           ph = data$ph,
           organic_matter = data$organic_matter,
-          organic_matter_class = data$organic_matter_class,
           cec = data$cec_meq,
           soluble_salts = data$soluble_salts_ppm,
           nitrate = data$nitrate_ppm,
@@ -1273,9 +1268,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         # Soil Properties
         if (!is.null(data$ph)) updateNumericInput(session, "ph", value = data$ph)
         if (!is.null(data$organic_matter)) updateNumericInput(session, "organic_matter", value = data$organic_matter)
-        if (!is.null(data$organic_matter_class) && nzchar(data$organic_matter_class)) {
-          updateSelectInput(session, "organic_matter_class", selected = data$organic_matter_class)
-        }
         if (!is.null(data$cec_meq)) updateNumericInput(session, "cec", value = data$cec_meq)
         if (!is.null(data$soluble_salts_ppm)) updateNumericInput(session, "soluble_salts", value = data$soluble_salts_ppm)
 
@@ -2085,7 +2077,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
       # Get soil chemistry from form (form may have been pre-filled via "Use previous soil data")
       ph_val <- input$ph
       om_val <- input$organic_matter
-      om_class_val <- if (nzchar(input$organic_matter_class)) input$organic_matter_class else NA
       cec_val <- input$cec
       salts_val <- input$soluble_salts
       nitrate_val <- input$nitrate
@@ -2163,7 +2154,6 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
           inat_url = inat_val,
           ph = ph_val,
           organic_matter = om_val,
-          organic_matter_class = om_class_val,
           cec_meq = cec_val,
           soluble_salts_ppm = salts_val,
           nitrate_ppm = nitrate_val,
@@ -2410,21 +2400,51 @@ dataEntryServer <- function(id, pool, species_db, zipcode_db, soil_texture_class
         }
       }
 
-      # --- Duplicate detection (warn but don't block) ---
+      # --- Duplicate detection: gate behind explicit confirm ---
+      # Honest false-positive case exists (same species in two zones), so we
+      # don't outright block — but we no longer just sail past with a toast.
       all_species <- c(
         if (has_batch) pld$valid$species else character(0),
         if (has_manual) manual_species else character(0)
       )
+      dup_species <- character(0)
       for (sp in all_species) {
-        dup_count <- db_check_duplicate(sp, u$user_uid, pool)
-        if (dup_count > 0) {
-          showNotification(
-            sprintf("You already submitted data for %s today. Submitting again will create a separate record.", sp),
-            type = "warning", duration = 8)
+        if (db_check_duplicate(sp, u$user_uid, pool) > 0) {
+          dup_species <- c(dup_species, sp)
         }
       }
 
+      if (length(dup_species) > 0 && !isTRUE(duplicate_acknowledged())) {
+        showModal(modalDialog(
+          title = span(icon("triangle-exclamation"), " Possible duplicate submission"),
+          easyClose = TRUE,
+          footer = tagList(
+            modalButton("Cancel"),
+            actionButton(ns("confirm_duplicate"), "Submit anyway", class = "btn-warning")
+          ),
+          p("You already submitted these species today:"),
+          tags$ul(lapply(dup_species, tags$li)),
+          p(class = "text-muted small",
+            "If this is a separate sample (e.g. a different zone or a re-test), continue. ",
+            "Otherwise, find your existing entry in ", tags$strong("My Data"), " and edit it.")
+        ))
+        return()
+      }
+
+      # Reset the ack flag so a future submit gets re-gated
+      duplicate_acknowledged(FALSE)
+
       # Proceed with submit
+      perform_submit(reuse_soil_data = NULL)
+    })
+
+    # Reactive flag set by the duplicate-confirm modal to bypass the check
+    # on the next submit attempt.
+    duplicate_acknowledged <- reactiveVal(FALSE)
+
+    observeEvent(input$confirm_duplicate, {
+      removeModal()
+      duplicate_acknowledged(TRUE)
       perform_submit(reuse_soil_data = NULL)
     })
 

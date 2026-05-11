@@ -67,9 +67,184 @@ adminServer <- function(id, pool, is_admin, current_user, data_changed) {
                 actionButton(ns("refresh"), "Refresh Table", class = "btn-outline-secondary", icon = icon("refresh"))
               )
             )
+          ),
+
+          card(
+            card_header(
+              class = "d-flex justify-content-between align-items-center",
+              span(icon("users-slash"), " User Moderation"),
+              span(class = "badge bg-danger", "Admin Only")
+            ),
+            card_body(
+              p(class = "text-muted",
+                "List of contributors. Use ", tags$strong("Bulk-flag"), " to mark every sample from a user as flagged, ",
+                "or ", tags$strong("Disable"), " to ban the user from new submissions, exports, and PDF extractions. ",
+                "Disabled users can be re-enabled later — disabling does not delete their data."),
+              DTOutput(ns("users_table"))
+            )
           )
         )
       )
+    })
+
+    # --- Per-user moderation table ---
+    output$users_table <- renderDT({
+      input$refresh
+      data_changed()
+      if (!is_admin()) return(NULL)
+
+      users <- tryCatch({
+        dbGetQuery(pool, "
+          SELECT s.created_by AS user_id,
+                 COUNT(*)::int AS n_samples,
+                 SUM(CASE WHEN s.flagged THEN 1 ELSE 0 END)::int AS n_flagged,
+                 MIN(s.created_at)::text AS first_seen,
+                 MAX(s.created_at)::text AS last_seen,
+                 (CASE WHEN d.user_id IS NOT NULL THEN TRUE ELSE FALSE END) AS is_disabled,
+                 d.reason AS disable_reason
+          FROM soil_samples s
+          LEFT JOIN disabled_users d ON d.user_id = s.created_by
+          WHERE s.created_by IS NOT NULL
+          GROUP BY s.created_by, d.user_id, d.reason
+          ORDER BY MAX(s.created_at) DESC")
+      }, error = function(e) {
+        message("users_table query error: ", e$message)
+        data.frame()
+      })
+
+      if (nrow(users) == 0) return(NULL)
+
+      # Sanitize
+      users$user_id <- vapply(users$user_id, htmltools::htmlEscape, character(1), USE.NAMES = FALSE)
+      users$disable_reason <- vapply(users$disable_reason %||% rep(NA_character_, nrow(users)),
+                                     function(v) if (is.na(v) || !nzchar(v)) "" else htmltools::htmlEscape(v),
+                                     character(1), USE.NAMES = FALSE)
+
+      users$status <- ifelse(users$is_disabled,
+                             '<span class="badge bg-danger">Disabled</span>',
+                             '<span class="badge bg-success">Active</span>')
+
+      users$actions <- mapply(function(uid, disabled) {
+        # Hidden Shiny input wiring via Shiny.setInputValue
+        bulk_btn <- sprintf(
+          "<button class=\"btn btn-sm btn-outline-warning me-1\" title=\"Bulk-flag all samples from this user\" onclick=\"Shiny.setInputValue('%s', '%s', {priority: 'event'})\"><i class=\"fa fa-flag\"></i> Bulk-flag</button>",
+          ns("bulk_flag_user"), uid)
+        toggle_btn <- if (isTRUE(disabled)) {
+          sprintf(
+            "<button class=\"btn btn-sm btn-success\" title=\"Re-enable this user\" onclick=\"Shiny.setInputValue('%s', '%s', {priority: 'event'})\"><i class=\"fa fa-user-check\"></i> Enable</button>",
+            ns("enable_user"), uid)
+        } else {
+          sprintf(
+            "<button class=\"btn btn-sm btn-danger\" title=\"Disable this user\" onclick=\"Shiny.setInputValue('%s', '%s', {priority: 'event'})\"><i class=\"fa fa-user-slash\"></i> Disable</button>",
+            ns("disable_user"), uid)
+        }
+        paste0(bulk_btn, toggle_btn)
+      }, users$user_id, users$is_disabled, USE.NAMES = FALSE)
+
+      display <- users[, c("user_id", "status", "n_samples", "n_flagged", "first_seen", "last_seen", "disable_reason", "actions")]
+      datatable(display,
+                options = list(pageLength = 10, scrollX = TRUE, order = list(list(2, 'desc'))),
+                rownames = FALSE,
+                escape = FALSE,
+                colnames = c("User ID", "Status", "Samples", "Flagged", "First seen", "Last seen", "Disable reason", "Actions"))
+    })
+
+    # --- Bulk-flag all samples from user ---
+    pending_bulk_user <- reactiveVal(NULL)
+    observeEvent(input$bulk_flag_user, {
+      if (!is_admin()) return()
+      uid <- input$bulk_flag_user
+      if (is.null(uid) || !nzchar(uid)) return()
+      pending_bulk_user(uid)
+      showModal(modalDialog(
+        title = span(icon("flag"), " Bulk-flag user samples"),
+        size = "s",
+        easyClose = TRUE,
+        footer = tagList(modalButton("Cancel"),
+                         actionButton(ns("confirm_bulk_flag"), "Bulk-flag", class = "btn-warning")),
+        p("Flag every sample from this user as suspicious?"),
+        tags$code(uid),
+        textAreaInput(ns("bulk_flag_reason"), "Reason",
+                      value = "Bulk flagged by admin",
+                      height = "80px")
+      ))
+    })
+    observeEvent(input$confirm_bulk_flag, {
+      uid <- pending_bulk_user()
+      if (is.null(uid)) return()
+      reason <- input$bulk_flag_reason
+      if (is.null(reason) || !nzchar(trimws(reason))) reason <- "Bulk flagged by admin"
+
+      n <- db_flag_samples_by_user(uid, reason, pool)
+      removeModal()
+      pending_bulk_user(NULL)
+
+      u <- current_user()
+      db_audit_log("bulk_flag", "soil_samples", NULL,
+                   if (!is.null(u)) u$user_uid else NULL,
+                   sprintf("Bulk-flagged %d samples from user %s: %s", n, uid, reason))
+      showNotification(sprintf("Flagged %d sample%s from user", n, if (n == 1) "" else "s"),
+                       type = "message")
+      data_changed(data_changed() + 1)
+    })
+
+    # --- Disable user ---
+    pending_disable_user <- reactiveVal(NULL)
+    observeEvent(input$disable_user, {
+      if (!is_admin()) return()
+      uid <- input$disable_user
+      if (is.null(uid) || !nzchar(uid)) return()
+      pending_disable_user(uid)
+      showModal(modalDialog(
+        title = span(icon("user-slash"), " Disable user"),
+        size = "s",
+        easyClose = TRUE,
+        footer = tagList(modalButton("Cancel"),
+                         actionButton(ns("confirm_disable_user"), "Disable", class = "btn-danger")),
+        p("Block this user from new submissions, exports, and PDF extractions?"),
+        tags$code(uid),
+        p(class = "text-muted small mt-2",
+          "Existing samples are NOT auto-removed. Use Bulk-flag separately if you also want to hide their submissions."),
+        textAreaInput(ns("disable_reason"), "Reason",
+                      placeholder = "e.g., Submitting spam / abusive content",
+                      height = "80px")
+      ))
+    })
+    observeEvent(input$confirm_disable_user, {
+      uid <- pending_disable_user()
+      if (is.null(uid)) return()
+      u <- current_user()
+      ok <- db_disable_user(uid, input$disable_reason %||% "Disabled by admin",
+                            if (!is.null(u)) u$user_uid else NULL, pool)
+      removeModal()
+      pending_disable_user(NULL)
+      if (ok) {
+        db_audit_log("disable_user", "disabled_users", NULL,
+                     if (!is.null(u)) u$user_uid else NULL,
+                     sprintf("Disabled user %s: %s", uid, input$disable_reason %||% ""))
+        showNotification("User disabled", type = "message")
+        data_changed(data_changed() + 1)
+      } else {
+        showNotification("Error disabling user", type = "error")
+      }
+    })
+
+    # --- Re-enable user ---
+    observeEvent(input$enable_user, {
+      if (!is_admin()) return()
+      uid <- input$enable_user
+      if (is.null(uid) || !nzchar(uid)) return()
+      ok <- db_enable_user(uid, pool)
+      if (ok) {
+        u <- current_user()
+        db_audit_log("enable_user", "disabled_users", NULL,
+                     if (!is.null(u)) u$user_uid else NULL,
+                     sprintf("Re-enabled user %s", uid))
+        showNotification("User re-enabled", type = "message")
+        data_changed(data_changed() + 1)
+      } else {
+        showNotification("Error re-enabling user", type = "error")
+      }
     })
 
     # Admin: all entries table with full edit/delete/flag capabilities
@@ -79,7 +254,7 @@ adminServer <- function(id, pool, is_admin, current_user, data_changed) {
 
       if (!is_admin()) return(NULL)
 
-      dat <- db_get_all_samples()
+      dat <- db_get_all_samples(include_flagged = TRUE)
       if (nrow(dat) == 0) return(NULL)
 
       # Ensure flagged columns exist (for databases not yet migrated)
@@ -226,7 +401,7 @@ adminServer <- function(id, pool, is_admin, current_user, data_changed) {
             return()
           }
 
-          data <- db_get_all_samples()
+          data <- db_get_all_samples(include_flagged = TRUE)
           data$created_by <- NULL  # Strip user IDs from export
           write.csv(data, file, row.names = FALSE)
           if (!is.null(u)) {

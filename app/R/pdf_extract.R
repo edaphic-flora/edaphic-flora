@@ -39,7 +39,6 @@ Return ONLY a valid JSON object with these exact field names (use null for missi
 {
   \"ph\": <number or null>,
   \"organic_matter\": <number as percentage or null>,
-  \"organic_matter_class\": <string like 'Low', 'Medium', 'High', 'Medium High' or null>,
   \"nitrate_ppm\": <number or null>,
   \"ammonium_ppm\": <number or null>,
   \"phosphorus_ppm\": <number or null>,
@@ -66,8 +65,8 @@ Return ONLY a valid JSON object with these exact field names (use null for missi
 }
 
 Important extraction rules:
-- If values are given as 'Qualitative (numeric ppm)' like 'Medium High (50 ppm)', extract BOTH the number (50) AND include the qualitative description where applicable
-- For organic matter: extract the numeric percentage if available, AND always extract the qualitative class (Low/Medium/High/etc.) if given
+- If values are given as 'Qualitative (numeric ppm)' like 'Medium High (50 ppm)', extract the number (50)
+- If ONLY a qualitative descriptor is given (e.g. 'Medium') with no numeric ppm or %, return null for that field and add a warning to extraction_warnings naming which fields were descriptor-only — the user must look up the numeric value from their lab's chart
 - Texture: if only a texture class name is given (e.g., 'Sandy Loam') without percentages, that's fine - extract the class name
 - CEC should be in meq/100g
 - If a value is given as a range, use the midpoint

@@ -1332,20 +1332,19 @@ early_access_ui <- function(n_samples, n_contributors,
 }
 
 #' Seed the database banner for welcome page
-#' @param total_samples Current total samples in database
-#' @param total_samples Current total sample count
+#' @param total_users Current total distinct contributors
 #' @return Shiny UI tag with escalating milestone progress
-seed_database_ui <- function(total_samples) {
-  # Escalating milestones
-  milestones <- c(10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
+seed_database_ui <- function(total_users) {
+  # Escalating milestones — contributors, not samples
+  milestones <- c(5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000)
   milestone_labels <- c(
-    "First Seeds"  , "Taking Root"  , "Growing Strong",
-    "Triple Digits", "Building Depth", "Half a Thousand",
-    "Major Milestone", "Research Grade", "Regional Dataset", "Continental Scale"
+    "First Five", "Ten Roots", "Growing Strong",
+    "Half a Hundred", "Triple Digits", "Quarter Thousand",
+    "Five Hundred Strong", "Thousand-Strong", "Regional Network", "Continental Community"
   )
 
   # Find current milestone (next one above current count)
-  current_idx <- which(milestones > total_samples)[1]
+  current_idx <- which(milestones > total_users)[1]
   if (is.na(current_idx)) {
     # Past all milestones
     goal <- milestones[length(milestones)]
@@ -1356,17 +1355,17 @@ seed_database_ui <- function(total_samples) {
     goal <- milestones[current_idx]
     label <- milestone_labels[current_idx]
     prev_goal <- if (current_idx > 1) milestones[current_idx - 1] else 0
-    pct <- min(100, round((total_samples - prev_goal) / (goal - prev_goal) * 100))
+    pct <- min(100, round((total_users - prev_goal) / (goal - prev_goal) * 100))
     next_label <- label
   }
 
   # Completed milestones for display
-  completed <- milestones[milestones <= total_samples]
+  completed <- milestones[milestones <= total_users]
   n_completed <- length(completed)
 
   # Milestone dots
   dots <- lapply(seq_along(milestones[1:min(7, length(milestones))]), function(i) {
-    is_done <- milestones[i] <= total_samples
+    is_done <- milestones[i] <= total_users
     is_current <- !is.na(current_idx) && i == current_idx
     tags$span(
       style = paste0(
@@ -1375,7 +1374,7 @@ seed_database_ui <- function(total_samples) {
         else if (is_current) "background: #D39B35;"
         else "background: #e0ddd2;"
       ),
-      title = sprintf("%s (%s samples)", milestone_labels[i], format(milestones[i], big.mark = ","))
+      title = sprintf("%s (%s contributors)", milestone_labels[i], format(milestones[i], big.mark = ","))
     )
   })
 
@@ -1394,14 +1393,14 @@ seed_database_ui <- function(total_samples) {
       div(class = "d-flex align-items-center mb-2",
           tags$small(class = "text-muted me-2",
                      style = "min-width: 110px; font-size: 0.8rem; cursor: help; border-bottom: 1px dotted currentColor;",
-                     title = "A soil sample is one species + one lab soil test result. Each submission adds to our shared knowledge of what grows where.",
-                     sprintf("%s / %s soil samples",
-                             format(total_samples, big.mark = ","),
+                     title = "A contributor is anyone who has submitted at least one soil sample. The more growers, regions, and conditions represented, the more useful the dataset becomes for everyone.",
+                     sprintf("%s / %s contributors",
+                             format(total_users, big.mark = ","),
                              format(goal, big.mark = ","))),
           div(class = "progress flex-grow-1", style = "height: 8px;",
               div(class = "progress-bar", role = "progressbar",
                   style = sprintf("width: %d%%; background-color: #7A9A86;", pct),
-                  `aria-valuenow` = total_samples, `aria-valuemin` = 0, `aria-valuemax` = goal))
+                  `aria-valuenow` = total_users, `aria-valuemin` = 0, `aria-valuemax` = goal))
       ),
       # Milestone dots
       div(class = "d-flex align-items-center justify-content-center gap-0 mb-1",

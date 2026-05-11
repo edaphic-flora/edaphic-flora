@@ -48,9 +48,20 @@ nul
 # Wildlife source data (proprietary - never commit)
 data/wildlife_source/
 
-# GBIF and eBird cache data (large bulk downloads)
+# Bulk cache data (regenerated locally by fetch scripts; too large for git)
 data/cache_gbif/
 data/cache_ebird/
+data/cache_usda/
+data/cache_bonap/
+data/cache_invasive_atlas/
+data/morgan_plates/
+
+# shinyapps.io deploy artifact (regenerated on deploy)
+app/manifest.json
+
+# Nested separate git repo for the GitHub Pages site
+edaphic-flora.github.io/
 
 # Alpha feedback (local only)
 feedback/
+.positai
