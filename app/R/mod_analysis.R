@@ -87,6 +87,10 @@ analysisUI <- function(id) {
 
       div(
         class = "analysis-tabs-container",
+        # Pane-level Early Access banner when species is below the public-stats
+        # threshold. Travels with the chart so users who screenshot or share
+        # see the same caveat that's in the sidebar.
+        uiOutput(ns("threshold_pane_banner")),
         # Mobile tab scroll arrows (hidden on desktop via CSS)
         div(class = "tab-scroll-arrows d-md-none",
             tags$button(class = "tab-scroll-left btn btn-sm", icon("chevron-left")),
@@ -331,6 +335,21 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       db_check_species_stats_threshold(sp, pool)
     })
 
+    # Pane-level Early Access banner — shown above the chart tabs when the
+    # currently selected species has fewer than MIN_SAMPLES_FOR_PUBLIC_STATS
+    # samples or MIN_CONTRIBUTORS_FOR_PUBLIC_STATS contributors. Charts render
+    # at small N; this banner ensures the caveat is visible in the same view
+    # as the chart, not just hidden in a sidebar that mobile users collapse.
+    output$threshold_pane_banner <- renderUI({
+      sp <- input$analysis_species %||% ""
+      if (!nzchar(sp)) return(NULL)
+      stats_check <- species_stats_check()
+      if (isTRUE(stats_check$meets_threshold)) return(NULL)
+      if (stats_check$n_samples == 0L) return(NULL)  # 0-sample case handled by per-chart empty states
+      div(class = "px-2 pt-2",
+        early_access_ui(stats_check$n_samples, stats_check$n_contributors))
+    })
+
     # --- Species summary sidebar ---
     output$species_summary <- renderUI({
       req(input$analysis_species, input$analysis_species != "")
@@ -420,13 +439,12 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       dat <- species_data()
       if (nrow(dat) == 0) return(dat)
 
-      # Gate behind public-stats threshold so a single n=1 submission can't
-      # render aggregate charts (pH, nutrients, texture, map, performance) that
-      # look authoritative. The Early Access banner in species_summary explains
-      # what's missing. USDA reference views still render via separate paths.
-      if (!species_stats_check()$meets_threshold) {
-        return(dat[0, , drop = FALSE])
-      }
+      # NOTE: Below-threshold data is NOT hidden here. Aggregate charts render
+      # at small N, but the analysis pane shows a prominent "Early Access"
+      # banner (output$threshold_pane_banner below + species_summary sidebar
+      # banner) so the small-N caveat travels with the chart. Hiding entirely
+      # was too aggressive — every species starts below threshold, so users
+      # saw "No Data" for every selection.
 
       if (nzchar(input$filter_outcome %||% "")) {
         dat <- dat[!is.na(dat$outcome) & dat$outcome == input$filter_outcome, , drop = FALSE]
@@ -453,19 +471,8 @@ analysisServer <- function(id, pool, data_changed, state_grid, is_prod,
       if (!nzchar(sp)) return(NULL)
 
       total <- nrow(species_data())
-      if (total == 0) return(NULL)
-
-      # If gated below threshold, filtered_species_data returns empty — show
-      # honest "early access" message instead of misleading "0 of N".
-      if (!species_stats_check()$meets_threshold) {
-        return(span(class = "small text-warning",
-                    icon("flask"),
-                    sprintf(" %d sample%s — charts unlock at %d",
-                            total, if (total == 1) "" else "s",
-                            MIN_SAMPLES_FOR_PUBLIC_STATS)))
-      }
-
       filtered <- nrow(filtered_species_data())
+
       if (total == filtered) {
         span(class = "small text-muted", icon("check"), sprintf(" Showing all %d", total))
       } else {
