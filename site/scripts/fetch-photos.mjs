@@ -35,8 +35,19 @@ const LICENSES = env.PHOTO_LICENSES ? env.PHOTO_LICENSES.split(',').map((s) => s
 const DRY = env.PHOTO_DRY_RUN === 'true';
 const USER_AGENT = 'EdaphicFlora/1.0 (https://edaphicflora.org; edaphicflora@gmail.com) species photo lookup';
 
+// species_reference and species_state_status scan every taxon, so each is
+// computed once (MATERIALIZED), and the state branch only runs when tiers 4
+// or 5 are wanted.
 const CANDIDATES_SQL = `
-WITH cand AS (
+WITH ref AS MATERIALIZED (
+  SELECT species_key, scientific_name, growth_habit FROM public_site.species_reference
+),
+st AS MATERIALIZED (
+  SELECT species_key, bool_or(status IN ('native', 'both')) AS any_native
+    FROM public_site.species_state_status
+   GROUP BY species_key
+),
+cand AS (
   SELECT species_key, min(tier) AS tier, min(name) AS name
   FROM (
     SELECT species_key, species_name AS name, CASE WHEN meets_threshold THEN 1 ELSE 2 END AS tier
@@ -44,16 +55,13 @@ WITH cand AS (
     UNION ALL
     SELECT w.species_key, r.scientific_name, 3
       FROM public_site.wildlife_species_summary w
-      JOIN public_site.species_reference r USING (species_key)
+      JOIN ref r USING (species_key)
     UNION ALL
-    SELECT DISTINCT s.species_key, r.scientific_name, 4
-      FROM public_site.species_state_status s
-      JOIN public_site.species_reference r USING (species_key)
-     WHERE s.status IN ('native', 'both') AND r.growth_habit IS NOT NULL
-    UNION ALL
-    SELECT DISTINCT s.species_key, r.scientific_name, 5
-      FROM public_site.species_state_status s
-      JOIN public_site.species_reference r USING (species_key)
+    SELECT s.species_key, r.scientific_name,
+           CASE WHEN s.any_native AND r.growth_habit IS NOT NULL THEN 4 ELSE 5 END
+      FROM st s
+      JOIN ref r USING (species_key)
+     WHERE $2::int >= 4
   ) x
   GROUP BY species_key
 )
