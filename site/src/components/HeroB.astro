@@ -4,15 +4,15 @@ import { browseOrder, featured } from '../lib/data.js';
 import { PH_SCALE } from '../config.js';
 const { hidden = false } = Astro.props;
 
-// Prefer a species with a real community snapshot; otherwise fall back to a
-// featured species and show its USDA reference range, clearly labeled.
-const ready = browseOrder.find((s) => s.soilReady && s.soil.ph);
+// Prefer a species with a real community pH range (3+ samples); otherwise fall
+// back to a featured species and show its USDA reference range, clearly labeled.
+const ready = browseOrder.find((s) => s.soilReady && s.soil.ph?.p10 != null);
 const fb = featured(4).find((s) => s.usda?.ph_min != null);
 const sp = ready || fb;
 const community = !!ready;
 const pos = (v) => `${Math.max(0, Math.min(100, ((v - PH_SCALE.min) / (PH_SCALE.max - PH_SCALE.min)) * 100))}%`;
 const ph = sp && (community ? sp.soil.ph : { p10: sp.usda.ph_min, p90: sp.usda.ph_max, p50: null });
-const om = community ? sp.soil.organic_matter : null;
+const om = community && sp.soil.organic_matter?.p10 != null ? sp.soil.organic_matter : null;
 const tx = community ? sp.soil.texture : null;
 const examples = featured(2);
 ---

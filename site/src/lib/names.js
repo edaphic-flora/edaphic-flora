@@ -10,6 +10,11 @@ export function slugify(name) {
     .replace(/^-+|-+$/g, '');
 }
 
+// plural(1, 'sample') -> "1 sample", plural(3, 'sample') -> "3 samples"
+export function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
 // "little bluestem" -> "Little Bluestem"; keeps words that are already
 // capitalized ("New England aster" -> "New England Aster").
 export function titleCaseCommon(name) {

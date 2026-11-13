@@ -38,8 +38,8 @@ const updated = meta.generated_at
       <div class="card pad thin">
         <div class="ph"><span class="dot" style="background:var(--gold)"></span>Still thin</div>
         <p>
-          Community soil samples. Soil stats only appear once a species clears a sample and contributor threshold, so many
-          soil snapshots are still empty. That's expected, and we show it plainly rather than guessing.
+          Community soil samples. Most species have one or two so far, so many soil numbers are early readings rather
+          than ranges. Each one shows the sample count behind it, and we say so plainly rather than guessing.
         </p>
       </div>
     </div>
@@ -50,7 +50,7 @@ const updated = meta.generated_at
     <ol class="steps">
       <li>Soil tests are entered in the app and tied to a species and a site. Contributor names, emails, and sample locations are <strong>never published</strong>.</li>
       <li>Samples flagged during moderation, and samples from suspended accounts, are <strong>left out</strong> of every public number.</li>
-      <li>A species gets a soil snapshot only with <strong>at least {t.min_samples} samples from at least {t.min_contributors} different people</strong>. Each measurement (pH, organic matter, texture, each nutrient) also needs {t.min_samples} values of its own before it is shown.</li>
+      <li>Every species with at least one sample shows its soil values, with <strong>the number of samples behind each measurement</strong>. pH and organic matter get a range once they have at least {t.min_range_samples} values; until then you see the readings themselves.</li>
       <li>Ranges show the <strong>middle 80%</strong> of samples (10th to 90th percentile), so one odd reading can't stretch the range. The highlighted value is the median.</li>
       <li>Texture class comes from the median sand, silt, and clay percentages, classified with the USDA soil texture triangle.</li>
       <li>Nutrient values come from different labs using different extraction methods (for example Mehlich-3 and Modified Morgan), so treat them as rough guides.</li>
@@ -104,7 +104,7 @@ const updated = meta.generated_at
     <h2 class="h2s">Honest about coverage</h2>
     <p class="lede" style="margin-top:14px">
       This is a young, growing dataset. Reference data is rich; community soil data is early. We'd rather show a confident
-      "not yet" than a confident wrong number. Every soil snapshot carries the sample count behind it so you can judge for
+      "not yet" than a confident wrong number. Every soil number carries the sample count behind it so you can judge for
       yourself.
     </p>
   </div>

@@ -37,7 +37,7 @@ const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
         <option value="">All states</option>
         {states.map((s) => <option value={s.code}>{s.name}</option>)}
       </select>
-      <label class="check"><input type="checkbox" id="f-soil" name="soil" value="1" /> Has soil snapshot</label>
+      <label class="check"><input type="checkbox" id="f-soil" name="soil" value="1" /> Has soil data</label>
     </form>
 
     <div class="status-row">
@@ -99,7 +99,7 @@ const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
       <div class="swatch" style="background:${r.sw}">${r.p ? `<img src="${esc(r.p)}" alt="" title="${esc(r.pc || '')}" width="500" height="375" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
       <div class="body">
         <div class="meta">${s ? `<span class="pill" style="background:${s.bg};color:${s.fg}">${s.label}</span>` : ''}
-          <span class="soil-tag ${r.ok ? 'ready' : 'needs'}">${r.ok ? `${r.sc} samples` : 'Needs soil data'}</span></div>
+          <span class="soil-tag ${r.ok ? 'ready' : 'needs'}">${r.ok ? `${r.sc} sample${r.sc === 1 ? '' : 's'}` : 'Needs soil data'}</span></div>
         <h3>${esc(r.c || r.n)}</h3>
         ${r.c ? `<div class="sci">${esc(r.n)}</div>` : ''}
         <div class="foot">${esc(r.t)} · ${foot}</div>
