@@ -61,8 +61,8 @@
   status = 301
   force = true
 
-# Short, shareable link to the app (edaphicflora.org/app)
+# Old short link to the retired Shiny app (edaphicflora.org/app)
 [[redirects]]
   from = "/app"
-  to = "https://edaphicflora.shinyapps.io/edaphic-flora/"
-  status = 302
+  to = "/contribute/"
+  status = 301

@@ -1,5 +1,5 @@
 ---
-import { APP_URL, CONTACT_EMAIL, GITHUB_URL } from '../config.js';
+import { CONTACT_EMAIL, GITHUB_URL } from '../config.js';
 import { isSample } from '../lib/data.js';
 const year = new Date().getFullYear();
 ---
@@ -20,7 +20,6 @@ const year = new Date().getFullYear();
         <div class="hd">Contribute</div>
         <a href="/contribute/">Add a soil test</a>
         <a href="/account/">Your account</a>
-        <a href={APP_URL} rel="noopener">Open the analysis app</a>
         <a href={GITHUB_URL} rel="noopener">Source code on GitHub</a>
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         <a href="/privacy/">Privacy</a>

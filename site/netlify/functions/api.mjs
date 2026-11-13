@@ -1,6 +1,7 @@
 // Signed-in API for contributing soil tests.
 //
-//   GET    /api/me            -> { email, disabled, remaining_today }
+//   GET    /api/me            -> { email, disabled, remaining_today, extractions_left, home: { zip, state, city } }
+//   PUT    /api/me            { zip, state } -> { home: { zip, state, city } }   saves the home location
 //   GET    /api/samples       -> { samples: [...] }       the person's own samples
 //   POST   /api/samples       -> 201 { ids, ecoregion, warnings }
 //   DELETE /api/samples/:id   -> 204
@@ -27,6 +28,7 @@ export default async (req) => {
   const sampleId = /^\/api\/samples\/(\d{1,9})$/.exec(path)?.[1];
   const route =
     path === '/api/me' && req.method === 'GET' ? 'me'
+    : path === '/api/me' && req.method === 'PUT' ? 'prefs'
     : path === '/api/samples' && req.method === 'GET' ? 'list'
     : path === '/api/samples' && req.method === 'POST' ? 'create'
     : sampleId && req.method === 'DELETE' ? 'delete'
@@ -44,7 +46,7 @@ export default async (req) => {
 
   // Read and check the body before opening a database connection
   let body = null;
-  if (route === 'create') {
+  if (route === 'create' || route === 'prefs') {
     if (!(req.headers.get('content-type') || '').includes('application/json')) {
       return json({ error: 'Send JSON.' }, 415);
     }
@@ -62,7 +64,29 @@ export default async (req) => {
       const { rows: [u] } = await c.query('SELECT * FROM site_api.resolve_user($1, $2)', [who.uid, who.email]);
 
       if (route === 'me') {
-        return json({ email: who.email, disabled: u.disabled, remaining_today: u.remaining_today });
+        const [{ rows: prefs }, { rows: [left] }] = await Promise.all([
+          c.query('SELECT * FROM site_api.get_prefs($1)', [u.user_id]),
+          c.query('SELECT site_api.extractions_left($1) AS n', [u.user_id]),
+        ]);
+        const p = prefs[0] || {};
+        return json({
+          email: who.email,
+          disabled: u.disabled,
+          remaining_today: u.remaining_today,
+          extractions_left: left.n,
+          home: { zip: p.home_zipcode || null, state: p.home_state || null, city: p.home_city || null },
+        });
+      }
+
+      if (route === 'prefs') {
+        if (body === null || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Not understood.' }, 400);
+        const zip = typeof body.zip === 'string' ? body.zip.trim() : '';
+        const state = typeof body.state === 'string' ? body.state.trim() : '';
+        if (zip && !/^\d{5}$/.test(zip)) return json({ error: 'Enter a 5-digit zip code.' }, 400);
+        if (state && !/^[A-Za-z]{2}$/.test(state)) return json({ error: 'Choose a state from the list.' }, 400);
+        const { rows: [r] } = await c.query('SELECT site_api.save_prefs($1, $2, $3) AS r', [u.user_id, zip, state]);
+        if (r.r.status !== 'ok') return json({ error: r.r.error || 'Could not save that.' }, 400);
+        return json({ home: { zip: r.r.home_zipcode, state: r.r.home_state, city: r.r.home_city } });
       }
 
       if (route === 'list') {
