@@ -28,6 +28,33 @@ BEGIN;
 CREATE SCHEMA IF NOT EXISTS public_site;
 
 -- -----------------------------------------------------------------------------
+-- Name helpers. A species is genus + epithet. Hybrid markers ("×", attached or
+-- not, or a lone "x") are left out of the key, so "Iris × germanica",
+-- "Iris x germanica" and "Iris germanica" are one species, and USDA's
+-- "Viola ×esculenta" keys as "viola esculenta". The display name keeps the ×.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public_site.strip_hybrid(name text) RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT regexp_replace(
+           regexp_replace(btrim(regexp_replace(name, '\s+', ' ', 'g')), '^(×|[xX] )\s*', ''),
+           '^(\S+) (×|[xX] )\s*', '\1 ')
+$$;
+
+CREATE OR REPLACE FUNCTION public_site.species_key(name text) RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT lower(split_part(public_site.strip_hybrid(name), ' ', 1) || ' ' ||
+               split_part(public_site.strip_hybrid(name), ' ', 2))
+$$;
+
+CREATE OR REPLACE FUNCTION public_site.species_label(name text) RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT CASE WHEN name ~ '^\s*(×|[xX]\s)' THEN '× ' ELSE '' END
+      || split_part(public_site.strip_hybrid(name), ' ', 1) || ' '
+      || CASE WHEN name ~ '^\s*\S+\s+(×|[xX]\s)' THEN '× ' ELSE '' END
+      || split_part(public_site.strip_hybrid(name), ' ', 2)
+$$;
+
+-- -----------------------------------------------------------------------------
 -- Thresholds (keep in sync with MIN_SAMPLES_FOR_PUBLIC_STATS and
 -- MIN_CONTRIBUTORS_FOR_PUBLIC_STATS in app/R/helpers.R)
 -- -----------------------------------------------------------------------------
@@ -42,8 +69,8 @@ SELECT
 CREATE OR REPLACE VIEW public_site.soil_species_summary AS
 WITH clean AS (
   SELECT
-    lower(split_part(btrim(s.species), ' ', 1) || ' ' || split_part(btrim(s.species), ' ', 2)) AS species_key,
-    split_part(btrim(s.species), ' ', 1) || ' ' || split_part(btrim(s.species), ' ', 2)        AS species_name,
+    public_site.species_key(s.species)   AS species_key,
+    public_site.species_label(s.species) AS species_name,
     s.created_by,
     CASE WHEN s.ph BETWEEN 3 AND 10              THEN s.ph END              AS ph,
     CASE WHEN s.organic_matter BETWEEN 0 AND 100 THEN s.organic_matter END  AS om,
@@ -157,9 +184,9 @@ SELECT DISTINCT ON (species_key)
   bloom_period
 FROM (
   SELECT
-    lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2)) AS species_key,
+    public_site.species_key(t.scientific_name)   AS species_key,
     t.id AS taxon_id,
-    split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2)        AS scientific_name,
+    public_site.species_label(t.scientific_name) AS scientific_name,
     t.usda_symbol,
     t.family,
     NULLIF(btrim(u.common_name), '') AS common_name,
@@ -177,8 +204,8 @@ FROM (
     CASE WHEN u.taxon_id IS NULL THEN 1 ELSE 0 END                           AS no_traits
   FROM ref_taxon t
   LEFT JOIN ref_usda_traits u ON u.taxon_id = t.id
-  WHERE split_part(t.scientific_name, ' ', 2) <> ''
-    AND split_part(t.scientific_name, ' ', 2) NOT LIKE '%[%'
+  WHERE split_part(public_site.strip_hybrid(t.scientific_name), ' ', 2) <> ''
+    AND split_part(public_site.strip_hybrid(t.scientific_name), ' ', 2) NOT LIKE '%[%'
 ) x
 ORDER BY species_key, rank_order, no_traits, scientific_name;
 
@@ -188,7 +215,7 @@ ORDER BY species_key, rank_order, no_traits, scientific_name;
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW public_site.species_state_status AS
 SELECT
-  lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2)) AS species_key,
+  public_site.species_key(t.scientific_name) AS species_key,
   sd.state_code,
   CASE max(CASE sd.native_status WHEN 'Native' THEN 3 WHEN 'Both' THEN 2 WHEN 'Introduced' THEN 1 ELSE 0 END)
     WHEN 3 THEN 'native' WHEN 2 THEN 'both' WHEN 1 THEN 'introduced' ELSE 'unknown'
@@ -196,7 +223,7 @@ SELECT
   CASE WHEN bool_or(sd.source = 'BONAP') THEN 'BONAP' ELSE max(sd.source) END AS source
 FROM ref_state_distribution sd
 JOIN ref_taxon t ON t.id = sd.taxon_id
-WHERE split_part(t.scientific_name, ' ', 2) <> ''
+WHERE split_part(public_site.strip_hybrid(t.scientific_name), ' ', 2) <> ''
 GROUP BY 1, 2;
 
 -- -----------------------------------------------------------------------------
@@ -204,7 +231,7 @@ GROUP BY 1, 2;
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW public_site.species_invasive AS
 SELECT DISTINCT
-  lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2)) AS species_key,
+  public_site.species_key(t.scientific_name) AS species_key,
   COALESCE(NULLIF(n.state_code, ''), 'US') AS state_code,
   n.designation,
   n.source,
@@ -227,8 +254,8 @@ SELECT DISTINCT ON (species_key)
   is_keystone_genus
 FROM (
   SELECT
-    lower(split_part(t.scientific_name, ' ', 1) || ' ' || split_part(t.scientific_name, ' ', 2)) AS species_key,
-    COALESCE(wp.genus, split_part(t.scientific_name, ' ', 1)) AS genus,
+    public_site.species_key(t.scientific_name) AS species_key,
+    COALESCE(wp.genus, split_part(public_site.strip_hybrid(t.scientific_name), ' ', 1)) AS genus,
     wp.lepidoptera_species_count,
     wp.specialist_bee_species_count,
     NULLIF(btrim(wp.songbird_value), '') AS songbird_value,
