@@ -4,3 +4,4 @@ dist/
 .netlify/
 # Real data export: built fresh on every Netlify build, never committed
 src/data/generated/
+.env

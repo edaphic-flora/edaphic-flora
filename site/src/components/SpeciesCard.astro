@@ -1,6 +1,6 @@
 ---
 import { STATUS_STYLE } from '../lib/data.js';
-const { sp, showFoot = false } = Astro.props;
+const { sp, showFoot = false, eager = false } = Astro.props;
 const st = sp.kind ? STATUS_STYLE[sp.kind] : null;
 const soilLabel = sp.soilReady ? `${sp.sampleCount} samples` : 'Needs soil data';
 const statesFoot = sp.nativeCodes.length
@@ -11,7 +11,19 @@ const statesFoot = sp.nativeCodes.length
 ---
 <a href={sp.url} class="sp-card">
   <div class="swatch" style={`background:${sp.swatchCss}`}>
-    {sp.photoHint && <span class="hint">{sp.photoHint}</span>}
+    {sp.photo && (
+      <img
+        src={sp.photo.src}
+        alt=""
+        title={sp.photoCredit.text}
+        width="500"
+        height="375"
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        referrerpolicy="no-referrer"
+        onerror="this.remove()"
+      />
+    )}
   </div>
   <div class="body">
     <div class="meta">

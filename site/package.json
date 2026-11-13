@@ -9,9 +9,10 @@
     "node": ">=22.23"
   },
   "scripts": {
-    "dev": "astro dev",
-    "export-data": "node scripts/export-data.mjs",
-    "build": "node scripts/export-data.mjs && astro build",
+    "dev": "node --env-file-if-exists=.env scripts/export-data.mjs && astro dev",
+    "export-data": "node --env-file-if-exists=.env scripts/export-data.mjs",
+    "fetch-photos": "node --env-file-if-exists=.env scripts/fetch-photos.mjs",
+    "build": "node --env-file-if-exists=.env scripts/export-data.mjs && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

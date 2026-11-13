@@ -9,7 +9,9 @@ site/
 ├── astro.config.mjs        site URL, sitemap
 ├── netlify.toml            build, headers, .com → .org redirect
 ├── sql/public_views.sql    the ONLY data the site can read (privacy rules live here)
+├── sql/species_photos.sql  photo table + view (one openly licensed photo per species)
 ├── scripts/export-data.mjs reads the views, writes src/data/generated/species.json
+├── scripts/fetch-photos.mjs finds photos on iNaturalist / Wikimedia, saves them to Neon
 ├── public/                 logos, favicon, og image, robots.txt
 └── src/
     ├── config.js           APP_URL, which hero ships, site URL
@@ -28,6 +30,29 @@ site/
 2. On every build, `scripts/export-data.mjs` reads those views (as the read-only `site_reader` role) and writes
    `src/data/generated/species.json`. That file is gitignored.
 3. Astro renders one page per species from that file.
+
+## Photos
+
+`scripts/fetch-photos.mjs` finds one photo per species and stores the URL and credit in `ref_species_photos`
+(`sql/species_photos.sql`). It tries iNaturalist first (exact plant name match, including synonyms), then the lead
+image of the species' Wikipedia article on Wikimedia Commons. Only CC0, public domain, CC BY, CC BY-SA, CC BY-NC and
+CC BY-NC-SA photos are used. Images are loaded straight from iNaturalist and Wikimedia, so they don't use Netlify
+bandwidth. Each species page shows the photographer and license.
+
+It works in priority order and saves each result as it goes, so it can be stopped and restarted:
+
+1. species with a public soil snapshot
+2. every other species in someone's garden (any soil sample)
+3. plants in the wildlife tables
+4. species native to at least one US state
+5. everything else with a US state record
+
+Run it locally (`npm run fetch-photos`, 400 species per run by default, about 1.2 to 2 seconds each) or let the
+weekly GitHub workflow do 2,500 at a time. `PHOTO_LIMIT=1000 npm run fetch-photos` changes the batch size;
+`PHOTO_DRY_RUN=true` lists what it would look up. Species with no usable photo are retried after 90 days.
+
+To use your own photo for a species, insert it with `locked = TRUE` (example at the bottom of
+`sql/species_photos.sql`); the script never replaces locked rows.
 
 With no `DATABASE_URL`, the build uses `src/data/sample/species.json` and shows a gold "sample data" ribbon. A
 production build without `DATABASE_URL` fails on purpose so sample numbers never go live.
@@ -59,9 +84,10 @@ production build without `DATABASE_URL` fails on purpose so sample numbers never
 4. Build & deploy > Branches and deploy contexts: add `dev` as a branch deploy.
 5. Domain management: add `edaphicflora.org` as the primary domain and `edaphicflora.com` as an alias. Using
    Netlify DNS (point both domains' nameservers at Netlify) is the simplest; HTTPS is automatic.
-6. Weekly data refresh (`.github/workflows/site-weekly-rebuild.yml`): create a Netlify build hook for
-   `main` and add its URL to GitHub as the `NETLIFY_BUILD_HOOK` secret. The workflow refreshes the data
-   every Monday.
+6. Weekly refresh (`.github/workflows/site-weekly-rebuild.yml` at the repo root): create a Netlify build hook
+   for `main` and add its URL to GitHub as the `NETLIFY_BUILD_HOOK` secret. For photos, run
+   `sql/species_photos.sql`, create the `photo_loader` role (bottom of that file) and add its connection string as
+   the `PHOTOS_DATABASE_URL` secret. Every Monday the workflow finds photos for 2,500 more species, then rebuilds.
 
 ## Everyday workflow
 
@@ -73,19 +99,30 @@ production build without `DATABASE_URL` fails on purpose so sample numbers never
 refresh is about 65 a month, which leaves room for roughly a dozen merges to `main`. If credits run out, every site
 on the account pauses until the next month, which is why this site lives on its own Netlify account.
 
-## Running it on your computer (optional)
+## Previewing on your computer
 
-Needs Node 22.23 or newer.
+This is the fastest way to work on the site: it reloads in the browser a moment after any file changes.
+
+One time (needs Node 22.23 or newer; check with `node -v`):
 
 ```bash
 cd site
 npm install
-npm run dev          # http://localhost:4321, sample data
+copy .env.example .env      # Windows (cp on Mac/Linux), then paste the real site_reader string into .env
 ```
 
-To preview with real data, set `DATABASE_URL` and run `npm run export-data` once, then `npm run dev`.
-`node_modules/` is large; if the repo stays in OneDrive, consider skipping local installs and using the `dev`
-branch preview on Netlify instead.
+Every time:
+
+```bash
+cd site
+npm run dev                 # pulls fresh data from Neon, then serves http://localhost:4321
+```
+
+Leave it running while you work. Without `.env` it uses the sample data. `npm run fetch-photos` uses the same `.env`
+(add `PHOTOS_DATABASE_URL`, or put the database owner's connection string in `DATABASE_URL` for that one run).
+
+`node_modules/` is about 100 MB of small files and OneDrive will sync all of it. That works, just slowly. Keeping the
+repo outside OneDrive (for example `C:\dev\edaphic-flora`) avoids it; GitHub is already the backup.
 
 ## Editing content
 

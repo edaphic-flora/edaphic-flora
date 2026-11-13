@@ -198,8 +198,11 @@ Static Astro site for edaphicflora.org (and .com, which redirects), deployed by 
 
 - The site reads ONLY the `public_site` views in `site/sql/public_views.sql`, using the read-only `site_reader` role (`DATABASE_URL` in Netlify). Privacy rules live in those views: thresholds (keep in sync with `helpers.R`), flagged and disabled-user samples excluded, no `created_by`, no locations. Wildlife is counts and highlight flags only.
 - `npm run build` runs `scripts/export-data.mjs` then `astro build`. Without `DATABASE_URL` it uses `src/data/sample/` and shows a sample-data ribbon; a production build without it fails on purpose.
-- Work on the `dev` branch (free branch deploys). Merges to `main` are production deploys (15 of 300 free credits each). Weekly data refresh: `.github/workflows/site-weekly-rebuild.yml`.
+- Work on the `dev` branch (free branch deploys). Merges to `main` are production deploys (15 of 300 free credits each). Weekly refresh (photos + rebuild): `.github/workflows/site-weekly-rebuild.yml`. Scheduled runs only happen once it is on `main`.
 - No em dashes in site copy.
+- Photos: `site/scripts/fetch-photos.mjs` stores one openly licensed photo per species in `ref_species_photos` (`site/sql/species_photos.sql`), iNaturalist first, Wikimedia Commons fallback, in tiers (soil snapshot, any samples, wildlife plants, natives, rest). Images are hotlinked, never stored in the repo. Locked rows are hand-picked and never overwritten.
+- Local preview: `cd site && npm run dev` (reads `site/.env`, see `.env.example`) serves http://localhost:4321 with live reload.
+- Not in the site yet (still Shiny only): sign-in, data entry + PDF extraction, My Garden, Analysis. Soil samples are keyed to the Polished user_uid in `created_by`, not email, so moving sign-in needs the Polished uid-to-email list.
 - Plan: next phase moves accounts, data entry, and PDF extraction from Shiny into the site (Netlify Functions + Neon), then shinyapps.io is retired.
 
 ## Important Conventions

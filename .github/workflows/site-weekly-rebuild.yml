@@ -1,32 +1,70 @@
-# Rebuilds edaphicflora.org once a week so new soil samples and reference
-# data updates show up without a code change.
+# Weekly refresh for edaphicflora.org:
+#   1. finds photos for up to 2,500 more species (iNaturalist, then Wikimedia)
+#   2. rebuilds the site so new soil samples and photos show up
 #
 # Setup (one time):
 #   1. Netlify > Site configuration > Build & deploy > Build hooks > Add build hook
-#      (name it "weekly data refresh", branch: main). Copy the URL.
-#   2. GitHub > this repo > Settings > Secrets and variables > Actions >
-#      New repository secret: NETLIFY_BUILD_HOOK = <the URL>
+#      (branch: main). GitHub secret NETLIFY_BUILD_HOOK = <the URL>
+#   2. Run site/sql/species_photos.sql in Neon and create the photo_loader role
+#      described at the bottom of that file. GitHub secret
+#      PHOTOS_DATABASE_URL = postgresql://photo_loader:<password>@<neon-host>/<db>?sslmode=require
+#   (GitHub > repo > Settings > Secrets and variables > Actions > New repository secret)
 #
-# Each run is one production deploy (15 Netlify credits on the free plan).
-# Run it by hand any time from the Actions tab ("Run workflow").
+# Either step is skipped if its secret is missing. Each run is one production
+# deploy (15 Netlify credits on the free plan). Run it by hand from the
+# Actions tab ("Run workflow"); you can set how many species to look up.
 
-name: Weekly site data refresh
+name: Weekly site refresh
 
 on:
   schedule:
-    - cron: '17 9 * * 1' # Mondays 09:17 UTC
+    - cron: '17 8 * * 1' # Mondays 08:17 UTC
   workflow_dispatch:
+    inputs:
+      photo_limit:
+        description: 'Species to look up photos for (about 1.2 to 2 seconds each)'
+        default: '2500'
+      rebuild:
+        description: 'Trigger a production rebuild afterwards'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
 
 jobs:
-  rebuild:
+  refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Find species photos
+        working-directory: site
+        env:
+          PHOTOS_DATABASE_URL: ${{ secrets.PHOTOS_DATABASE_URL }}
+          PHOTO_LIMIT: ${{ inputs.photo_limit || '2500' }}
+        run: |
+          if [ -z "$PHOTOS_DATABASE_URL" ]; then
+            echo "PHOTOS_DATABASE_URL secret is not set yet; skipping photos."
+            exit 0
+          fi
+          npm ci --no-audit --no-fund
+          npm run fetch-photos
+
       - name: Trigger Netlify build hook
+        if: ${{ always() && (github.event_name == 'schedule' || inputs.rebuild) }}
         env:
           HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
         run: |
           if [ -z "$HOOK" ]; then
-            echo "NETLIFY_BUILD_HOOK secret is not set yet; skipping."
+            echo "NETLIFY_BUILD_HOOK secret is not set yet; skipping rebuild."
             exit 0
           fi
           curl -fsS -X POST -d '{}' "$HOOK"

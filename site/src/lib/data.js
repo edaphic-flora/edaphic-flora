@@ -7,6 +7,7 @@ import curated from '../data/curated.json';
 import { STATES, STATE_NAME } from '../data/states.js';
 import invasiveUrls from '../data/state-invasive-urls.json';
 import { titleCaseCommon, plantType } from './names.js';
+import { photoCredit } from './photos.js';
 
 const GENERATED = path.join(process.cwd(), 'src/data/generated/species.json');
 const SAMPLE = path.join(process.cwd(), 'src/data/sample/species.json');
@@ -87,7 +88,7 @@ function enrich(r) {
     sampleCount: r.soil?.sample_count || 0,
     swatch,
     swatchCss: `linear-gradient(135deg, ${swatch[0]}, ${swatch[1]})`,
-    photoHint: c.photo_hint || null,
+    photoCredit: photoCredit(r.photo),
     url: `/species/${r.slug}/`,
   };
   sp.blurb = c.blurb || null;
@@ -126,6 +127,7 @@ export const plantTypes = [...new Set(species.map((s) => s.type))].sort();
 export const totals = {
   species: species.length,
   samples: meta.public_sample_count ?? species.reduce((t, s) => t + s.sampleCount, 0),
+  photos: species.filter((s) => s.photo).length,
   soilReady: species.filter((s) => s.soilReady).length,
 };
 
