@@ -105,6 +105,55 @@ import Base from '../layouts/Base.astro';
 
   const fmt = (v, d = 1) => (v == null ? '' : Number(v).toFixed(d));
 
+  const button = (text, cls, label) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.textContent = text;
+    if (label) b.setAttribute('aria-label', label);
+    return b;
+  };
+
+  // Two-step delete inside the row (no browser confirm dialog, which some
+  // browsers and embedded views block)
+  function deleteControl(s, tr, body) {
+    const box = document.createElement('span');
+    box.className = 'del';
+    const what = `${s.species}, ${s.date || 'no date'}`;
+    const start = button('Delete', 'link', `Delete ${what}`);
+    const ask = document.createElement('span');
+    ask.className = 'del-ask';
+    ask.hidden = true;
+    const yes = button('Yes, delete', 'link danger', `Yes, delete ${what} for good`);
+    const no = button('Cancel', 'link', 'Keep this sample');
+    ask.append('Delete for good? ', yes, ' ', no);
+    box.append(start, ask);
+
+    start.addEventListener('click', () => {
+      start.hidden = true;
+      ask.hidden = false;
+      yes.focus();
+    });
+    no.addEventListener('click', () => {
+      ask.hidden = true;
+      start.hidden = false;
+      start.focus();
+    });
+    yes.addEventListener('click', async () => {
+      yes.disabled = no.disabled = true;
+      const r = await api(`/api/samples/${s.id}`, { method: 'DELETE' });
+      if (r.ok) {
+        tr.remove();
+        say(`Deleted the ${s.species} sample.`);
+        if (!body.rows.length) renderSamples([]);
+      } else {
+        yes.disabled = no.disabled = false;
+        say(r.data?.error || 'Could not delete that sample.', 'error');
+      }
+    });
+    return box;
+  }
+
   function renderSamples(list) {
     const box = $('samples');
     box.replaceChildren();
@@ -140,25 +189,7 @@ import Base from '../layouts/Base.astro';
         if (i === 2 || i === 3) td.className = 'mono';
       });
       if (s.flagged) tr.cells[1].append(' (flagged for review)');
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'link';
-      del.textContent = 'Delete';
-      del.setAttribute('aria-label', `Delete ${s.species}, ${s.date || ''}`);
-      del.addEventListener('click', async () => {
-        if (!confirm(`Delete the ${s.species} sample from ${s.date || 'this test'}? This can't be undone.`)) return;
-        del.disabled = true;
-        const r = await api(`/api/samples/${s.id}`, { method: 'DELETE' });
-        if (r.ok) {
-          tr.remove();
-          say('Deleted.');
-          if (!body.rows.length) renderSamples([]);
-        } else {
-          del.disabled = false;
-          say(r.data?.error || 'Could not delete that sample.', 'error');
-        }
-      });
-      tr.insertCell().append(del);
+      tr.insertCell().append(deleteControl(s, tr, body));
     }
     box.append(table);
   }
@@ -284,6 +315,8 @@ import Base from '../layouts/Base.astro';
   .samples :global(th) { text-align: left; font-family: var(--f-head); font-weight: 600; font-size: 13px; padding: 8px 10px; border-bottom: 1px solid var(--line-strong); }
   .samples :global(td) { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
   .samples :global(.empty) { color: var(--bark); }
+  .samples :global(.del-ask) { white-space: nowrap; font-size: 15px; }
+  .samples :global(.danger) { color: #9b3d22; }
   .msg { margin-top: 18px; min-height: 1.4em; font-size: 17px; }
   .msg[data-kind='error'] { color: #9b3d22; }
 </style>
