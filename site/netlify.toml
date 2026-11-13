@@ -29,6 +29,25 @@
     X-Frame-Options = "DENY"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
+# Sign-in pages: Firebase loads only here, so they get a strict content
+# security policy (Google sign-in popup, Firebase auth APIs, nothing else).
+[[headers]]
+  for = "/account/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://apis.google.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://*.firebaseapp.com https://accounts.google.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'"
+
+[[headers]]
+  for = "/contribute/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://apis.google.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://*.firebaseapp.com https://accounts.google.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'"
+
+# Local testing of the site plus functions: `npx netlify dev` from site/
+[dev]
+  command = "npm run dev"
+  targetPort = 4321
+  port = 8888
+  framework = "#custom"
+
 # Send the .com to the .org (add both domains in Netlify > Domain management first)
 [[redirects]]
   from = "https://edaphicflora.com/*"

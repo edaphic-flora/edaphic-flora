@@ -202,7 +202,8 @@ Static Astro site for edaphicflora.org (and .com, which redirects), deployed by 
 - No em dashes in site copy.
 - Photos: `site/scripts/fetch-photos.mjs` stores one openly licensed photo per species in `ref_species_photos` (`site/sql/species_photos.sql`), iNaturalist first, Wikimedia Commons fallback, in tiers (soil snapshot, any samples, wildlife plants, natives, rest). Images are hotlinked, never stored in the repo. Locked rows are hand-picked and never overwritten.
 - Local preview: `cd site && npm run dev` (reads `site/.env`, see `.env.example`) serves http://localhost:4321 with live reload.
-- Not in the site yet (still Shiny only): sign-in, data entry + PDF extraction, My Garden, Analysis. Soil samples are keyed to the Polished user_uid in `created_by`, not email, so moving sign-in needs the Polished uid-to-email list.
+- Contributing on the site: `/contribute/` and `/account/` (Firebase sign-in, same project as the app) call Netlify functions in `site/netlify/functions/`; the `site_writer` login can only call `site_api` functions from `site/sql/contribute.sql`. Existing contributors link to their Polished uid by email via `legacy_users` (loaded by `scripts/load_site_reference.R`). Tests: `npm test` in site/, `Rscript site/test/db/contribute_functions_test.R`.
+- Not in the site yet (still Shiny only): PDF extraction, editing samples, My Garden, Analysis.
 - Plan: next phase moves accounts, data entry, and PDF extraction from Shiny into the site (Netlify Functions + Neon), then shinyapps.io is retired.
 
 ## Important Conventions

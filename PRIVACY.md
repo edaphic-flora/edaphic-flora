@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: 2026-05-11**
+**Last updated: 2026-11-12**
 
 Edaphic Flora ("we," "our," or "us") is committed to protecting your privacy. This policy explains how we collect, use, and safeguard your information when you use our soil data application.
 
@@ -18,7 +18,7 @@ Edaphic Flora ("we," "our," or "us") is committed to protecting your privacy. Th
 - Outcome observations (thriving, struggling, etc.)
 
 ### Automatically Collected
-- Server logs (request timestamps, errors) — kept short-term for operational debugging only; no third-party analytics, advertising, or tracking cookies are loaded.
+- Server logs (request timestamps, errors), kept short-term for operational debugging only; no third-party analytics, advertising, or tracking cookies are loaded.
 
 ## How We Use Your Information
 
@@ -30,7 +30,7 @@ Edaphic Flora ("we," "our," or "us") is committed to protecting your privacy. Th
 ## Data Sharing and Visibility
 
 ### Your Submitted Soil Data
-- **Is publicly visible** in aggregate analyses and maps
+- **Is publicly visible** on species pages (soil values with the number of samples behind them, never your location or identity) and in aggregate analyses and maps
 - **Is shared** under the [CC BY-NC 4.0 license](https://creativecommons.org/licenses/by-nc/4.0/) for non-commercial use
 - **Your email is NOT publicly displayed** - only used internally for attribution
 
@@ -47,6 +47,7 @@ We use the following services that may process your data:
 |---------|---------|---------------------|
 | Firebase (Google) | Authentication | [Google Privacy Policy](https://policies.google.com/privacy) |
 | Neon | Database hosting | [Neon Privacy Policy](https://neon.tech/privacy) |
+| Netlify | Website hosting (edaphicflora.org) | [Netlify Privacy Policy](https://www.netlify.com/privacy/) |
 | Anthropic Claude | AI extraction of soil reports | [Anthropic Privacy Policy](https://www.anthropic.com/privacy) |
 
 ## Data Retention
@@ -58,9 +59,9 @@ We use the following services that may process your data:
 ## Your Rights
 
 You may:
-- **Access** your submitted data through the app (My Data tab)
+- **Access** your submitted data through the app (My Data tab) or your account page on edaphicflora.org
 - **Edit or delete** your own submissions at any time
-- **Request account deletion** by emailing edaphicflora@gmail.com — we typically action requests within 7 days
+- **Request account deletion** by emailing edaphicflora@gmail.com. We typically action requests within 7 days
 
 ## Moderation
 

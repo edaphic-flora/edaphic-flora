@@ -1,0 +1,548 @@
+---
+import Base from '../layouts/Base.astro';
+import { SOIL_FIELDS, OUTCOMES, SUN_EXPOSURES, HYDROLOGY, TEXTURE_CLASS_NAMES, MAX_PLANTS, MAX_NOTES } from '../../netlify/lib/validate.mjs';
+const basic = SOIL_FIELDS.filter((f) => f.basic);
+const more = SOIL_FIELDS.filter((f) => !f.basic);
+const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
+---
+<Base
+  title="Add a soil test"
+  description="Add your lab soil test results and the plants growing in that soil to Edaphic Flora."
+>
+  <div class="narrow contrib">
+    <span class="eyebrow">Contribute</span>
+    <h1 class="h1">Add a soil test</h1>
+    <p class="lede">One lab soil test, the plants growing in that soil, and how they're doing. It takes about five minutes.</p>
+
+    <div id="gate" class="card pad gate">
+      <p id="gate-text">Loading…</p>
+      <a id="gate-link" class="btn btn-gold" href="/account/?next=/contribute/" hidden>Sign in to continue</a>
+    </div>
+
+    <form id="f" novalidate hidden>
+      <!-- 1. Soil test -->
+      <fieldset class="step">
+        <legend><span class="num">1</span> Your soil test</legend>
+        <label class="check">
+          <input type="checkbox" id="lab" />
+          <span>These results come from a soil testing laboratory report.</span>
+        </label>
+        <div class="grid">
+          {basic.map((f) => (
+            <label class="fld">{f.label}{unitLabel(f)}
+              <input class="input" type="number" inputmode="decimal" data-soil={f.key} min={f.min} max={f.max} step={f.step} />
+            </label>
+          ))}
+        </div>
+        <details class="more">
+          <summary>More results (CEC, nitrogen, salts, micronutrients)</summary>
+          <div class="grid">
+            {more.map((f) => (
+              <label class="fld">{f.label}{unitLabel(f)}
+                <input class="input" type="number" inputmode="decimal" data-soil={f.key} min={f.min} max={f.max} step={f.step} />
+              </label>
+            ))}
+          </div>
+        </details>
+
+        <div class="texture">
+          <p class="lbl">Soil texture</p>
+          <div class="radios" role="radiogroup" aria-label="Soil texture">
+            <label><input type="radio" name="tx" value="none" checked /> Not on my report</label>
+            <label><input type="radio" name="tx" value="pct" /> Sand, silt, clay %</label>
+            <label><input type="radio" name="tx" value="class" /> Texture class</label>
+          </div>
+          <div id="tx-pct" class="grid three" hidden>
+            <label class="fld">Sand %<input class="input" type="number" inputmode="decimal" id="sand" min="0" max="100" step="any" /></label>
+            <label class="fld">Silt %<input class="input" type="number" inputmode="decimal" id="silt" min="0" max="100" step="any" /></label>
+            <label class="fld">Clay %<input class="input" type="number" inputmode="decimal" id="clay" min="0" max="100" step="any" /></label>
+            <p id="tx-result" class="small mono span3"></p>
+          </div>
+          <div id="tx-class" hidden>
+            <label class="fld">Texture class
+              <select class="select" id="tx-class-sel">
+                <option value="">Choose a class</option>
+                {TEXTURE_CLASS_NAMES.map((c) => <option value={c}>{c}</option>)}
+              </select>
+            </label>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- 2. Plants -->
+      <fieldset class="step">
+        <legend><span class="num">2</span> Plants growing in this soil</legend>
+        <p class="small">Search by common or scientific name. Up to {MAX_PLANTS} plants per soil test.</p>
+        <div class="search">
+          <label for="sp-q" class="sr-only">Search for a plant</label>
+          <input id="sp-q" class="input" type="text" autocomplete="off" placeholder="e.g. butterfly weed or Asclepias tuberosa"
+                 role="combobox" aria-expanded="false" aria-controls="sp-list" aria-autocomplete="list" />
+          <ul id="sp-list" class="sp-list" role="listbox" hidden></ul>
+        </div>
+
+        <div id="all-row" class="all-row" hidden>
+          <span class="lbl">Set for all plants:</span>
+          <select class="select sm" id="all-outcome" aria-label="Outcome for all plants">
+            <option value="">Outcome</option>
+            {OUTCOMES.map((o) => <option value={o}>{o}</option>)}
+          </select>
+          <select class="select sm" id="all-sun" aria-label="Sun for all plants">
+            <option value="">Sun</option>
+            {SUN_EXPOSURES.map((o) => <option value={o}>{o}</option>)}
+          </select>
+          <select class="select sm" id="all-hydro" aria-label="Site moisture for all plants">
+            <option value="">Moisture</option>
+            {HYDROLOGY.map((o) => <option value={o.value}>{o.label}</option>)}
+          </select>
+          <button type="button" id="apply-all" class="btn btn-sage btn-sm">Apply to all</button>
+        </div>
+
+        <ol id="plants" class="plants"></ol>
+        <p id="plant-count" class="small"></p>
+
+        <template id="plant-tpl">
+          <li class="plant card">
+            <div class="p-head">
+              <div><span class="p-common"></span> <span class="p-sci sci"></span></div>
+              <button type="button" class="link p-remove">Remove</button>
+            </div>
+            <div class="grid four">
+              <label class="fld"><span>Cultivar <span class="opt">(optional)</span></span><input class="input p-cultivar" type="text" maxlength="255" /></label>
+              <label class="fld">How it's doing
+                <select class="select p-outcome"><option value="">Choose</option>{OUTCOMES.map((o) => <option value={o}>{o}</option>)}</select>
+              </label>
+              <label class="fld">Sun
+                <select class="select p-sun"><option value="">Choose</option>{SUN_EXPOSURES.map((o) => <option value={o}>{o}</option>)}</select>
+              </label>
+              <label class="fld">Site moisture
+                <select class="select p-hydro"><option value="">Choose</option>{HYDROLOGY.map((o) => <option value={o.value}>{o.label}</option>)}</select>
+              </label>
+            </div>
+            <label class="fld inat"><span>iNaturalist observation link <span class="opt">(optional)</span></span>
+              <input class="input p-inat" type="url" placeholder="https://www.inaturalist.org/observations/12345" />
+            </label>
+          </li>
+        </template>
+      </fieldset>
+
+      <!-- 3. Where and when -->
+      <fieldset class="step">
+        <legend><span class="num">3</span> Where and when</legend>
+        <div id="loc-zip" class="grid wide">
+          <label class="fld">Zip code where the sample was taken
+            <input class="input" id="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" />
+          </label>
+          <p id="zip-result" class="small zip-result"></p>
+        </div>
+        <div id="loc-coords" class="grid wide" hidden>
+          <label class="fld">Latitude<input class="input" id="lat" type="number" inputmode="decimal" step="any" min="-90" max="90" /></label>
+          <label class="fld">Longitude<input class="input" id="lon" type="number" inputmode="decimal" step="any" min="-180" max="180" /></label>
+        </div>
+        <button type="button" id="loc-toggle" class="link">Use latitude and longitude instead</button>
+        <p class="small privacy">We store the zip code's center point (or the coordinates you enter), never your address, and locations are never shown publicly.</p>
+
+        <div class="grid wide">
+          <label class="fld">Date the sample was taken<input class="input" id="date" type="date" /></label>
+        </div>
+        <label class="fld"><span>Notes <span class="opt">(optional)</span></span>
+          <textarea class="input notes" id="notes" rows="3" maxlength={MAX_NOTES}></textarea>
+        </label>
+        <p class="small"><span id="notes-count">0</span> of {MAX_NOTES.toLocaleString()} characters</p>
+      </fieldset>
+
+      <div id="problems" class="problems" role="alert" hidden></div>
+      <div id="dup" class="problems dup" hidden>
+        <p id="dup-text"></p>
+        <button type="button" id="dup-yes" class="btn btn-gold btn-sm">Add it anyway</button>
+      </div>
+      <button type="submit" id="save" class="btn btn-gold big">Save soil test</button>
+    </form>
+
+    <div id="done" class="card pad done" hidden>
+      <h2 class="h3" id="done-h">Saved.</h2>
+      <p id="done-text"></p>
+      <ul id="done-warn" class="warn"></ul>
+      <div class="row">
+        <a href="/contribute/" class="btn btn-gold btn-sm">Add another soil test</a>
+        <a href="/account/" class="btn btn-sage btn-sm">See your samples</a>
+      </div>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { signInConfigured, watchUser, needsVerification, api } from '../lib/firebase.js';
+  import { validateSubmission, MAX_PLANTS } from '../../netlify/lib/validate.mjs';
+  import { textureClassFor } from '../../netlify/lib/texture.mjs';
+  import { titleCaseCommon } from '../lib/names.js';
+
+  const $ = (id) => document.getElementById(id);
+  const form = $('f');
+  const params = new URLSearchParams(location.search);
+  const localToday = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  $('date').value = localToday();
+  $('date').max = localToday();
+
+  // ---------- sign-in gate
+  function gate(text, linkText, href) {
+    $('gate').hidden = false;
+    form.hidden = true;
+    $('gate-text').textContent = text;
+    $('gate-link').hidden = !linkText;
+    if (linkText) {
+      $('gate-link').textContent = linkText;
+      $('gate-link').href = href;
+    }
+  }
+  const here = `/contribute/${location.search}`;
+  if (!signInConfigured) gate("Adding soil tests isn't available on this copy of the site yet.");
+  watchUser(async (user) => {
+    if (!signInConfigured) return;
+    if (!user) return gate('Sign in (or create a free account) to add a soil test.', 'Sign in to continue', `/account/?next=${encodeURIComponent(here)}`);
+    if (needsVerification(user)) return gate('Please confirm your email address first.', 'Go to your account', `/account/?next=${encodeURIComponent(here)}`);
+    const me = await api('/api/me');
+    if (!me.ok) return gate(me.data?.error || 'Could not check your account. Please reload the page.');
+    if (me.data.disabled) return gate("This account can't add new samples. Email edaphicflora@gmail.com if you think that's a mistake.");
+    if (me.data.remaining_today === 0) return gate("You've added 20 samples in the last 24 hours, the daily limit. Please come back tomorrow.");
+    $('gate').hidden = true;
+    form.hidden = false;
+  });
+
+  // ---------- texture
+  const txMode = () => form.querySelector('input[name="tx"]:checked').value;
+  function updateTexture() {
+    const m = txMode();
+    $('tx-pct').hidden = m !== 'pct';
+    $('tx-class').hidden = m !== 'class';
+    if (m === 'pct') {
+      const [s, si, c] = ['sand', 'silt', 'clay'].map((k) => $(k).valueAsNumber);
+      const sum = s + si + c;
+      $('tx-result').textContent =
+        [s, si, c].every(Number.isFinite) && sum >= 90 && sum <= 110 ? `Texture class: ${textureClassFor(s, si, c)}`
+        : [s, si, c].every(Number.isFinite) ? `These add up to ${sum.toFixed(1)}%. They should total about 100.` : '';
+    }
+  }
+  form.querySelectorAll('input[name="tx"], #sand, #silt, #clay').forEach((el) => el.addEventListener('input', updateTexture));
+
+  // ---------- plants
+  const plantsEl = $('plants');
+  const tpl = $('plant-tpl');
+  const chosen = () => [...plantsEl.children].map((li) => li.dataset.species);
+
+  function refreshPlants() {
+    const n = plantsEl.children.length;
+    $('plant-count').textContent = n ? `${n} of ${MAX_PLANTS} plants` : '';
+    $('all-row').hidden = n < 2;
+    $('sp-q').disabled = n >= MAX_PLANTS;
+    $('sp-q').placeholder = n >= MAX_PLANTS ? `That's the limit of ${MAX_PLANTS} plants.` : 'e.g. butterfly weed or Asclepias tuberosa';
+  }
+
+  function addPlant(name, common) {
+    if (chosen().includes(name) || plantsEl.children.length >= MAX_PLANTS) return;
+    const li = tpl.content.firstElementChild.cloneNode(true);
+    li.dataset.species = name;
+    li.querySelector('.p-common').textContent = common ? titleCaseCommon(common) : '';
+    li.querySelector('.p-sci').textContent = name;
+    li.querySelector('.p-remove').addEventListener('click', () => {
+      li.remove();
+      refreshPlants();
+    });
+    plantsEl.append(li);
+    refreshPlants();
+  }
+
+  $('apply-all').addEventListener('click', () => {
+    const vals = { '.p-outcome': $('all-outcome').value, '.p-sun': $('all-sun').value, '.p-hydro': $('all-hydro').value };
+    for (const li of plantsEl.children) {
+      for (const [sel, v] of Object.entries(vals)) if (v) li.querySelector(sel).value = v;
+    }
+  });
+
+  // ---------- species search
+  const q = $('sp-q');
+  const list = $('sp-list');
+  let results = [];
+  let active = -1;
+  let timer = null;
+  let seq = 0;
+
+  function closeList() {
+    list.hidden = true;
+    q.setAttribute('aria-expanded', 'false');
+    q.removeAttribute('aria-activedescendant');
+    active = -1;
+  }
+  function renderList() {
+    list.replaceChildren();
+    if (!results.length) {
+      const li = document.createElement('li');
+      li.className = 'none';
+      li.textContent = q.value.trim().length >= 2 ? 'No matches. Try the scientific name.' : '';
+      list.append(li);
+    }
+    results.forEach((r, i) => {
+      const li = document.createElement('li');
+      li.id = `sp-opt-${i}`;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', String(i === active));
+      if (r.common) {
+        const c = document.createElement('span');
+        c.textContent = titleCaseCommon(r.common);
+        li.append(c, ' ');
+      }
+      const s = document.createElement('span');
+      s.className = 'sci';
+      s.textContent = r.name;
+      li.append(s);
+      if (chosen().includes(r.name)) li.classList.add('taken');
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        pick(i);
+      });
+      list.append(li);
+    });
+    list.hidden = false;
+    q.setAttribute('aria-expanded', 'true');
+    if (active >= 0) q.setAttribute('aria-activedescendant', `sp-opt-${active}`);
+  }
+  function pick(i) {
+    const r = results[i];
+    if (!r) return;
+    addPlant(r.name, r.common);
+    q.value = '';
+    results = [];
+    closeList();
+    q.focus();
+  }
+  async function search(term) {
+    const mine = ++seq;
+    const res = await fetch(`/api/species?q=${encodeURIComponent(term)}`).then((r) => r.json()).catch(() => ({ results: [] }));
+    if (mine !== seq) return;
+    results = res.results || [];
+    active = results.length ? 0 : -1;
+    renderList();
+  }
+  q.addEventListener('input', () => {
+    clearTimeout(timer);
+    const term = q.value.trim();
+    if (term.length < 2) return closeList();
+    timer = setTimeout(() => search(term), 200);
+  });
+  q.addEventListener('keydown', (e) => {
+    if (list.hidden) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!results.length) return;
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length;
+      renderList();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      pick(active);
+    } else if (e.key === 'Escape') {
+      closeList();
+    }
+  });
+  q.addEventListener('blur', () => setTimeout(closeList, 150));
+
+  // A species page's "Add a soil test" link passes ?species=
+  const pre = (params.get('species') || '').trim();
+  // compare without hybrid signs: the page may say "Iris germanica", the list "Iris × germanica"
+  const plainName = (s) => s.toLowerCase().replace(/×/g, ' ').replace(/(^|\s)x(?=\s)/g, ' ').replace(/\s+/g, ' ').trim();
+  if (pre) {
+    fetch(`/api/species?q=${encodeURIComponent(pre)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const hit = (d.results || []).find((r) => plainName(r.name) === plainName(pre));
+        if (hit) addPlant(hit.name, hit.common);
+      })
+      .catch(() => {});
+  }
+
+  // ---------- location
+  let useCoords = false;
+  $('loc-toggle').addEventListener('click', () => {
+    useCoords = !useCoords;
+    $('loc-zip').hidden = useCoords;
+    $('loc-coords').hidden = !useCoords;
+    $('loc-toggle').textContent = useCoords ? 'Use a zip code instead' : 'Use latitude and longitude instead';
+  });
+  $('zip').addEventListener('input', async () => {
+    const z = $('zip').value.trim();
+    $('zip-result').textContent = '';
+    if (!/^\d{5}$/.test(z)) return;
+    const r = await fetch(`/api/zip/${z}`).then((x) => x.json().then((d) => ({ ok: x.ok, d }))).catch(() => null);
+    if ($('zip').value.trim() !== z) return;
+    if (!r) return;
+    $('zip-result').textContent = r.ok
+      ? `${r.d.city}, ${r.d.state}${r.d.ecoregion ? ` · Ecoregion: ${r.d.ecoregion}` : ''}`
+      : r.d?.error || '';
+  });
+
+  // ---------- notes counter
+  $('notes').addEventListener('input', () => {
+    $('notes-count').textContent = String([...$('notes').value].length);
+  });
+
+  // ---------- collect, check, save
+  const numOrNull = (el) => {
+    if (el.value === '') return null;
+    const n = Number(el.value);
+    return Number.isFinite(n) ? n : el.value;
+  };
+
+  function collect(confirmDuplicates) {
+    const soil = {};
+    form.querySelectorAll('[data-soil]').forEach((el) => {
+      const v = numOrNull(el);
+      if (v !== null) soil[el.dataset.soil] = v;
+    });
+    const m = txMode();
+    const texture = m === 'pct'
+      ? { mode: 'pct', sand: numOrNull($('sand')), silt: numOrNull($('silt')), clay: numOrNull($('clay')) }
+      : m === 'class' ? { mode: 'class', class: $('tx-class-sel').value } : { mode: 'none' };
+    const plants = [...plantsEl.children].map((li) => ({
+      species: li.dataset.species,
+      cultivar: li.querySelector('.p-cultivar').value,
+      outcome: li.querySelector('.p-outcome').value,
+      sun_exposure: li.querySelector('.p-sun').value,
+      site_hydrology: li.querySelector('.p-hydro').value,
+      inat_url: li.querySelector('.p-inat').value.trim(),
+    }));
+    const location = useCoords ? { lat: numOrNull($('lat')), lon: numOrNull($('lon')) } : { zip: $('zip').value.trim() };
+    return {
+      lab_test_confirmed: $('lab').checked,
+      soil,
+      texture,
+      plants,
+      location,
+      date: $('date').value,
+      notes: $('notes').value,
+      confirm_duplicates: confirmDuplicates,
+    };
+  }
+
+  function showProblems(items) {
+    const box = $('problems');
+    box.replaceChildren();
+    if (!items.length) {
+      box.hidden = true;
+      return;
+    }
+    const p = document.createElement('p');
+    p.textContent = items.length === 1 ? 'Please fix this:' : 'Please fix these:';
+    const ul = document.createElement('ul');
+    for (const t of items) {
+      const li = document.createElement('li');
+      li.textContent = t;
+      ul.append(li);
+    }
+    box.append(p, ul);
+    box.hidden = false;
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function save(confirmDuplicates = false) {
+    $('dup').hidden = true;
+    const body = collect(confirmDuplicates);
+    const v = validateSubmission(body, { today: localToday() });
+    if (!v.ok) return showProblems(v.errors);
+    showProblems([]);
+    $('save').disabled = true;
+    $('save').textContent = 'Saving…';
+    const r = await api('/api/samples', { method: 'POST', body });
+    $('save').disabled = false;
+    $('save').textContent = 'Save soil test';
+    if (r.status === 201) {
+      const n = r.data.ids.length;
+      form.hidden = true;
+      $('done').hidden = false;
+      $('done-h').textContent = `Saved ${n} ${n === 1 ? 'sample' : 'samples'}. Thank you.`;
+      $('done-text').textContent =
+        "They're in your account now and will show on species pages after the weekly site refresh." +
+        (r.data.ecoregion ? ` Ecoregion: ${r.data.ecoregion}.` : '');
+      for (const w of r.data.warnings || []) {
+        const li = document.createElement('li');
+        li.textContent = w;
+        $('done-warn').append(li);
+      }
+      $('done').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (r.status === 409 && r.data?.code === 'duplicate') {
+      $('dup-text').textContent = r.data.error;
+      $('dup').hidden = false;
+      $('dup').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    showProblems(r.data?.errors || [r.data?.error || 'Something went wrong. Please try again.']);
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    save(false);
+  });
+  $('dup-yes').addEventListener('click', () => save(true));
+  refreshPlants();
+</script>
+
+<style>
+  .contrib { padding-top: clamp(40px, 6vw, 72px); padding-bottom: 32px; }
+  .contrib h1 { margin-top: 10px; }
+  .contrib .lede { margin-top: 14px; }
+  .gate { margin-top: 26px; display: grid; gap: 14px; justify-items: start; }
+  .step { border: none; margin: 34px 0 0; padding: 0; }
+  .step legend { font-family: var(--f-head); font-weight: 700; font-size: 22px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .num { display: inline-flex; width: 32px; height: 32px; border-radius: 50%; align-items: center; justify-content: center; background: var(--sage-fill); font-size: 15px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 18px; margin-bottom: 18px; }
+  .check input { width: 20px; height: 20px; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 16px; }
+  .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+  .grid.wide { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .grid.four { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .span3 { grid-column: 1 / -1; }
+  .fld { display: grid; gap: 6px; font-family: var(--f-head); font-weight: 600; font-size: 13.5px; align-content: start; }
+  .fld .input, .fld .select { width: 100%; font-size: 17px; padding: 11px 13px; }
+  .opt { font-weight: 400; color: var(--ink-muted); }
+  .more { margin-top: 16px; }
+  .more summary { cursor: pointer; font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--sage-ink); margin-bottom: 12px; }
+  .texture { margin-top: 22px; }
+  .lbl { font-family: var(--f-head); font-weight: 600; font-size: 13.5px; }
+  .radios { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; font-size: 17px; }
+  #tx-class { margin-top: 12px; max-width: 320px; }
+  .search { position: relative; margin-top: 12px; }
+  .search .input { width: 100%; }
+  .sp-list {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; list-style: none; margin: 0; padding: 6px;
+    background: var(--paper); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    max-height: 320px; overflow-y: auto;
+  }
+  .sp-list li { padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 17px; }
+  .sp-list li[aria-selected='true'], .sp-list li:hover { background: rgba(122, 154, 134, 0.18); }
+  .sp-list li.taken { opacity: 0.5; }
+  .sp-list li.none { cursor: default; color: var(--bark); }
+  .sp-list .sci { color: var(--ink-muted); font-size: 14px; }
+  .all-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+  .select.sm { font-size: 13px; padding: 9px 10px; }
+  .plants { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 12px; }
+  .plant { padding: 16px 18px; }
+  .p-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 12px; font-size: 18px; }
+  .p-common { font-family: var(--f-head); font-weight: 600; }
+  .p-sci { color: var(--ink-muted); font-size: 14px; }
+  .inat { margin-top: 12px; }
+  .zip-result { align-self: end; padding-bottom: 12px; }
+  .privacy { margin: 8px 0 20px; }
+  #loc-toggle { margin-top: 10px; }
+  .notes { width: 100%; resize: vertical; margin-top: 16px; }
+  .problems { margin-top: 26px; padding: 16px 18px; border-radius: 12px; background: rgba(211, 155, 53, 0.16); color: var(--charcoal); font-size: 17px; }
+  .problems ul { margin: 8px 0 0; padding-left: 20px; }
+  .dup { display: grid; gap: 12px; justify-items: start; }
+  .big { margin-top: 26px; font-size: 17px; padding: 16px 30px; }
+  .done { margin-top: 26px; }
+  .done p { margin-top: 10px; font-size: 18px; }
+  .warn { margin: 10px 0 0; padding-left: 20px; color: var(--bark); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  @media (max-width: 560px) { .grid.three { grid-template-columns: 1fr; } }
+</style>
