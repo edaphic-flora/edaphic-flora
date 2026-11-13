@@ -16,10 +16,21 @@ export const DEFAULT_LICENSES = ['cc0', 'pd', 'cc-by', 'cc-by-sa', 'cc-by-nc', '
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const lc = (s) => String(s || '').trim().toLowerCase();
 
-// "schizachyrium Scoparium" -> "Schizachyrium scoparium"
+// Drops hybrid markers ("×", attached or not, or a lone "x"), the same way
+// public_site.strip_hybrid() does: "Iris × germanica" -> "Iris germanica".
+export function stripHybrid(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/^(×|x )\s*/i, '')
+    .replace(/^(\S+) (×|x )\s*/i, '$1 ');
+}
+
+// "schizachyrium Scoparium" -> "Schizachyrium scoparium" (hybrid marker dropped;
+// lookups compare names without it, so either spelling finds the taxon)
 export function normalizeName(name) {
-  const parts = String(name || '').trim().split(/\s+/);
-  if (parts.length < 2) return null;
+  const parts = stripHybrid(name).split(' ');
+  if (parts.length < 2 || !parts[1]) return null;
   const genus = parts[0][0].toUpperCase() + parts[0].slice(1).toLowerCase();
   return `${genus} ${parts[1].toLowerCase()}`;
 }
@@ -114,7 +125,7 @@ export function makePhotoLookup({
       (t) =>
         t.iconic_taxon_name === 'Plantae' &&
         PLANT_RANKS.includes(t.rank) &&
-        (lc(t.matched_term) === want || lc(t.name) === want)
+        (lc(stripHybrid(t.matched_term)) === want || lc(stripHybrid(t.name)) === want)
     );
     hits.sort((a, b) => (a.rank === 'species' ? 0 : 1) - (b.rank === 'species' ? 0 : 1));
     const taxon = hits[0];

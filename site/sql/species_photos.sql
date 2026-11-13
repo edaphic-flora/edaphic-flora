@@ -12,7 +12,7 @@
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS ref_species_photos (
-  species_key   TEXT PRIMARY KEY,           -- lower('Genus epithet'), same key as public_site views
+  species_key   TEXT PRIMARY KEY,           -- public_site.species_key(name): lower('genus epithet'), no hybrid ×
   source        TEXT NOT NULL CHECK (source IN ('inaturalist', 'wikimedia', 'manual', 'none')),
   photo_id      TEXT,
   page_url      TEXT,                        -- photo page (credit link)
