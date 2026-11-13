@@ -26,12 +26,12 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
         <div class="card pad upload">
           <p class="lbl">Fill this in from your lab report <span class="opt">(optional)</span></p>
           <p class="small">
-            Upload the PDF or a photo of the report and we'll read the values for you to check. The file is not kept.
-            <span id="x-left"></span>
+            Upload the report (PDF, RTF, text or CSV) or a photo of it, and we'll read the values for you to check.
+            The file is not kept. <span id="x-left"></span>
           </p>
           <label class="btn btn-sage btn-sm file-btn" id="x-label">
-            Choose a PDF or photo
-            <input type="file" id="x-file" class="sr-only" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic" />
+            Choose a report file or photo
+            <input type="file" id="x-file" class="sr-only" accept=".pdf,.rtf,.txt,.csv,application/pdf,application/rtf,text/rtf,text/plain,text/csv,image/jpeg,image/png,image/webp,image/gif,image/heic" />
           </label>
           <p id="x-status" class="small x-status" role="status" aria-live="polite"></p>
           <ul id="x-warn" class="warn"></ul>
@@ -188,6 +188,7 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
   import { validateSubmission, MAX_PLANTS } from '../../netlify/lib/validate.mjs';
   import { textureClassFor } from '../../netlify/lib/texture.mjs';
   import { titleCaseCommon } from '../lib/names.js';
+  import { isRtf, rtfToText } from '../../netlify/lib/rtf.mjs';
 
   const $ = (id) => document.getElementById(id);
   const form = $('f');
@@ -244,6 +245,13 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
       r.onerror = () => reject(new Error('read'));
       r.readAsDataURL(blob);
     });
+  const readText = (blob, encoding) =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || ''));
+      r.onerror = () => reject(new Error('read'));
+      r.readAsText(blob, encoding);
+    });
   // Photos are shrunk to at most 2000 px and sent as JPEG
   async function photoToJpeg(file) {
     const img = await createImageBitmap(file);
@@ -295,8 +303,16 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
     $('x-warn').replaceChildren();
     const say = (t) => ($('x-status').textContent = t);
     let payload;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
     try {
-      if (file.type === 'application/pdf') {
+      if (['rtf', 'txt', 'csv'].includes(ext) || /^text\/|rtf/.test(file.type)) {
+        if (file.size > MAX_UPLOAD) return say('That file is over 4 MB. Try a smaller file.');
+        // RTF is usually saved in the Windows character set; plain text in UTF-8
+        const raw = await readText(file, ext === 'rtf' ? 'windows-1252' : 'utf-8');
+        const text = isRtf(raw) ? rtfToText(raw) : raw;
+        if (!text || text.trim().length < 20) return say('No readable text was found in that file.');
+        payload = { media_type: 'text/plain', text: text.slice(0, 200000) };
+      } else if (file.type === 'application/pdf' || ext === 'pdf') {
         if (file.size > MAX_UPLOAD) return say('That PDF is over 4 MB. Try a smaller file, or a photo of the page.');
         payload = { media_type: 'application/pdf', data: await toBase64(file) };
       } else if (file.type.startsWith('image/')) {
@@ -304,7 +320,7 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
         if (!jpeg || jpeg.size > MAX_UPLOAD) return say('That photo is too large. Try a smaller one.');
         payload = { media_type: 'image/jpeg', data: await toBase64(jpeg) };
       } else {
-        return say('Upload a PDF or a photo (JPG or PNG).');
+        return say('Upload a PDF, RTF, text or CSV file, or a photo (JPG or PNG). For a Word file, save it as PDF or RTF first.');
       }
     } catch {
       return say("That file couldn't be opened here. If it's an iPhone photo, save it as a JPEG and try again.");

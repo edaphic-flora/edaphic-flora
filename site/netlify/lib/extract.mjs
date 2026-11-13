@@ -9,7 +9,9 @@ import { SOIL_FIELDS, TEXTURE_CLASS_NAMES } from './validate.mjs';
 
 export const EXTRACT_MODEL = 'claude-opus-5-5';
 export const MAX_FILE_BYTES = 4 * 1024 * 1024; // Netlify's 6 MB request limit, after base64
-export const MEDIA_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+export const MEDIA_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'text/plain'];
+// RTF, TXT and CSV reports are turned into plain text in the browser
+export const MAX_TEXT_CHARS = 200_000;
 
 export const EXTRACTION_PROMPT = `You are extracting soil test data from a soil lab report. Fill in each field if it is present and use null when it is missing.
 
