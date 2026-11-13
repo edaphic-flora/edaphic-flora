@@ -105,6 +105,35 @@ tryCatch({
   check("disabled account cannot submit", status(submit("test-fb-uid-1", sp[24], confirm = TRUE)) == "disabled")
   x("RESET ROLE")
   check("site_reader cannot call site_api", !q("SELECT has_function_privilege('site_reader', 'site_api.my_samples(text)', 'EXECUTE') AS ok")$ok)
+
+  # ---- home location
+  x("SET ROLE tmp_site_writer_test")
+  r <- jsonlite::fromJSON(q("SELECT site_api.save_prefs('test-fb-uid-1', '06511', NULL)::text AS r")$r)
+  check("save a home zip: state and city come from the zip", r$status == "ok" && r$home_state == "CT" && r$home_city == "New Haven")
+  p <- q("SELECT * FROM site_api.get_prefs('test-fb-uid-1')")
+  check("read it back", nrow(p) == 1 && p$home_zipcode == "06511" && p$home_state == "CT")
+  r <- jsonlite::fromJSON(q("SELECT site_api.save_prefs('test-fb-uid-1', '', 'vt')::text AS r")$r)
+  check("state only (any case) replaces the zip", r$status == "ok" && r$home_state == "VT" && is.null(r$home_zipcode))
+  check("unknown zip refused", jsonlite::fromJSON(q("SELECT site_api.save_prefs('test-fb-uid-1', '00000', NULL)::text AS r")$r)$status == "invalid")
+  check("bad state refused", jsonlite::fromJSON(q("SELECT site_api.save_prefs('test-fb-uid-1', NULL, 'ZZ')::text AS r")$r)$status == "invalid")
+  check("clearing works", jsonlite::fromJSON(q("SELECT site_api.save_prefs('test-fb-uid-1', '', '')::text AS r")$r)$status == "ok" &&
+          is.na(q("SELECT home_state FROM site_api.get_prefs('test-fb-uid-1')")$home_state))
+  check("unknown user cannot save", jsonlite::fromJSON(q("SELECT site_api.save_prefs('not-a-site-user', '06511', NULL)::text AS r")$r)$status == "unknown_user")
+  check("get_prefs shows nothing for an unknown id", nrow(q("SELECT * FROM site_api.get_prefs('not-a-site-user')")) == 0)
+
+  # ---- extraction limits (test-fb-uid-1 is disabled above, so use account 2's link)
+  uid2 <- q("SELECT user_id FROM site_api.resolve_user('test-fb-uid-3', 'nobody3@example.invalid')")$user_id
+  claim <- function() jsonlite::fromJSON(q("SELECT site_api.claim_extraction($1, 'report.pdf')::text AS r", uid2)$r)
+  c1 <- claim()
+  check("first extraction claimed, 2 left", c1$status == "ok" && c1$remaining == 2)
+  x(sprintf("SELECT site_api.release_extraction('%s', %d)", uid2, c1$id))
+  check("a failed call is released and doesn't count", q("SELECT site_api.extractions_left($1) AS n", uid2)$n == 3)
+  for (i in 1:3) { ci <- claim(); x(sprintf("SELECT site_api.finish_extraction('%s', %d, 1200)", uid2, ci$id)) }
+  check("4th extraction in a day refused", claim()$status == "user_limit")
+  check("finished extraction can't be released", {
+    x(sprintf("SELECT site_api.release_extraction('%s', %d)", uid2, ci$id)); q("SELECT site_api.extractions_left($1) AS n", uid2)$n == 0 })
+  check("disabled account cannot extract", jsonlite::fromJSON(q("SELECT site_api.claim_extraction('test-fb-uid-1', 'x.pdf')::text AS r")$r)$status == "disabled")
+  x("RESET ROLE")
 }, error = function(e) {
   fails <<- fails + 1
   cat("ERROR", conditionMessage(e), "\n")

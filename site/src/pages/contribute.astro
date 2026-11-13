@@ -23,6 +23,19 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
       <!-- 1. Soil test -->
       <fieldset class="step">
         <legend><span class="num">1</span> Your soil test</legend>
+        <div class="card pad upload">
+          <p class="lbl">Fill this in from your lab report <span class="opt">(optional)</span></p>
+          <p class="small">
+            Upload the PDF or a photo of the report and we'll read the values for you to check. The file is not kept.
+            <span id="x-left"></span>
+          </p>
+          <label class="btn btn-sage btn-sm file-btn" id="x-label">
+            Choose a PDF or photo
+            <input type="file" id="x-file" class="sr-only" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic" />
+          </label>
+          <p id="x-status" class="small x-status" role="status" aria-live="polite"></p>
+          <ul id="x-warn" class="warn"></ul>
+        </div>
         <label class="check">
           <input type="checkbox" id="lab" />
           <span>These results come from a soil testing laboratory report.</span>
@@ -209,6 +222,112 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
     if (me.data.remaining_today === 0) return gate("You've added 20 samples in the last 24 hours, the daily limit. Please come back tomorrow.");
     $('gate').hidden = true;
     form.hidden = false;
+    // Start from the saved home zip, if there is one
+    if (me.data.home?.zip && !$('zip').value) {
+      $('zip').value = me.data.home.zip;
+      $('zip').dispatchEvent(new Event('input'));
+    }
+    setExtractionsLeft(me.data.extractions_left);
+  });
+
+  // ---------- read a lab report (PDF or photo)
+  const MAX_UPLOAD = 4 * 1024 * 1024;
+  function setExtractionsLeft(n) {
+    $('x-left').textContent = n == null ? '' : n > 0 ? `You can read ${n} more ${n === 1 ? 'report' : 'reports'} today.` : "You've read today's 3 reports; enter the values by hand.";
+    $('x-file').disabled = n === 0;
+    $('x-label').classList.toggle('off', n === 0);
+  }
+  const toBase64 = (blob) =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = () => reject(new Error('read'));
+      r.readAsDataURL(blob);
+    });
+  // Photos are shrunk to at most 2000 px and sent as JPEG
+  async function photoToJpeg(file) {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  }
+  function applyExtraction(x) {
+    form.querySelectorAll('.filled').forEach((el) => el.classList.remove('filled'));
+    let advanced = false;
+    for (const [key, value] of Object.entries(x.soil || {})) {
+      const el = form.querySelector(`[data-soil="${key}"]`);
+      if (!el) continue;
+      el.value = String(value);
+      el.classList.add('filled');
+      if (el.closest('details')) advanced = true;
+    }
+    if (advanced) form.querySelector('details.more').open = true;
+    if (x.texture) {
+      form.querySelector(`input[name="tx"][value="${x.texture.mode}"]`).checked = true;
+      if (x.texture.mode === 'pct') {
+        for (const k of ['sand', 'silt', 'clay']) {
+          $(k).value = String(x.texture[k]);
+          $(k).classList.add('filled');
+        }
+      } else {
+        $('tx-class-sel').value = x.texture.class;
+        $('tx-class-sel').classList.add('filled');
+      }
+      updateTexture();
+    }
+    if (x.sample_date) {
+      $('date').value = x.sample_date;
+      $('date').classList.add('filled');
+    }
+    if (x.notes) {
+      const current = $('notes').value.trim();
+      $('notes').value = current ? `${current}\n${x.notes}` : x.notes;
+      $('notes').dispatchEvent(new Event('input'));
+    }
+  }
+  $('x-file').addEventListener('change', async () => {
+    const file = $('x-file').files[0];
+    $('x-file').value = '';
+    if (!file) return;
+    $('x-warn').replaceChildren();
+    const say = (t) => ($('x-status').textContent = t);
+    let payload;
+    try {
+      if (file.type === 'application/pdf') {
+        if (file.size > MAX_UPLOAD) return say('That PDF is over 4 MB. Try a smaller file, or a photo of the page.');
+        payload = { media_type: 'application/pdf', data: await toBase64(file) };
+      } else if (file.type.startsWith('image/')) {
+        const jpeg = await photoToJpeg(file);
+        if (!jpeg || jpeg.size > MAX_UPLOAD) return say('That photo is too large. Try a smaller one.');
+        payload = { media_type: 'image/jpeg', data: await toBase64(jpeg) };
+      } else {
+        return say('Upload a PDF or a photo (JPG or PNG).');
+      }
+    } catch {
+      return say("That file couldn't be opened here. If it's an iPhone photo, save it as a JPEG and try again.");
+    }
+    $('x-label').classList.add('off');
+    $('x-file').disabled = true;
+    say(`Reading ${file.name}... this usually takes 10 to 30 seconds.`);
+    const r = await api('/api/extract', { method: 'POST', body: { filename: file.name, ...payload } });
+    $('x-label').classList.remove('off');
+    $('x-file').disabled = false;
+    if (!r.ok) return say(r.data?.error || 'Reading the report did not work. Please enter the values by hand.');
+    applyExtraction(r.data);
+    setExtractionsLeft(r.data.extractions_left);
+    say(
+      r.data.found
+        ? `Filled in ${r.data.found} ${r.data.found === 1 ? 'value' : 'values'} from ${file.name} (highlighted). Check each one against your report before saving.`
+        : `No soil values were found in ${file.name}. Please enter them by hand.`
+    );
+    for (const w of r.data.warnings || []) {
+      const li = document.createElement('li');
+      li.textContent = w;
+      $('x-warn').append(li);
+    }
   });
 
   // ---------- texture
@@ -496,6 +615,13 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
   .step { border: none; margin: 34px 0 0; padding: 0; }
   .step legend { font-family: var(--f-head); font-weight: 700; font-size: 22px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
   .num { display: inline-flex; width: 32px; height: 32px; border-radius: 50%; align-items: center; justify-content: center; background: var(--sage-fill); font-size: 15px; }
+  .upload { margin-bottom: 20px; }
+  .upload .small { margin-top: 6px; }
+  .file-btn { margin-top: 12px; position: relative; }
+  .file-btn.off { opacity: 0.5; pointer-events: none; }
+  .file-btn:focus-within { outline: 3px solid rgba(122, 154, 134, 0.5); outline-offset: 2px; }
+  .x-status { margin-top: 10px; }
+  .filled { border-color: var(--sage) !important; background: rgba(122, 154, 134, 0.12) !important; }
   .check { display: flex; gap: 10px; align-items: flex-start; font-size: 18px; margin-bottom: 18px; }
   .check input { width: 20px; height: 20px; margin-top: 4px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 16px; }

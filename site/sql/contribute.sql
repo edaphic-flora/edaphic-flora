@@ -359,6 +359,111 @@ BEGIN
   RETURN v_deleted IS NOT NULL;
 END $$;
 
+-- -----------------------------------------------------------------------------
+-- Home location (same user_preferences table the earlier Shiny app used)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION site_api.get_prefs(p_user_id TEXT)
+RETURNS TABLE (home_zipcode TEXT, home_state TEXT, home_city TEXT)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT p.home_zipcode::TEXT, p.home_state::TEXT, p.home_city::TEXT
+    FROM user_preferences p
+   WHERE p.user_id = p_user_id
+     AND EXISTS (SELECT 1 FROM site_users su WHERE su.user_id = p_user_id)
+$$;
+
+-- Save a home zip (state, city and coordinates come from the zip) or just a
+-- state. Empty values clear the saved location.
+CREATE OR REPLACE FUNCTION site_api.save_prefs(p_user_id TEXT, p_zip TEXT, p_state TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_zip   TEXT := NULLIF(btrim(p_zip), '');
+  v_state TEXT := upper(NULLIF(btrim(p_state), ''));
+  v_city  TEXT;
+  v_lat   NUMERIC;
+  v_lon   NUMERIC;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM site_users WHERE user_id = p_user_id) THEN
+    RETURN jsonb_build_object('status', 'unknown_user');
+  END IF;
+  IF v_zip IS NOT NULL THEN
+    SELECT z.state, z.city, z.latitude, z.longitude INTO v_state, v_city, v_lat, v_lon
+      FROM ref_zipcodes z WHERE z.zipcode = v_zip;
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('status', 'invalid', 'error', 'That zip code was not found.');
+    END IF;
+  ELSIF v_state IS NOT NULL AND v_state NOT IN (
+    'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+    'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD',
+    'TN','TX','UT','VT','VA','WA','WV','WI','WY') THEN
+    RETURN jsonb_build_object('status', 'invalid', 'error', 'Choose a state from the list.');
+  END IF;
+
+  INSERT INTO user_preferences (user_id, home_zipcode, home_state, home_city, home_lat, home_long, updated_at)
+  VALUES (p_user_id, v_zip, v_state, v_city, v_lat, v_lon, now())
+  ON CONFLICT (user_id) DO UPDATE SET
+    home_zipcode = EXCLUDED.home_zipcode, home_state = EXCLUDED.home_state, home_city = EXCLUDED.home_city,
+    home_lat = EXCLUDED.home_lat, home_long = EXCLUDED.home_long, updated_at = now();
+
+  RETURN jsonb_build_object('status', 'ok', 'home_zipcode', v_zip, 'home_state', v_state, 'home_city', v_city);
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- Soil report extraction (Anthropic API), same limits as the Shiny app:
+-- 3 per person and 20 overall per calendar day. A slot is claimed before the
+-- API call and released if the call fails, so failures don't count.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION site_api.claim_extraction(p_user_id TEXT, p_filename TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  c_per_user CONSTANT INT := 3;
+  c_global   CONSTANT INT := 20;
+  v_user INT;
+  v_all  INT;
+  v_id   INT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM site_users WHERE user_id = p_user_id) THEN
+    RETURN jsonb_build_object('status', 'unknown_user');
+  END IF;
+  IF EXISTS (SELECT 1 FROM disabled_users WHERE user_id = p_user_id) THEN
+    RETURN jsonb_build_object('status', 'disabled');
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('site_api.extract:all'));
+  SELECT count(*) INTO v_user FROM pdf_extractions WHERE user_id = p_user_id AND extracted_at >= CURRENT_DATE;
+  IF v_user >= c_per_user THEN
+    RETURN jsonb_build_object('status', 'user_limit', 'limit', c_per_user);
+  END IF;
+  SELECT count(*) INTO v_all FROM pdf_extractions WHERE extracted_at >= CURRENT_DATE;
+  IF v_all >= c_global THEN
+    RETURN jsonb_build_object('status', 'global_limit');
+  END IF;
+  INSERT INTO pdf_extractions (user_id, filename)
+  VALUES (p_user_id, left(coalesce(p_filename, ''), 200) || ' (edaphicflora.org)')
+  RETURNING id INTO v_id;
+  RETURN jsonb_build_object('status', 'ok', 'id', v_id, 'remaining', c_per_user - v_user - 1);
+END $$;
+
+CREATE OR REPLACE FUNCTION site_api.finish_extraction(p_user_id TEXT, p_id INT, p_tokens INT)
+RETURNS VOID
+LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  UPDATE pdf_extractions SET tokens_used = greatest(0, p_tokens)
+   WHERE id = p_id AND user_id = p_user_id
+$$;
+
+CREATE OR REPLACE FUNCTION site_api.release_extraction(p_user_id TEXT, p_id INT)
+RETURNS VOID
+LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  DELETE FROM pdf_extractions WHERE id = p_id AND user_id = p_user_id AND tokens_used IS NULL
+$$;
+
+CREATE OR REPLACE FUNCTION site_api.extractions_left(p_user_id TEXT)
+RETURNS INT
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT greatest(0, 3 - (SELECT count(*)::int FROM pdf_extractions
+                           WHERE user_id = p_user_id AND extracted_at >= CURRENT_DATE))
+$$;
+
 -- Functions are executable by PUBLIC by default; only site_writer may call these.
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA site_api FROM PUBLIC;
 DO $$

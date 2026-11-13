@@ -48,7 +48,7 @@ const updated = meta.generated_at
   <div class="narrow block">
     <h2 class="h2s">How the soil stats are computed</h2>
     <ol class="steps">
-      <li>Soil tests are entered in the app and tied to a species and a site. Contributor names, emails, and sample locations are <strong>never published</strong>.</li>
+      <li>Soil tests are added by signed-in contributors and tied to a species and a site. Contributor names, emails, and sample locations are <strong>never published</strong>.</li>
       <li>Samples flagged during moderation, and samples from suspended accounts, are <strong>left out</strong> of every public number.</li>
       <li>Every species with at least one sample shows its soil values, with <strong>the number of samples behind each measurement</strong>. pH and organic matter get a range once they have at least {t.min_range_samples} values; until then you see the readings themselves.</li>
       <li>Ranges show the <strong>middle 80%</strong> of samples (10th to 90th percentile), so one odd reading can't stretch the range. The highlighted value is the median.</li>

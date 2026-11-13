@@ -86,7 +86,13 @@ app. Existing app contributors are linked to their Polished id by verified email
 New samples show in the person's account right away and on species pages after the weekly rebuild. Firebase loads
 only on these two pages, which get a strict content security policy (`netlify.toml`).
 
-Tests: `npm test` (validation, texture against the app's R code, token checks) and, from the repo root,
+Reading a lab report: `netlify/functions/extract.mjs` (`POST /api/extract`) sends the PDF or photo to Claude
+(`claude-opus-5-5` at low effort, structured JSON output, server-side refusal fallback) and returns values for the
+person to check; the file is never stored. Limits match the earlier app (3 per person and 20 overall per day,
+enforced in the database so failed calls don't count). Needs `ANTHROPIC_API_KEY` in Netlify. The account page also
+saves a home zip or state (`user_preferences`), which fills in the contribute form.
+
+Tests: `npm test` (validation, texture against the app's R code, token checks, report cleanup) and, from the repo root,
 `Rscript site/test/db/contribute_functions_test.R` (database functions, run in a transaction that is rolled back).
 Locally, `npx netlify dev` from `site/` serves the site and the functions on http://localhost:8888.
 

@@ -1,5 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
+import { STATES } from '../data/states.js';
+const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
 ---
 <Base
   title="Your account"
@@ -16,7 +18,7 @@ import Base from '../layouts/Base.astro';
 
     <!-- Signed out -->
     <section id="st-signin" hidden>
-      <p class="lede">Sign in to add soil tests and see the ones you've added. Accounts from the Edaphic Flora app work here too.</p>
+      <p class="lede">Sign in to add soil tests and see the ones you've added. If you had an account in the earlier Edaphic Flora app, sign in the same way here.</p>
       <div class="card pad box">
         <button type="button" id="google" class="btn btn-sage full">Continue with Google</button>
         <div class="or"><span>or use your email</span></div>
@@ -61,6 +63,24 @@ import Base from '../layouts/Base.astro';
         This account can't add new samples. If you think that's a mistake, email
         <a href="mailto:edaphicflora@gmail.com">edaphicflora@gmail.com</a>.
       </p>
+      <section class="card pad home-loc" aria-labelledby="home-h">
+        <h2 class="h3" id="home-h">Your home location</h2>
+        <p class="small">Fills in the zip code when you add a soil test. It's never shown publicly.</p>
+        <form id="home-form" class="loc-row" novalidate>
+          <label class="fld">Zip code
+            <input class="input" id="home-zip" type="text" inputmode="numeric" maxlength="5" autocomplete="postal-code" />
+          </label>
+          <label class="fld">or just your state
+            <select class="select" id="home-state">
+              <option value="">Choose a state</option>
+              {stateOptions.map((s) => <option value={s.code}>{s.name}</option>)}
+            </select>
+          </label>
+          <button type="submit" id="home-save" class="btn btn-sage btn-sm">Save</button>
+        </form>
+        <p id="home-msg" class="small" role="status" aria-live="polite"></p>
+      </section>
+
       <div class="head-row">
         <h2 class="h3">Your soil tests</h2>
         <a href="/contribute/" id="add-btn" class="btn btn-gold btn-sm">Add a soil test</a>
@@ -202,6 +222,10 @@ import Base from '../layouts/Base.astro';
       say(me.data?.error || 'Could not load your account. Please try again.', 'error');
       return;
     }
+    const home = me.data.home || {};
+    $('home-zip').value = home.zip || '';
+    $('home-state').value = home.state || '';
+    $('home-msg').textContent = home.city ? `Saved: ${home.city}, ${home.state}` : home.state ? `Saved: ${home.state}` : '';
     $('disabled-note').hidden = !me.data.disabled;
     $('add-btn').hidden = !!me.data.disabled;
     const n = me.data.remaining_today;
@@ -293,6 +317,43 @@ import Base from '../layouts/Base.astro';
   });
 
   document.querySelectorAll('.signout').forEach((b) => b.addEventListener('click', () => signOut()));
+
+  // ---- home location
+  $('home-zip').addEventListener('input', async () => {
+    const z = $('home-zip').value.trim();
+    if (!/^\d{5}$/.test(z)) return;
+    const r = await fetch(`/api/zip/${z}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if ($('home-zip').value.trim() !== z) return;
+    if (r) {
+      $('home-state').value = r.state;
+      $('home-msg').textContent = `${r.city}, ${r.state}`;
+    } else {
+      $('home-msg').textContent = 'That zip code was not found.';
+    }
+  });
+  $('home-state').addEventListener('change', () => {
+    // choosing a different state means the zip no longer applies
+    if ($('home-zip').value && $('home-state').value) $('home-zip').value = '';
+  });
+  $('home-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const zip = $('home-zip').value.trim();
+    if (zip && !/^\d{5}$/.test(zip)) {
+      $('home-msg').textContent = 'Enter a 5-digit zip code.';
+      return;
+    }
+    $('home-save').disabled = true;
+    const r = await api('/api/me', { method: 'PUT', body: { zip, state: zip ? '' : $('home-state').value } });
+    $('home-save').disabled = false;
+    if (!r.ok) {
+      $('home-msg').textContent = r.data?.error || 'Could not save that.';
+      return;
+    }
+    const h = r.data.home;
+    $('home-zip').value = h.zip || '';
+    $('home-state').value = h.state || '';
+    $('home-msg').textContent = h.city ? `Saved: ${h.city}, ${h.state}` : h.state ? `Saved: ${h.state}` : 'Cleared.';
+  });
 </script>
 
 <style>
@@ -309,6 +370,10 @@ import Base from '../layouts/Base.astro';
   .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 12px; }
   .who { margin-top: 14px; }
   .note { margin-top: 16px; padding: 14px 16px; border-radius: 10px; background: rgba(211, 155, 53, 0.16); color: var(--charcoal); }
+  .home-loc { margin-top: 22px; }
+  .loc-row { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin-top: 12px; }
+  .loc-row .fld { margin-bottom: 0; min-width: 180px; }
+  .loc-row .input, .loc-row .select { font-size: 17px; padding: 11px 13px; }
   .head-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
   .samples { margin-top: 16px; overflow-x: auto; }
   .samples :global(table) { width: 100%; border-collapse: collapse; font-size: 16px; }
