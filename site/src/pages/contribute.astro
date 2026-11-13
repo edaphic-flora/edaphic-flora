@@ -519,11 +519,12 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
     background: var(--paper); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
     max-height: 320px; overflow-y: auto;
   }
-  .sp-list li { padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 17px; }
-  .sp-list li[aria-selected='true'], .sp-list li:hover { background: rgba(122, 154, 134, 0.18); }
-  .sp-list li.taken { opacity: 0.5; }
-  .sp-list li.none { cursor: default; color: var(--bark); }
-  .sp-list .sci { color: var(--ink-muted); font-size: 14px; }
+  /* list items are created by the script, so they need :global() */
+  .sp-list :global(li) { padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 17px; }
+  .sp-list :global(li[aria-selected='true']), .sp-list :global(li:hover) { background: rgba(122, 154, 134, 0.18); }
+  .sp-list :global(li.taken) { opacity: 0.5; }
+  .sp-list :global(li.none) { cursor: default; color: var(--bark); }
+  .sp-list :global(.sci) { color: var(--ink-muted); font-size: 14px; }
   .all-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
   .select.sm { font-size: 13px; padding: 9px 10px; }
   .plants { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 12px; }
@@ -537,7 +538,7 @@ const unitLabel = (f) => (f.unit ? ` (${f.unit})` : '');
   #loc-toggle { margin-top: 10px; }
   .notes { width: 100%; resize: vertical; margin-top: 16px; }
   .problems { margin-top: 26px; padding: 16px 18px; border-radius: 12px; background: rgba(211, 155, 53, 0.16); color: var(--charcoal); font-size: 17px; }
-  .problems ul { margin: 8px 0 0; padding-left: 20px; }
+  .problems :global(ul) { margin: 8px 0 0; padding-left: 20px; }
   .dup { display: grid; gap: 12px; justify-items: start; }
   .big { margin-top: 26px; font-size: 17px; padding: 16px 30px; }
   .done { margin-top: 26px; }
