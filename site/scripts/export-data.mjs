@@ -6,7 +6,8 @@
 //
 // Environment:
 //   DATABASE_URL       Postgres connection string (use the read-only
-//                      site_reader role). If unset, the site builds from
+//                      site_reader role). Read from site/.env when present
+//                      (npm scripts pass --env-file-if-exists). If unset, the site builds from
 //                      src/data/sample/species.json and shows a "sample data"
 //                      ribbon.
 //   SITE_SCOPE         Which species get pages:
@@ -101,6 +102,12 @@ async function main() {
     const soil = await q('SELECT * FROM public_site.soil_species_summary WHERE species_key = ANY($1)', [keyList]);
     const wildSp = await q('SELECT * FROM public_site.wildlife_species_summary WHERE species_key = ANY($1)', [keyList]);
     const wildGenus = await q('SELECT * FROM public_site.wildlife_genus_summary');
+    let photos = [];
+    try {
+      photos = await q('SELECT * FROM public_site.species_photos WHERE species_key = ANY($1)', [keyList]);
+    } catch (err) {
+      log('no photos yet (run sql/species_photos.sql, then npm run fetch-photos):', err.message.split('\n')[0]);
+    }
 
     const by = (rows) => {
       const m = new Map();
@@ -114,6 +121,7 @@ async function main() {
     const soilBy = new Map(soil.map((r) => [r.species_key, r]));
     const wildBy = new Map(wildSp.map((r) => [r.species_key, r]));
     const genusBy = new Map(wildGenus.map((r) => [r.genus_key, r]));
+    const photoBy = new Map(photos.map((r) => [r.species_key, r]));
     const statesBy = by(states);
     const invBy = by(invasive);
 
@@ -221,6 +229,20 @@ async function main() {
         })),
         soil: soilOut,
         wildlife,
+        photo: (() => {
+          const p = photoBy.get(key);
+          if (!p) return null;
+          return {
+            src: p.image_url,
+            large: p.large_url || p.image_url,
+            w: p.width || null,
+            h: p.height || null,
+            source: p.source,
+            license: p.license,
+            creator: p.creator,
+            page: p.page_url,
+          };
+        })(),
       });
     }
 
@@ -233,6 +255,7 @@ async function main() {
         thresholds: settings,
         species_count: records.length,
         public_sample_count: records.reduce((t, r) => t + (r.soil?.sample_count || 0), 0),
+        photo_count: records.filter((r) => r.photo).length,
       },
       species: records,
     };

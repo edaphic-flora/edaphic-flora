@@ -59,7 +59,7 @@ const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
 </Base>
 
 <script>
-  type Row = { s: string; c: string | null; a?: string; n: string; t: string; k: string | null; nat: string; int: string; inv: string; sc: number; ok: number; sw: string; h: string | null };
+  type Row = { s: string; c: string | null; a?: string; n: string; t: string; k: string | null; nat: string; int: string; inv: string; sc: number; ok: number; sw: string; p?: string; pc?: string };
   const STYLE: Record<string, { label: string; bg: string; fg: string }> = {
     native: { label: 'Native', bg: '#93AF9C', fg: '#373D3C' },
     both: { label: 'Native + introduced', bg: '#9DAF92', fg: '#373D3C' },
@@ -96,7 +96,7 @@ const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
       ? (kind ? `${STYLE[kind].label} in ${st}` : `No record in ${st}`)
       : natN ? `Native in ${n(natN, 'state')}` : intN ? `Introduced in ${n(intN, 'state')}` : 'No state records';
     return `<a href="/species/${r.s}/" class="sp-card">
-      <div class="swatch" style="background:${r.sw}">${r.h ? `<span class="hint">${esc(r.h)}</span>` : ''}</div>
+      <div class="swatch" style="background:${r.sw}">${r.p ? `<img src="${esc(r.p)}" alt="" title="${esc(r.pc || '')}" width="500" height="375" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
       <div class="body">
         <div class="meta">${s ? `<span class="pill" style="background:${s.bg};color:${s.fg}">${s.label}</span>` : ''}
           <span class="soil-tag ${r.ok ? 'ready' : 'needs'}">${r.ok ? `${r.sc} samples` : 'Needs soil data'}</span></div>

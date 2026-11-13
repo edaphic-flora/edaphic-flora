@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-written content layered on top of the database export. Edit freely. Keys are species slugs. 'featured' controls the home page cards (first four that exist in the data are shown). 'common_name' overrides the USDA common name for display.",
+  "_note": "Hand-written content layered on top of the database export. Edit freely. Keys are species slugs. 'featured' controls the home page cards (first four that exist in the data are shown). 'common_name' overrides the USDA common name for display. 'swatch' is the color shown when a species has no photo yet.",
   "featured": [
     "schizachyrium-scoparium",
     "asclepias-tuberosa",
@@ -9,7 +9,6 @@
   "species": {
     "schizachyrium-scoparium": {
       "blurb": "A clump-forming warm-season grass that turns copper in fall. Tough, drought-tolerant, and a backbone of tallgrass prairie and meadow plantings.",
-      "photo_hint": "macro · seed head + blade",
       "swatch": [
         "#B79B6A",
         "#8A7B5C"
@@ -18,7 +17,6 @@
     "asclepias-tuberosa": {
       "common_name": "Butterfly Weed",
       "blurb": "A clump-forming milkweed with bright orange flower clusters. It has a deep taproot, prefers lean dry soil, and draws butterflies all summer.",
-      "photo_hint": "macro · orange umbel",
       "swatch": [
         "#D3A35A",
         "#C9824E"
@@ -27,7 +25,6 @@
     "echinacea-purpurea": {
       "common_name": "Purple Coneflower",
       "blurb": "A sturdy upright prairie perennial with rosy-purple petals and a copper cone. Reliable in gardens and a favorite of bees and goldfinches.",
-      "photo_hint": "macro · cone + ray florets",
       "swatch": [
         "#A98AA0",
         "#8A7B8E"
@@ -35,7 +32,6 @@
     },
     "panicum-virgatum": {
       "blurb": "A tall, upright warm-season grass with airy seed heads. It handles dry to wet ground and shows up in a lot of restoration and rain garden work.",
-      "photo_hint": "macro · airy panicle",
       "swatch": [
         "#A8A06A",
         "#8A8C5C"
@@ -44,7 +40,6 @@
     "rudbeckia-hirta": {
       "common_name": "Black-Eyed Susan",
       "blurb": "A golden daisy with a dark central cone. Short-lived but self-sowing, so it fills open ground quickly.",
-      "photo_hint": "macro · ray florets",
       "swatch": [
         "#D9B24A",
         "#C49A38"
@@ -52,7 +47,6 @@
     },
     "symphyotrichum-novae-angliae": {
       "blurb": "A tall, late-season aster covered in violet daisies. It is one of the last big nectar sources of the year, after most other bloom has faded.",
-      "photo_hint": "macro · violet rays",
       "swatch": [
         "#8E84B0",
         "#756C99"
@@ -60,7 +54,6 @@
     },
     "monarda-fistulosa": {
       "blurb": "A lavender-flowered mint with an oregano scent. It spreads by rhizome and hums with bees in midsummer.",
-      "photo_hint": "macro · ragged corolla",
       "swatch": [
         "#B49AB6",
         "#9A82A0"
@@ -68,7 +61,6 @@
     },
     "asclepias-syriaca": {
       "blurb": "A robust, colony-forming milkweed with fragrant pink-mauve flower balls. The classic monarch host of old fields and roadsides.",
-      "photo_hint": "macro · flower ball",
       "swatch": [
         "#BFA0A6",
         "#A4868C"
@@ -76,7 +68,6 @@
     },
     "andropogon-gerardii": {
       "blurb": "The tall turkey-foot grass of the tallgrass prairie, reaching head height with three-pronged seed heads.",
-      "photo_hint": "macro · turkey-foot seed",
       "swatch": [
         "#A88E5E",
         "#8A7348"
@@ -85,7 +76,6 @@
     "aquilegia-canadensis": {
       "common_name": "Eastern Red Columbine",
       "blurb": "A woodland-edge perennial with nodding red and yellow spurred flowers. It does well in rocky, part-shade spots and feeds early hummingbirds.",
-      "photo_hint": "macro · spurred bloom",
       "swatch": [
         "#C77E63",
         "#A86149"
@@ -94,7 +84,6 @@
     "eutrochium-maculatum": {
       "common_name": "Spotted Joe-Pye Weed",
       "blurb": "A tall wetland perennial topped with dusty-mauve flower domes. It likes wet feet and pulls in butterflies by the dozen.",
-      "photo_hint": "macro · mauve dome",
       "swatch": [
         "#B093A0",
         "#957B88"
@@ -102,7 +91,6 @@
     },
     "acer-platanoides": {
       "blurb": "A dense-canopied shade tree planted widely in cities and now naturalized in many forests. Its heavy shade suppresses native understory plants.",
-      "photo_hint": "macro · samara + leaf",
       "swatch": [
         "#8FA07A",
         "#73855E"

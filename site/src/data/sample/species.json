@@ -1,14 +1,15 @@
 {
  "meta": {
   "source": "sample",
-  "generated_at": "2026-11-12T23:57:38.425Z",
+  "generated_at": "2026-11-13T01:20:05.191Z",
   "scope": "curated",
   "thresholds": {
    "min_samples": 5,
    "min_contributors": 2
   },
   "species_count": 13,
-  "public_sample_count": 106
+  "public_sample_count": 106,
+  "photo_count": 13
  },
  "species": [
   {
@@ -92,7 +93,17 @@
      "magnesium": null
     }
    },
-   "wildlife": null
+   "wildlife": null,
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/87307303/medium.jpeg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/87307303/large.jpeg",
+    "w": 1536,
+    "h": 2048,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "tauntonguy02780",
+    "page": "https://www.inaturalist.org/photos/87307303"
+   }
   },
   {
    "key": "andropogon gerardii",
@@ -214,6 +225,16 @@
     "bird_food": "Seeds",
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/49663357/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/49663357/large.jpg",
+    "w": 2048,
+    "h": 1536,
+    "source": "inaturalist",
+    "license": "cc-by-nc-sa",
+    "creator": "Kingsbrae Garden",
+    "page": "https://www.inaturalist.org/photos/49663357"
    }
   },
   {
@@ -302,6 +323,16 @@
     "bird_food": null,
     "hummingbird": true,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/503013812/medium.jpeg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/503013812/large.jpeg",
+    "w": 1536,
+    "h": 2048,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "Sadie Hickey",
+    "page": "https://www.inaturalist.org/photos/503013812"
    }
   },
   {
@@ -389,6 +420,16 @@
     "bird_food": null,
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/99923276/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/99923276/large.jpg",
+    "w": 1536,
+    "h": 2048,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "csozanne",
+    "page": "https://www.inaturalist.org/photos/99923276"
    }
   },
   {
@@ -481,6 +522,16 @@
     "bird_food": null,
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/206558098/medium.jpeg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/206558098/large.jpeg",
+    "w": 2048,
+    "h": 1728,
+    "source": "inaturalist",
+    "license": "cc-by",
+    "creator": "Michael J. Papay",
+    "page": "https://www.inaturalist.org/photos/206558098"
    }
   },
   {
@@ -587,6 +638,16 @@
     "bird_food": "Seeds",
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/563980339/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/563980339/large.jpg",
+    "w": 2048,
+    "h": 1151,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "Isaac Krauss",
+    "page": "https://www.inaturalist.org/photos/563980339"
    }
   },
   {
@@ -694,6 +755,16 @@
     "bird_food": null,
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/608430488/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/608430488/large.jpg",
+    "w": 2048,
+    "h": 1335,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "Léo-Guy de Repentigny",
+    "page": "https://www.inaturalist.org/photos/608430488"
    }
   },
   {
@@ -818,6 +889,16 @@
     "bird_food": null,
     "hummingbird": true,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/301795454/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/301795454/large.jpg",
+    "w": 1536,
+    "h": 2048,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "ziggymom",
+    "page": "https://www.inaturalist.org/photos/301795454"
    }
   },
   {
@@ -846,7 +927,17 @@
      "magnesium": null
     }
    },
-   "wildlife": null
+   "wildlife": null,
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/102867/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/102867/large.jpg",
+    "w": 2048,
+    "h": 1924,
+    "source": "inaturalist",
+    "license": "cc-by",
+    "creator": "Nicholas",
+    "page": "https://www.inaturalist.org/photos/102867"
+   }
   },
   {
    "key": "panicum virgatum",
@@ -973,6 +1064,16 @@
     "bird_food": "Seeds",
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/9682082/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/9682082/large.jpg",
+    "w": 1509,
+    "h": 2048,
+    "source": "inaturalist",
+    "license": "cc-by",
+    "creator": "aarongunnar",
+    "page": "https://www.inaturalist.org/photos/9682082"
    }
   },
   {
@@ -1098,6 +1199,16 @@
     "bird_food": "Seeds",
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/20050503/medium.jpeg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/20050503/large.jpeg",
+    "w": 2048,
+    "h": 1365,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "germangirl",
+    "page": "https://www.inaturalist.org/photos/20050503"
    }
   },
   {
@@ -1223,6 +1334,16 @@
     "bird_food": "Seeds",
     "hummingbird": false,
     "keystone": false
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/163915824/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/163915824/large.jpg",
+    "w": 2048,
+    "h": 1536,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "Scott E Severs",
+    "page": "https://www.inaturalist.org/photos/163915824"
    }
   },
   {
@@ -1315,6 +1436,16 @@
     "bird_food": "Seeds",
     "hummingbird": false,
     "keystone": true
+   },
+   "photo": {
+    "src": "https://inaturalist-open-data.s3.amazonaws.com/photos/52293886/medium.jpg",
+    "large": "https://inaturalist-open-data.s3.amazonaws.com/photos/52293886/large.jpg",
+    "w": 1639,
+    "h": 2048,
+    "source": "inaturalist",
+    "license": "cc-by-nc",
+    "creator": "musicmanz",
+    "page": "https://www.inaturalist.org/photos/52293886"
    }
   }
  ]

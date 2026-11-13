@@ -7,6 +7,7 @@ import TraitsCard from '../../components/TraitsCard.astro';
 import SpeciesCard from '../../components/SpeciesCard.astro';
 import { species, related, countLabel, STATUS_STYLE, isSample } from '../../lib/data.js';
 import { APP_URL, SITE_URL, SITE_NAME } from '../../config.js';
+import { photoSize } from '../../lib/photos.js';
 
 export function getStaticPaths() {
   return species.map((sp) => ({ params: { slug: sp.slug }, props: { sp } }));
@@ -14,6 +15,9 @@ export function getStaticPaths() {
 
 const { sp } = Astro.props;
 const rel = related(sp, 4);
+const photo = sp.photo;
+const credit = sp.photoCredit;
+const big = photoSize(photo, 1024);
 const aka = sp.common_name && sp.common && sp.common_name.toLowerCase() !== sp.common.toLowerCase() ? sp.common_name : null;
 const na = sp.usda?.na_status;
 
@@ -51,6 +55,7 @@ const jsonLd = [
     taxonRank: 'species',
     parentTaxon: { '@type': 'Taxon', name: sp.genus, taxonRank: 'genus' },
     url: pageUrl,
+    ...(photo ? { image: photo.large } : {}),
   },
   {
     '@context': 'https://schema.org',
@@ -63,11 +68,13 @@ const jsonLd = [
   },
 ];
 ---
-<Base title={title} description={description} active="browse" jsonLd={jsonLd}>
+<Base title={title} description={description} active="browse" jsonLd={jsonLd} ogImage={photo ? photo.large : undefined}>
   <header class="sp-head dark">
     <div class="stripes"></div>
     <div class="wrap inner">
       <nav aria-label="Breadcrumb" class="crumb"><a href="/species/">← all species</a></nav>
+      <div class:list={['head-grid', { 'has-photo': photo }]}>
+      <div class="head-copy">
       <div class="type mono">{sp.type}{sp.family && ` · ${sp.family}`}</div>
       <h1>{sp.displayName}</h1>
       {sp.common && <div class="sci-big">{sp.scientific_name}</div>}
@@ -78,6 +85,27 @@ const jsonLd = [
           {badges.map((b) => <span class="badge" style={`background:${b.bg};color:${b.fg}`}>{b.label}</span>)}
         </div>
       )}
+      </div>
+      {photo && (
+        <figure class="head-photo">
+          <img
+            src={photo.large}
+            alt={sp.common ? `${sp.common} (${sp.scientific_name})` : sp.scientific_name}
+            width={big.width}
+            height={big.height}
+            fetchpriority="high"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onerror="this.closest('figure').remove()"
+          />
+          <figcaption>
+            Photo: {credit.page ? <a href={credit.page} rel="noopener">{credit.creator}</a> : credit.creator},
+            {' '}{credit.licenseUrl ? <a href={credit.licenseUrl} rel="noopener license">{credit.licenseLabel}</a> : credit.licenseLabel}
+            {credit.via && `, via ${credit.via}`}
+          </figcaption>
+        </figure>
+      )}
+      </div>
     </div>
   </header>
 
@@ -117,6 +145,20 @@ const jsonLd = [
 <style>
   .inner { position: relative; padding-top: clamp(28px, 4vw, 44px); padding-bottom: clamp(34px, 5vw, 52px); }
   .crumb a { font-family: var(--f-data); font-size: 12px; color: var(--sage-muted); text-decoration: none; }
+  .head-grid.has-photo { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); align-items: center; }
+  .head-photo { margin: 18px 0 0; }
+  .head-photo img {
+    width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px;
+    background: rgba(247, 244, 232, 0.06); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28); display: block;
+  }
+  .head-photo figcaption { font-family: var(--f-data); font-size: 11px; color: var(--sage-muted); margin-top: 10px; line-height: 1.5; }
+  .head-photo figcaption a { color: inherit; text-underline-offset: 2px; }
+  .head-photo figcaption a:hover { color: var(--limestone); }
+  @media (max-width: 860px) {
+    .head-grid.has-photo { grid-template-columns: 1fr; gap: 0; }
+    .head-photo { order: -1; }
+    .head-photo img { aspect-ratio: 3 / 2; max-height: 300px; }
+  }
   .crumb a:hover { color: var(--limestone); }
   .type { font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--sage-muted); margin-top: 18px; }
   h1 { font-weight: 700; color: var(--limestone); font-size: clamp(34px, 5vw, 58px); line-height: 1.05; margin-top: 8px; letter-spacing: -0.6px; }

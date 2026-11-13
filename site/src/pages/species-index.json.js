@@ -15,7 +15,8 @@ export function GET() {
     sc: s.sampleCount,
     ok: s.soilReady ? 1 : 0,
     sw: s.swatchCss,
-    h: s.photoHint,
+    p: s.photo ? s.photo.src : undefined,
+    pc: s.photoCredit ? s.photoCredit.text : undefined,
   }));
   return new Response(JSON.stringify(rows), { headers: { 'Content-Type': 'application/json' } });
 }

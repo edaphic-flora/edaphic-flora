@@ -8,7 +8,7 @@ const ready = !!s?.meets_threshold;
 const pos = (v) => Math.max(0, Math.min(100, ((v - PH_SCALE.min) / (PH_SCALE.max - PH_SCALE.min)) * 100));
 const pct = (v) => `${pos(v).toFixed(1)}%`;
 const usdaPh = u?.ph_min != null && u?.ph_max != null ? { min: u.ph_min, max: u.ph_max } : null;
-const ticks = [4.0, 5.5, 7.0, 8.5].map((v) => ({ v, at: pct(v), label: v === 4 ? '4.0 acidic' : v === 7 ? '7.0 neutral' : v === 8.5 ? '8.5 alkaline' : v.toFixed(1) }));
+const ticks = [4.0, 5.5, 7.0, 8.5].map((v) => ({ v, at: pct(v), num: v.toFixed(1), word: v === 4 ? 'acidic' : v === 7 ? 'neutral' : v === 8.5 ? 'alkaline' : '' }));
 const nutrients = ready
   ? [
       ['Phosphorus (P)', s.nutrients?.phosphorus],
@@ -46,7 +46,7 @@ const refBits = [
             <div class="ph-mark" style={`left:${pct(s.ph.p50)}`}></div>
             {usdaPh && <div class="ph-usda" style={`left:${pct(usdaPh.min)};width:${(pos(usdaPh.max) - pos(usdaPh.min)).toFixed(1)}%`}></div>}
           </div>
-          <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.label}</span>)}</div>
+          <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.num}{t.word && <i> {t.word}</i>}</span>)}</div>
           <p class="key">
             <span class="sw sw-range"></span> middle 80% of samples
             <span class="sw sw-mark"></span> median
@@ -106,7 +106,7 @@ const refBits = [
               <div class="ph-usda solid" style={`left:${pct(usdaPh.min)};width:${(pos(usdaPh.max) - pos(usdaPh.min)).toFixed(1)}%`}></div>
             </div>
           )}
-          {usdaPh && <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.label}</span>)}</div>}
+          {usdaPh && <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.num}{t.word && <i> {t.word}</i>}</span>)}</div>}
         </div>
       )}
     </div>
@@ -132,6 +132,8 @@ const refBits = [
   .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
   .ticks span:first-child { transform: none; }
   .ticks span:last-child { transform: translateX(-100%); }
+  .ticks i { font-style: normal; }
+  @media (max-width: 480px) { .ticks i { display: none; } }
   .key { margin-top: 14px; font-family: var(--f-data); font-size: 11px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .sw { display: inline-block; width: 16px; height: 8px; border-radius: 3px; margin-left: 8px; }
   .sw:first-child { margin-left: 0; }
