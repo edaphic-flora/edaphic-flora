@@ -1,0 +1,16 @@
+---
+import { isSample } from '../lib/data.js';
+---
+{isSample && (
+  <div class="ribbon" role="note">
+    Preview build with sample data. Numbers on this site are illustrative, not real measurements.
+  </div>
+)}
+
+<style>
+  .ribbon {
+    background: var(--gold); color: var(--charcoal); text-align: center;
+    font-family: var(--f-head); font-weight: 600; font-size: 12.5px; letter-spacing: 0.2px;
+    padding: 7px 16px;
+  }
+</style>

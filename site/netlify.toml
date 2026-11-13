@@ -1,0 +1,49 @@
+# Netlify settings for edaphicflora.org
+#
+# In the Netlify UI set "Base directory" to: site
+# Netlify then reads this file from site/. With a base directory set,
+# Netlify skips the build automatically when nothing under site/ changed,
+# so commits that only touch the R app don't spend deploy credits.
+# Build-hook builds (the weekly data refresh) always run.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Which species get pages: curated | native | all (see scripts/export-data.mjs)
+  SITE_SCOPE = "curated"
+
+# Fingerprinted assets never change, so cache them for a year
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Send the .com to the .org (add both domains in Netlify > Domain management first)
+[[redirects]]
+  from = "https://edaphicflora.com/*"
+  to = "https://edaphicflora.org/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.edaphicflora.com/*"
+  to = "https://edaphicflora.org/:splat"
+  status = 301
+  force = true
+
+# Short, shareable link to the app (edaphicflora.org/app)
+[[redirects]]
+  from = "/app"
+  to = "https://edaphicflora.shinyapps.io/edaphic-flora/"
+  status = 302

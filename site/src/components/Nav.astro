@@ -1,0 +1,51 @@
+---
+import { APP_URL } from '../config.js';
+const { active = '' } = Astro.props;
+const links = [
+  { href: '/', label: 'Home', key: 'home' },
+  { href: '/species/', label: 'Browse species', key: 'browse' },
+  { href: '/about/', label: 'About', key: 'about' },
+];
+---
+<header class="nav">
+  <div class="wrap bar">
+    <a href="/" class="logo" aria-label="Edaphic Flora home">
+      <img src="/logo-sage.svg" alt="edaphic flora" width="95" height="40" />
+    </a>
+    <nav aria-label="Main">
+      {links.map((l) => (
+        <a href={l.href} class:list={[{ on: active === l.key }]} aria-current={active === l.key ? 'page' : undefined}>
+          {l.label}
+        </a>
+      ))}
+    </nav>
+    <a href={APP_URL} class="btn btn-gold btn-sm cta" rel="noopener">Open the app →</a>
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: sticky; top: 0; z-index: 50; background: var(--charcoal);
+    border-bottom: 1px solid rgba(247, 244, 232, 0.08);
+  }
+  .bar { height: 66px; display: flex; align-items: center; gap: 24px; }
+  .logo { flex-shrink: 0; }
+  .logo img { height: 40px; width: auto; }
+  nav { display: flex; align-items: center; gap: 24px; margin-left: 10px; }
+  nav a {
+    font-family: var(--f-head); font-weight: 600; font-size: 13.5px; letter-spacing: 0.4px;
+    color: var(--limestone); text-decoration: none; white-space: nowrap;
+  }
+  nav a:hover { color: var(--gold-hover); }
+  nav a.on { color: var(--gold); }
+  .cta { margin-left: auto; }
+
+  @media (max-width: 720px) {
+    .bar { height: auto; flex-wrap: wrap; row-gap: 0; padding-top: 12px; }
+    .logo img { height: 34px; }
+    nav {
+      order: 3; width: 100%; margin: 0; gap: 22px; padding: 12px 0 12px;
+      overflow-x: auto; border-top: 1px solid rgba(247, 244, 232, 0.08); margin-top: 12px;
+    }
+  }
+</style>

@@ -1,0 +1,137 @@
+---
+import Base from '../../layouts/Base.astro';
+import SoilSnapshot from '../../components/SoilSnapshot.astro';
+import StateMap from '../../components/StateMap.astro';
+import WildlifeCard from '../../components/WildlifeCard.astro';
+import TraitsCard from '../../components/TraitsCard.astro';
+import SpeciesCard from '../../components/SpeciesCard.astro';
+import { species, related, countLabel, STATUS_STYLE, isSample } from '../../lib/data.js';
+import { APP_URL, SITE_URL, SITE_NAME } from '../../config.js';
+
+export function getStaticPaths() {
+  return species.map((sp) => ({ params: { slug: sp.slug }, props: { sp } }));
+}
+
+const { sp } = Astro.props;
+const rel = related(sp, 4);
+const aka = sp.common_name && sp.common && sp.common_name.toLowerCase() !== sp.common.toLowerCase() ? sp.common_name : null;
+const na = sp.usda?.na_status;
+
+// Header badges
+const badges = [];
+if (sp.usda?.native_status_na) {
+  const k = na === 'introduced' ? 'introduced' : na === 'both' ? 'both' : 'native';
+  badges.push({ ...STATUS_STYLE[k], label: sp.usda.native_status_na });
+}
+if (sp.nativeCodes.length) badges.push({ ...STATUS_STYLE.native, label: `Native in ${countLabel(sp.nativeCodes)}` });
+if (sp.introducedCodes.length && !sp.nativeCodes.length)
+  badges.push({ ...STATUS_STYLE.introduced, label: `Introduced in ${countLabel(sp.introducedCodes)}` });
+if (sp.invasiveCodes.length) {
+  const shown = sp.invasiveCodes.slice(0, 3).join(', ');
+  const more = sp.invasiveCodes.length > 3 ? ` +${sp.invasiveCodes.length - 3}` : '';
+  badges.push({ ...STATUS_STYLE.invasive, label: `Invasive: ${shown}${more}` });
+}
+if (sp.federalInvasive) badges.push({ ...STATUS_STYLE.invasive, label: 'Federal noxious weed' });
+
+// SEO
+const name = sp.common ? `${sp.common} (${sp.scientific_name})` : sp.scientific_name;
+const title = `${name}: soil pH, native range and wildlife value`;
+const nativeBit = sp.nativeCodes.length ? `native in ${countLabel(sp.nativeCodes)} (BONAP)` : sp.introducedCodes.length ? `introduced in ${countLabel(sp.introducedCodes)}` : null;
+const description = sp.soilReady
+  ? `Soil pH, organic matter and texture from ${sp.sampleCount} community soil samples for ${name}, plus native status by US state${nativeBit ? `, ${nativeBit}` : ''}, and wildlife value.`
+  : `Native status by US state${nativeBit ? ` (${nativeBit})` : ''}, USDA traits and wildlife value for ${name}, with community soil data as it comes in.`;
+const pageUrl = `${SITE_URL}${sp.url}`;
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Taxon',
+    '@id': `${pageUrl}#taxon`,
+    name: sp.scientific_name,
+    ...(sp.common ? { alternateName: aka ? [sp.common, aka] : sp.common } : {}),
+    taxonRank: 'species',
+    parentTaxon: { '@type': 'Taxon', name: sp.genus, taxonRank: 'genus' },
+    url: pageUrl,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: SITE_NAME, item: `${SITE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Species', item: `${SITE_URL}/species/` },
+      { '@type': 'ListItem', position: 3, name: sp.displayName, item: pageUrl },
+    ],
+  },
+];
+---
+<Base title={title} description={description} active="browse" jsonLd={jsonLd}>
+  <header class="sp-head dark">
+    <div class="stripes"></div>
+    <div class="wrap inner">
+      <nav aria-label="Breadcrumb" class="crumb"><a href="/species/">← all species</a></nav>
+      <div class="type mono">{sp.type}{sp.family && ` · ${sp.family}`}</div>
+      <h1>{sp.displayName}</h1>
+      {sp.common && <div class="sci-big">{sp.scientific_name}</div>}
+      {aka && <div class="aka">Also called {aka}</div>}
+      <p class="blurb">{sp.blurb || sp.summary}</p>
+      {badges.length > 0 && (
+        <div class="badges">
+          {badges.map((b) => <span class="badge" style={`background:${b.bg};color:${b.fg}`}>{b.label}</span>)}
+        </div>
+      )}
+    </div>
+  </header>
+
+  <div class="wrap body">
+    <div class="main">
+      <SoilSnapshot sp={sp} />
+      <StateMap sp={sp} />
+      <div class="contrib">
+        <div class="c-copy">
+          <h3>Have a soil test for this plant?</h3>
+          <p>Add it and see how your site compares to everyone else growing {sp.common_name || sp.common || 'it'}.</p>
+        </div>
+        <a href={APP_URL} class="btn btn-sage" rel="noopener">Open the app →</a>
+      </div>
+    </div>
+
+    <aside class="side">
+      <WildlifeCard sp={sp} />
+      <TraitsCard sp={sp} />
+      <p class="srcs">
+        Status: BONAP (Kartesz 2015) and state invasive lists · Traits: USDA PLANTS · Soil: community contributed,
+        contributor identity and locations removed{isSample && ' · Sample values are illustrative'}.
+      </p>
+    </aside>
+  </div>
+
+  {rel.length > 0 && (
+    <section class="wrap related" aria-labelledby="rel-h">
+      <h2 id="rel-h" class="sec-h">Related species</h2>
+      <div class="grid-cards" style="margin-top:20px">
+        {rel.map((r) => <SpeciesCard sp={r} />)}
+      </div>
+    </section>
+  )}
+</Base>
+
+<style>
+  .inner { position: relative; padding-top: clamp(28px, 4vw, 44px); padding-bottom: clamp(34px, 5vw, 52px); }
+  .crumb a { font-family: var(--f-data); font-size: 12px; color: var(--sage-muted); text-decoration: none; }
+  .crumb a:hover { color: var(--limestone); }
+  .type { font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--sage-muted); margin-top: 18px; }
+  h1 { font-weight: 700; color: var(--limestone); font-size: clamp(34px, 5vw, 58px); line-height: 1.05; margin-top: 8px; letter-spacing: -0.6px; }
+  .sci-big { font-family: var(--f-data); font-size: clamp(16px, 2.2vw, 22px); color: var(--sage-pale); margin-top: 8px; }
+  .aka { font-size: 16px; color: var(--sage-muted); margin-top: 6px; }
+  .blurb { font-weight: 300; font-size: clamp(17px, 2vw, 20px); color: rgba(247, 244, 232, 0.82); margin-top: 18px; max-width: 64ch; line-height: 1.55; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
+  .body { padding-top: clamp(36px, 5vw, 56px); display: flex; gap: clamp(28px, 4vw, 44px); flex-wrap: wrap; align-items: flex-start; }
+  .main { flex: 1.6; min-width: min(320px, 100%); }
+  .side { flex: 1; min-width: min(280px, 100%); display: flex; flex-direction: column; gap: 16px; }
+  .contrib { margin-top: 36px; background: var(--sand); border: 1px solid var(--line); border-radius: 16px; padding: 24px 26px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .c-copy { flex: 1; min-width: 220px; }
+  .contrib h3 { font-weight: 600; font-size: 19px; }
+  .contrib p { font-weight: 300; font-size: 16.5px; color: var(--ink-soft); margin-top: 6px; }
+  .srcs { font-family: var(--f-data); font-size: 11px; color: var(--bark); line-height: 1.6; padding: 0 4px; }
+  .related { margin-top: clamp(48px, 6vw, 72px); }
+  .sec-h { font-weight: 700; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.3px; }
+</style>

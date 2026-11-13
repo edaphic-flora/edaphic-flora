@@ -1,0 +1,25 @@
+---
+import { APP_URL } from '../config.js';
+const {
+  heading = 'have a soil test? add it to the data.',
+  body = 'The workshop lives in the app: enter your soil results, see how your site compares, and help sharpen the picture of each species for everyone.',
+} = Astro.props;
+---
+<section class="wrap section">
+  <div class="band dark">
+    <div class="stripes"></div>
+    <div class="inner">
+      <h2>{heading}</h2>
+      <p>{body}</p>
+      <a href={APP_URL} class="btn btn-gold big" rel="noopener">Open the app →</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .band { border-radius: 20px; padding: clamp(36px, 5vw, 64px); text-align: center; }
+  .inner { position: relative; }
+  h2 { font-family: var(--f-brand); font-weight: 400; color: var(--limestone); font-size: clamp(28px, 4vw, 46px); line-height: 1.1; }
+  p { font-weight: 300; font-size: clamp(17px, 2vw, 21px); color: rgba(247, 244, 232, 0.8); margin: 18px auto 0; max-width: 56ch; line-height: 1.55; }
+  .big { margin-top: 28px; font-size: 16px; padding: 16px 32px; border-radius: 10px; }
+</style>

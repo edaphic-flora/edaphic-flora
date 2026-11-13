@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://edaphicflora.org/sitemap-index.xml

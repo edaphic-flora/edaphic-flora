@@ -1,0 +1,73 @@
+---
+import '@fontsource/baumans/latin-400.css';
+import '@fontsource/montserrat/latin-500.css';
+import '@fontsource/montserrat/latin-600.css';
+import '@fontsource/montserrat/latin-700.css';
+import '@fontsource/rokkitt/latin-300.css';
+import '@fontsource/rokkitt/latin-400.css';
+import '@fontsource/rokkitt/latin-600.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import SampleRibbon from '../components/SampleRibbon.astro';
+import { SITE_NAME, SITE_URL } from '../config.js';
+
+const {
+  title,
+  description,
+  active = '',
+  jsonLd = [],
+  ogImage = '/og-default.png',
+  noindex = false,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, SITE_URL).href;
+const ogUrl = new URL(ogImage, SITE_URL).href;
+const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Soil and plant data for the curious`;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta name="theme-color" content="#373D3C" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={title || SITE_NAME} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title || SITE_NAME} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogUrl} />
+
+    {jsonLd.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+  </head>
+  <body>
+    <a class="skip sr-only" href="#main">Skip to content</a>
+    <SampleRibbon />
+    <Nav active={active} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
+
+<style>
+  .skip:focus {
+    position: fixed; top: 8px; left: 8px; width: auto; height: auto; clip: auto; margin: 0;
+    padding: 10px 14px; background: var(--gold); color: var(--charcoal); z-index: 100;
+    font-family: var(--f-head); font-weight: 600; border-radius: 8px;
+  }
+</style>

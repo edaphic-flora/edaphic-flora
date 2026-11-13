@@ -1,0 +1,189 @@
+---
+import Base from '../../layouts/Base.astro';
+import SpeciesCard from '../../components/SpeciesCard.astro';
+import { browseOrder, plantTypes, totals, STATES } from '../../lib/data.js';
+
+const FIRST = 60;
+const initial = browseOrder.slice(0, FIRST);
+const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
+---
+<Base
+  title="Browse species"
+  description="Search and filter plant species by name, plant type, native status, and US state. Soil snapshots, native ranges, and wildlife value."
+  active="browse"
+>
+  <div class="wrap page">
+    <span class="eyebrow">Find a plant</span>
+    <h1 class="h1" style="margin-top:12px">Browse species</h1>
+    <p class="lede" style="margin-top:12px;max-width:60ch">Search by name, then narrow by plant type, native status, or state.</p>
+
+    <form class="controls" id="filters" action="/species/" method="get" role="search">
+      <label class="sr-only" for="f-q">Search common or scientific name</label>
+      <input id="f-q" name="q" class="input grow" placeholder="Search common or scientific name…" autocomplete="off" />
+      <label class="sr-only" for="f-type">Plant type</label>
+      <select id="f-type" name="type" class="select">
+        <option value="">All plant types</option>
+        {plantTypes.map((t) => <option value={t}>{t}</option>)}
+      </select>
+      <label class="sr-only" for="f-status">Status</label>
+      <select id="f-status" name="status" class="select">
+        <option value="">Any status</option>
+        <option value="native">Native</option>
+        <option value="introduced">Introduced</option>
+        <option value="invasive">Invasive</option>
+      </select>
+      <label class="sr-only" for="f-state">State</label>
+      <select id="f-state" name="state" class="select">
+        <option value="">All states</option>
+        {states.map((s) => <option value={s.code}>{s.name}</option>)}
+      </select>
+      <label class="check"><input type="checkbox" id="f-soil" name="soil" value="1" /> Has soil snapshot</label>
+    </form>
+
+    <div class="status-row">
+      <div class="mono count" id="count" aria-live="polite">{totals.species.toLocaleString()} species</div>
+      <button type="button" class="link" id="clear">Clear filters</button>
+    </div>
+
+    <div class="grid-cards" id="results" style="margin-top:22px">
+      {initial.map((sp) => <SpeciesCard sp={sp} showFoot />)}
+    </div>
+    <div class="empty" id="empty" hidden>
+      No species match those filters. <button type="button" class="link" id="clear2">Clear filters</button>
+    </div>
+    <div class="more">
+      <button type="button" class="btn btn-sage" id="more" hidden={browseOrder.length <= FIRST}>Show more</button>
+    </div>
+    <noscript><p class="small" style="margin-top:24px">Filtering needs JavaScript. Every species is also listed in the <a href="/sitemap-index.xml">sitemap</a>.</p></noscript>
+  </div>
+</Base>
+
+<script>
+  type Row = { s: string; c: string | null; a?: string; n: string; t: string; k: string | null; nat: string; int: string; inv: string; sc: number; ok: number; sw: string; h: string | null };
+  const STYLE: Record<string, { label: string; bg: string; fg: string }> = {
+    native: { label: 'Native', bg: '#93AF9C', fg: '#373D3C' },
+    both: { label: 'Native + introduced', bg: '#9DAF92', fg: '#373D3C' },
+    introduced: { label: 'Introduced', bg: '#6B5D49', fg: '#F7F4E8' },
+    invasive: { label: 'Invasive', bg: '#D39B35', fg: '#373D3C' },
+  };
+  const PAGE = 60;
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const form = $<HTMLFormElement>('filters');
+  const q = $<HTMLInputElement>('f-q'), type = $<HTMLSelectElement>('f-type'), status = $<HTMLSelectElement>('f-status');
+  const state = $<HTMLSelectElement>('f-state'), soil = $<HTMLInputElement>('f-soil');
+  const results = $('results'), count = $('count'), empty = $('empty'), more = $<HTMLButtonElement>('more');
+  let rows: Row[] | null = null;
+  let matches: Row[] = [];
+  let shown = 0;
+
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+  const has = (list: string, code: string) => (' ' + list + ' ').includes(' ' + code + ' ');
+  const n = (k: number, w: string) => `${k} ${w}${k === 1 ? '' : 's'}`;
+
+  function statusIn(r: Row, st: string): string | null {
+    if (has(r.inv, st)) return 'invasive';
+    if (has(r.nat, st)) return 'native';
+    if (has(r.int, st)) return 'introduced';
+    return null;
+  }
+
+  function card(r: Row): string {
+    const st = state.value;
+    const kind = st ? statusIn(r, st) : r.k;
+    const s = kind ? STYLE[kind] : null;
+    const natN = r.nat ? r.nat.split(' ').length : 0, intN = r.int ? r.int.split(' ').length : 0;
+    const foot = st
+      ? (kind ? `${STYLE[kind].label} in ${st}` : `No record in ${st}`)
+      : natN ? `Native in ${n(natN, 'state')}` : intN ? `Introduced in ${n(intN, 'state')}` : 'No state records';
+    return `<a href="/species/${r.s}/" class="sp-card">
+      <div class="swatch" style="background:${r.sw}">${r.h ? `<span class="hint">${esc(r.h)}</span>` : ''}</div>
+      <div class="body">
+        <div class="meta">${s ? `<span class="pill" style="background:${s.bg};color:${s.fg}">${s.label}</span>` : ''}
+          <span class="soil-tag ${r.ok ? 'ready' : 'needs'}">${r.ok ? `${r.sc} samples` : 'Needs soil data'}</span></div>
+        <h3>${esc(r.c || r.n)}</h3>
+        ${r.c ? `<div class="sci">${esc(r.n)}</div>` : ''}
+        <div class="foot">${esc(r.t)} · ${foot}</div>
+      </div></a>`;
+  }
+
+  function filter() {
+    if (!rows) return;
+    const term = q.value.trim().toLowerCase();
+    const st = state.value;
+    matches = rows.filter((r) => {
+      if (term && !(`${r.c || ''} ${r.a || ''} ${r.n}`.toLowerCase().includes(term))) return false;
+      if (type.value && r.t !== type.value) return false;
+      if (soil.checked && !r.ok) return false;
+      if (st) {
+        const k = statusIn(r, st);
+        if (status.value ? k !== status.value : !k) return false;
+      } else if (status.value) {
+        const list = status.value === 'native' ? r.nat : status.value === 'introduced' ? r.int : r.inv;
+        if (!list.trim()) return false;
+      }
+      return true;
+    });
+    shown = 0;
+    results.innerHTML = '';
+    render();
+    count.textContent = `${matches.length.toLocaleString()} species`;
+    empty.hidden = matches.length > 0;
+    const p = new URLSearchParams();
+    if (q.value.trim()) p.set('q', q.value.trim());
+    if (type.value) p.set('type', type.value);
+    if (status.value) p.set('status', status.value);
+    if (st) p.set('state', st);
+    if (soil.checked) p.set('soil', '1');
+    history.replaceState(null, '', p.toString() ? `?${p}` : location.pathname);
+    if (st) try { localStorage.setItem('ef-state', st); } catch {}
+  }
+
+  function render() {
+    const next = matches.slice(shown, shown + PAGE);
+    results.insertAdjacentHTML('beforeend', next.map(card).join(''));
+    shown += next.length;
+    more.hidden = shown >= matches.length;
+  }
+
+  async function load() {
+    if (rows) return;
+    const res = await fetch('/species-index.json');
+    rows = await res.json();
+  }
+
+  function clear() {
+    form.reset();
+    filter();
+  }
+
+  // restore filters from the URL (e.g. from the home page search)
+  const params = new URLSearchParams(location.search);
+  q.value = params.get('q') || '';
+  type.value = params.get('type') || '';
+  status.value = params.get('status') || '';
+  state.value = params.get('state') || '';
+  soil.checked = params.get('soil') === '1';
+  const anyParam = [...params.keys()].length > 0;
+
+  let t: number | undefined;
+  form.addEventListener('submit', (e) => { e.preventDefault(); load().then(filter); });
+  form.addEventListener('input', () => { clearTimeout(t); t = window.setTimeout(() => load().then(filter), 120); });
+  form.addEventListener('change', () => load().then(filter));
+  $('clear').addEventListener('click', () => load().then(clear));
+  $('clear2').addEventListener('click', () => load().then(clear));
+  more.addEventListener('click', () => (rows ? render() : load().then(() => { filter(); render(); })));
+  if (anyParam) load().then(filter);
+</script>
+
+<style>
+  .page { padding-top: clamp(40px, 5vw, 64px); }
+  .controls { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .grow { flex: 1; min-width: min(240px, 100%); }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-head); font-weight: 500; font-size: 14px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--sage); }
+  .status-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+  .count { font-size: 13px; color: var(--ink-muted); }
+  .empty { text-align: center; padding: 64px 24px; color: var(--ink-muted); font-size: 19px; }
+  .more { text-align: center; margin-top: 28px; }
+  @media (max-width: 560px) { .select { flex: 1 1 45%; } }
+</style>

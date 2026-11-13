@@ -1,0 +1,33 @@
+# Rebuilds edaphicflora.org once a week so new soil samples and reference
+# data updates show up without a code change.
+#
+# Setup (one time):
+#   1. Netlify > Site configuration > Build & deploy > Build hooks > Add build hook
+#      (name it "weekly data refresh", branch: main). Copy the URL.
+#   2. GitHub > this repo > Settings > Secrets and variables > Actions >
+#      New repository secret: NETLIFY_BUILD_HOOK = <the URL>
+#
+# Each run is one production deploy (15 Netlify credits on the free plan).
+# Run it by hand any time from the Actions tab ("Run workflow").
+
+name: Weekly site data refresh
+
+on:
+  schedule:
+    - cron: '17 9 * * 1' # Mondays 09:17 UTC
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify build hook
+        env:
+          HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "NETLIFY_BUILD_HOOK secret is not set yet; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST -d '{}' "$HOOK"
+          echo "Build triggered."
