@@ -42,7 +42,7 @@ const name = sp.common ? `${sp.common} (${sp.scientific_name})` : sp.scientific_
 const title = `${name}: soil pH, native range and wildlife value`;
 const nativeBit = sp.nativeCodes.length ? `native in ${countLabel(sp.nativeCodes)} (BONAP)` : sp.introducedCodes.length ? `introduced in ${countLabel(sp.introducedCodes)}` : null;
 const description = sp.soilReady
-  ? `Soil pH, organic matter and texture from ${sp.sampleCount} community soil samples for ${name}, plus native status by US state${nativeBit ? `, ${nativeBit}` : ''}, and wildlife value.`
+  ? `Soil pH, organic matter and texture from ${sp.sampleCount} community soil ${sp.sampleCount === 1 ? 'sample' : 'samples'} for ${name}, plus native status by US state${nativeBit ? `, ${nativeBit}` : ''}, and wildlife value.`
   : `Native status by US state${nativeBit ? ` (${nativeBit})` : ''}, USDA traits and wildlife value for ${name}, with community soil data as it comes in.`;
 const pageUrl = `${SITE_URL}${sp.url}`;
 const jsonLd = [

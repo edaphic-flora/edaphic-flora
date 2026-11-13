@@ -196,7 +196,7 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 
 Static Astro site for edaphicflora.org (and .com, which redirects), deployed by Netlify from this repo with base directory `site` on the edaphicflora@gmail.com Netlify account. Details in `site/README.md`.
 
-- The site reads ONLY the `public_site` views in `site/sql/public_views.sql`, using the read-only `site_reader` role (`DATABASE_URL` in Netlify). Privacy rules live in those views: thresholds (keep in sync with `helpers.R`), flagged and disabled-user samples excluded, no `created_by`, no locations. Wildlife is counts and highlight flags only.
+- The site reads ONLY the `public_site` views in `site/sql/public_views.sql`, using the read-only `site_reader` role (`DATABASE_URL` in Netlify). Privacy rules live in those views: flagged and disabled-user samples excluded, no `created_by`, no locations. Every sample shows publicly with its count (ranges at 3+, `public_site.settings`); the Shiny app keeps its own threshold in `helpers.R`. Wildlife is counts and highlight flags only.
 - `npm run build` runs `scripts/export-data.mjs` then `astro build`. Without `DATABASE_URL` it uses `src/data/sample/` and shows a sample-data ribbon; a production build without it fails on purpose.
 - Work on the `dev` branch (free branch deploys). Merges to `main` are production deploys (15 of 300 free credits each). Weekly refresh (photos + rebuild): `.github/workflows/site-weekly-rebuild.yml`. Scheduled runs only happen once it is on `main`.
 - No em dashes in site copy.

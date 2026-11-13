@@ -20,7 +20,7 @@ function load() {
 const raw = load();
 export const meta = raw.meta;
 export const isSample = meta.source !== 'database';
-export const thresholds = meta.thresholds || { min_samples: 5, min_contributors: 2 };
+export const thresholds = { min_samples: 1, min_contributors: 1, min_range_samples: 3, ...meta.thresholds };
 
 // Muted, earthy swatches for cards until real macro photos exist.
 const SWATCHES = [
@@ -72,7 +72,8 @@ function enrich(r) {
   const common = c.common_name || titleCaseCommon(r.common_name);
   const kind =
     invasiveCodes.length || federalInvasive ? 'invasive' : nativeCodes.length ? 'native' : introducedCodes.length ? 'introduced' : null;
-  const soilReady = !!r.soil?.meets_threshold;
+  // Any public soil data at all (every sample counts; ranges come later)
+  const soilReady = !!r.soil?.meets_threshold && (r.soil?.sample_count || 0) > 0;
   const swatch = c.swatch || SWATCHES[hash(r.slug) % SWATCHES.length];
   const sp = {
     ...r,

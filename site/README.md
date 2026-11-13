@@ -25,8 +25,9 @@ site/
 ## How the data flows
 
 1. `sql/public_views.sql` creates a `public_site` schema of read-only views. They strip contributor emails and
-   locations, drop flagged samples and suspended users, and null out soil numbers until a species has at least 5
-   samples from 2 people (same thresholds as `app/R/helpers.R`). Wildlife is counts and highlight flags only.
+   locations and drop flagged samples and suspended users. Every remaining sample counts: soil values always come
+   with their sample count, and pH and organic matter get a range (10th to 90th percentile) at 3 or more values
+   (`public_site.settings`). Wildlife is counts and highlight flags only.
 2. On every build, `scripts/export-data.mjs` reads those views (as the read-only `site_reader` role) and writes
    `src/data/generated/species.json`. That file is gitignored.
 3. Astro renders one page per species from that file.

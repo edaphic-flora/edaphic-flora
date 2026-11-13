@@ -10,8 +10,9 @@
 --   * location_lat / location_long, notes, photos and files are never exposed
 --   * flagged samples are excluded
 --   * samples from users in disabled_users are excluded
---   * soil aggregates are NULL unless the species clears the thresholds below
---   * each metric is also NULL unless that metric has enough values on its own
+--   * every species with a sample shows its values, always with the count;
+--     a range (10th to 90th percentile) needs min_range_samples values of that
+--     measurement, and below that the individual readings (lo, hi) are shown
 --   * wildlife data is limited to counts and highlight flags (no interaction
 --     lists, no wildlife species names, no sources table)
 --
@@ -55,13 +56,15 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
 $$;
 
 -- -----------------------------------------------------------------------------
--- Thresholds (keep in sync with MIN_SAMPLES_FOR_PUBLIC_STATS and
--- MIN_CONTRIBUTORS_FOR_PUBLIC_STATS in app/R/helpers.R)
+-- Thresholds. The public site shows every sample (1 and 1), with counts.
+-- The Shiny app keeps its own MIN_SAMPLES_FOR_PUBLIC_STATS and
+-- MIN_CONTRIBUTORS_FOR_PUBLIC_STATS in app/R/helpers.R.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW public_site.settings AS
 SELECT
-  5::int AS min_samples,
-  2::int AS min_contributors;
+  1::int AS min_samples,
+  1::int AS min_contributors,
+  3::int AS min_range_samples;
 
 -- -----------------------------------------------------------------------------
 -- Soil: one row per species (genus + epithet), aggregates gated by thresholds
@@ -102,11 +105,15 @@ agg AS (
     percentile_cont(0.1) WITHIN GROUP (ORDER BY ph)                     AS ph_p10,
     percentile_cont(0.5) WITHIN GROUP (ORDER BY ph)                     AS ph_p50,
     percentile_cont(0.9) WITHIN GROUP (ORDER BY ph)                     AS ph_p90,
+    min(ph)                                                             AS ph_min,
+    max(ph)                                                             AS ph_max,
 
     count(om)::int                                                      AS om_n,
     percentile_cont(0.1) WITHIN GROUP (ORDER BY om)                     AS om_p10,
     percentile_cont(0.5) WITHIN GROUP (ORDER BY om)                     AS om_p50,
     percentile_cont(0.9) WITHIN GROUP (ORDER BY om)                     AS om_p90,
+    min(om)                                                             AS om_min,
+    max(om)                                                             AS om_max,
 
     count(*) FILTER (WHERE has_texture)::int                            AS texture_n,
     percentile_cont(0.5) WITHIN GROUP (ORDER BY texture_sand) FILTER (WHERE has_texture) AS sand_p50,
@@ -125,7 +132,8 @@ gated AS (
   SELECT
     a.*,
     (a.sample_count >= st.min_samples AND a.contributor_count >= st.min_contributors) AS meets_threshold,
-    st.min_samples
+    st.min_samples,
+    st.min_range_samples
   FROM agg a CROSS JOIN public_site.settings st
 )
 SELECT
@@ -136,14 +144,14 @@ SELECT
   meets_threshold,
 
   ph_n,
-  CASE WHEN meets_threshold AND ph_n >= min_samples THEN round(ph_p10::numeric, 1) END AS ph_p10,
-  CASE WHEN meets_threshold AND ph_n >= min_samples THEN round(ph_p50::numeric, 1) END AS ph_p50,
-  CASE WHEN meets_threshold AND ph_n >= min_samples THEN round(ph_p90::numeric, 1) END AS ph_p90,
+  CASE WHEN meets_threshold AND ph_n >= min_range_samples THEN round(ph_p10::numeric, 1) END AS ph_p10,
+  CASE WHEN meets_threshold AND ph_n >= min_samples       THEN round(ph_p50::numeric, 1) END AS ph_p50,
+  CASE WHEN meets_threshold AND ph_n >= min_range_samples THEN round(ph_p90::numeric, 1) END AS ph_p90,
 
   om_n,
-  CASE WHEN meets_threshold AND om_n >= min_samples THEN round(om_p10::numeric, 1) END AS om_p10,
-  CASE WHEN meets_threshold AND om_n >= min_samples THEN round(om_p50::numeric, 1) END AS om_p50,
-  CASE WHEN meets_threshold AND om_n >= min_samples THEN round(om_p90::numeric, 1) END AS om_p90,
+  CASE WHEN meets_threshold AND om_n >= min_range_samples THEN round(om_p10::numeric, 1) END AS om_p10,
+  CASE WHEN meets_threshold AND om_n >= min_samples       THEN round(om_p50::numeric, 1) END AS om_p50,
+  CASE WHEN meets_threshold AND om_n >= min_range_samples THEN round(om_p90::numeric, 1) END AS om_p90,
 
   texture_n,
   CASE WHEN meets_threshold AND texture_n >= min_samples THEN round(sand_p50::numeric) END AS sand_p50,
@@ -154,11 +162,17 @@ SELECT
   p_n,  CASE WHEN meets_threshold AND p_n  >= min_samples THEN round(p_p50::numeric)  END AS p_p50,
   k_n,  CASE WHEN meets_threshold AND k_n  >= min_samples THEN round(k_p50::numeric)  END AS k_p50,
   ca_n, CASE WHEN meets_threshold AND ca_n >= min_samples THEN round(ca_p50::numeric) END AS ca_p50,
-  mg_n, CASE WHEN meets_threshold AND mg_n >= min_samples THEN round(mg_p50::numeric) END AS mg_p50
+  mg_n, CASE WHEN meets_threshold AND mg_n >= min_samples THEN round(mg_p50::numeric) END AS mg_p50,
+
+  -- The readings themselves while there are too few for a range (1 or 2)
+  CASE WHEN meets_threshold AND ph_n BETWEEN min_samples AND min_range_samples - 1 THEN round(ph_min::numeric, 1) END AS ph_lo,
+  CASE WHEN meets_threshold AND ph_n BETWEEN min_samples AND min_range_samples - 1 THEN round(ph_max::numeric, 1) END AS ph_hi,
+  CASE WHEN meets_threshold AND om_n BETWEEN min_samples AND min_range_samples - 1 THEN round(om_min::numeric, 1) END AS om_lo,
+  CASE WHEN meets_threshold AND om_n BETWEEN min_samples AND min_range_samples - 1 THEN round(om_max::numeric, 1) END AS om_hi
 FROM gated;
 
 COMMENT ON VIEW public_site.soil_species_summary IS
-  'Public soil aggregates per species. Thresholds from public_site.settings. No contributor identity or location.';
+  'Public soil values per species, always with sample counts. Ranges need public_site.settings.min_range_samples values. No contributor identity or location.';
 
 -- -----------------------------------------------------------------------------
 -- Reference: one row per species (genus + epithet), preferring the

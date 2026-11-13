@@ -89,19 +89,19 @@ const jsonLd = [
         <span class="eyebrow gold">Honest by design</span>
         <h2 class="h2" style="font-size:clamp(24px,3vw,34px);margin-top:12px">We never fake the numbers.</h2>
         <p class="lede" style="margin-top:16px">
-          Community soil data is still growing. A species only shows soil stats once at least {t.min_samples} samples
-          from at least {t.min_contributors} different people back them up. Below that line you'll see exactly what we
-          do have, and a clear note that the rest is still coming.
+          Community soil data is still growing. Every soil number shows how many samples back it, even when that's
+          one. A measurement gets a range once it has {t.min_range_samples} or more samples; before that you see the
+          readings themselves, and species with none yet show USDA reference data.
         </p>
       </div>
       <div class="h-states">
         <div class="state ok">
-          <div class="st-hd"><span class="dot" style="background:var(--sage)"></span><strong>Enough data</strong><span class="mono">{t.min_samples}+ samples · {t.min_contributors}+ people</span></div>
-          <p>Full soil snapshot shown.</p>
+          <div class="st-hd"><span class="dot" style="background:var(--sage)"></span><strong>Range</strong><span class="mono">{t.min_range_samples}+ samples</span></div>
+          <p>Middle 80% of samples, plus the median.</p>
         </div>
         <div class="state not">
-          <div class="st-hd"><span class="dot" style="background:var(--gold)"></span><strong>Not yet</strong><span class="mono">below the line</span></div>
-          <p>Reference data plus an honest "needs data" note.</p>
+          <div class="st-hd"><span class="dot" style="background:var(--gold)"></span><strong>Early readings</strong><span class="mono">1 or 2 samples</span></div>
+          <p>The actual values, each with its count.</p>
         </div>
       </div>
     </div>

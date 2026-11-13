@@ -1,8 +1,9 @@
 ---
 import { STATUS_STYLE } from '../lib/data.js';
+import { plural } from '../lib/names.js';
 const { sp, showFoot = false, eager = false } = Astro.props;
 const st = sp.kind ? STATUS_STYLE[sp.kind] : null;
-const soilLabel = sp.soilReady ? `${sp.sampleCount} samples` : 'Needs soil data';
+const soilLabel = sp.soilReady ? plural(sp.sampleCount, 'sample') : 'Needs soil data';
 const statesFoot = sp.nativeCodes.length
   ? `Native in ${sp.nativeCodes.length} ${sp.nativeCodes.length === 1 ? 'state' : 'states'}`
   : sp.introducedCodes.length

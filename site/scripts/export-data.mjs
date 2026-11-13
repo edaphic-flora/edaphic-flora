@@ -71,7 +71,7 @@ async function main() {
   const q = async (sql, params = []) => (await client.query(sql, params)).rows;
 
   try {
-    const [settings] = await q('SELECT min_samples, min_contributors FROM public_site.settings');
+    const [settings] = await q('SELECT * FROM public_site.settings');
 
     // ---- choose which species get pages
     const curatedKeys = await q(
@@ -148,8 +148,10 @@ async function main() {
       // soil
       let soilOut = null;
       if (s) {
-        const metric = (n, p10, p50, p90) =>
-          num(p50) === null ? null : { n, p10: num(p10), p50: num(p50), p90: num(p90) };
+        // p10/p90 once there are enough values for a range; lo/hi are the
+        // readings themselves before that (one or two samples)
+        const metric = (n, p10, p50, p90, lo, hi) =>
+          num(p50) === null ? null : { n, p10: num(p10), p50: num(p50), p90: num(p90), lo: num(lo), hi: num(hi) };
         let texture = null;
         if (num(s.sand_p50) !== null) {
           const norm = normalizeTexture(num(s.sand_p50), num(s.silt_p50), num(s.clay_p50));
@@ -164,8 +166,8 @@ async function main() {
           sample_count: s.sample_count,
           contributor_count: s.contributor_count,
           meets_threshold: s.meets_threshold,
-          ph: metric(s.ph_n, s.ph_p10, s.ph_p50, s.ph_p90),
-          organic_matter: metric(s.om_n, s.om_p10, s.om_p50, s.om_p90),
+          ph: metric(s.ph_n, s.ph_p10, s.ph_p50, s.ph_p90, s.ph_lo, s.ph_hi),
+          organic_matter: metric(s.om_n, s.om_p10, s.om_p50, s.om_p90, s.om_lo, s.om_hi),
           texture,
           nutrients: {
             phosphorus: nut(s.p_n, s.p_p50),

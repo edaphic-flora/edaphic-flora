@@ -1,10 +1,17 @@
 ---
 import { APP_URL, PH_SCALE } from '../config.js';
 import { thresholds } from '../lib/data.js';
+import { plural } from '../lib/names.js';
 const { sp } = Astro.props;
 const s = sp.soil;
 const u = sp.usda;
-const ready = !!s?.meets_threshold;
+const ready = sp.soilReady;
+const minRange = thresholds.min_range_samples;
+// One or two readings: show them as they are. "6.4 and 7.1", or "6.8".
+const readings = (m, unit = '') =>
+  m.lo == null || m.lo === m.hi ? `${(m.lo ?? m.p50).toFixed(1)}${unit}` : `${m.lo.toFixed(1)} and ${m.hi.toFixed(1)}${unit}`;
+const phMarks = s?.ph && s.ph.p10 == null ? [...new Set([s.ph.lo ?? s.ph.p50, s.ph.hi ?? s.ph.p50])] : [];
+const early = ready && [s.ph, s.organic_matter].some((m) => m && m.p10 == null);
 const pos = (v) => Math.max(0, Math.min(100, ((v - PH_SCALE.min) / (PH_SCALE.max - PH_SCALE.min)) * 100));
 const pct = (v) => `${pos(v).toFixed(1)}%`;
 const usdaPh = u?.ph_min != null && u?.ph_max != null ? { min: u.ph_min, max: u.ph_max } : null;
@@ -19,7 +26,6 @@ const nutrients = ready
   : [];
 const n = s?.sample_count || 0;
 const c = s?.contributor_count || 0;
-const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
 const refBits = [
   usdaPh && `pH ${usdaPh.min.toFixed(1)} to ${usdaPh.max.toFixed(1)}`,
   u?.moisture_use && `moisture use ${u.moisture_use.toLowerCase()}`,
@@ -33,23 +39,37 @@ const refBits = [
   {ready ? (
     <div class="ready">
       <div class="based"><span class="dot" style="background:var(--sage)"></span>based on {plural(n, 'sample')} from {plural(c, 'contributor')}</div>
+      {early && (
+        <p class="early">Early data: each measurement shows its readings until it has {minRange} or more samples, then a range.</p>
+      )}
 
       {s.ph && (
         <div class="card pad block">
           <div class="b-hd">
             <span class="b-t">Soil pH</span>
-            <span class="mono b-v">{s.ph.p10.toFixed(1)} to {s.ph.p90.toFixed(1)} · median <span class="gold">{s.ph.p50.toFixed(1)}</span></span>
+            {s.ph.p10 != null ? (
+              <span class="mono b-v">{s.ph.p10.toFixed(1)} to {s.ph.p90.toFixed(1)} · median <span class="gold">{s.ph.p50.toFixed(1)}</span></span>
+            ) : (
+              <span class="mono b-v"><span class="gold">{readings(s.ph)}</span> · {plural(s.ph.n, 'sample')}</span>
+            )}
           </div>
           <div class="ph">
             <div class="ph-grad"></div>
-            <div class="ph-range" style={`left:${pct(s.ph.p10)};width:${(pos(s.ph.p90) - pos(s.ph.p10)).toFixed(1)}%`}></div>
-            <div class="ph-mark" style={`left:${pct(s.ph.p50)}`}></div>
+            {s.ph.p10 != null && <div class="ph-range" style={`left:${pct(s.ph.p10)};width:${(pos(s.ph.p90) - pos(s.ph.p10)).toFixed(1)}%`}></div>}
+            {s.ph.p10 != null ? (
+              <div class="ph-mark" style={`left:${pct(s.ph.p50)}`}></div>
+            ) : (
+              phMarks.map((v) => <div class="ph-mark" style={`left:${pct(v)}`}></div>)
+            )}
             {usdaPh && <div class="ph-usda" style={`left:${pct(usdaPh.min)};width:${(pos(usdaPh.max) - pos(usdaPh.min)).toFixed(1)}%`}></div>}
           </div>
           <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.num}{t.word && <i> {t.word}</i>}</span>)}</div>
           <p class="key">
-            <span class="sw sw-range"></span> middle 80% of samples
-            <span class="sw sw-mark"></span> median
+            {s.ph.p10 != null ? (
+              <><span class="sw sw-range"></span> middle 80% of samples <span class="sw sw-mark"></span> median</>
+            ) : (
+              <><span class="sw sw-mark"></span> {s.ph.n === 1 ? 'the one reading so far' : 'each reading'}</>
+            )}
             {usdaPh && (<><span class="sw sw-usda"></span> USDA PLANTS range</>)}
           </p>
         </div>
@@ -59,8 +79,17 @@ const refBits = [
         {s.organic_matter && (
           <div class="card pad">
             <div class="b-t">Organic matter</div>
-            <div class="mono big">{s.organic_matter.p50.toFixed(1)}%</div>
-            <div class="mono sub">middle 80%: {s.organic_matter.p10.toFixed(1)} to {s.organic_matter.p90.toFixed(1)}%</div>
+            {s.organic_matter.p10 != null ? (
+              <>
+                <div class="mono big">{s.organic_matter.p50.toFixed(1)}%</div>
+                <div class="mono sub">middle 80%: {s.organic_matter.p10.toFixed(1)} to {s.organic_matter.p90.toFixed(1)}% · {plural(s.organic_matter.n, 'sample')}</div>
+              </>
+            ) : (
+              <>
+                <div class="mono big">{readings(s.organic_matter, '%')}</div>
+                <div class="mono sub">{plural(s.organic_matter.n, 'sample')}</div>
+              </>
+            )}
           </div>
         )}
         {s.texture && (
@@ -68,7 +97,7 @@ const refBits = [
             <div class="b-hd"><span class="b-t">Texture</span><span class="mono b-v">{s.texture.class}</span></div>
             <div class="tex"><div style={`width:${s.texture.sand}%;background:#C9A86A`}></div><div style={`width:${s.texture.silt}%;background:#8A9A86`}></div><div style={`width:${s.texture.clay}%;background:#6B5D49`}></div></div>
             <div class="tex-lbl mono"><span>{s.texture.sand}% sand</span><span>{s.texture.silt}% silt</span><span>{s.texture.clay}% clay</span></div>
-            <div class="mono sub">median of {plural(s.texture.n, 'sample')}</div>
+            <div class="mono sub">{s.texture.n === 1 ? 'from 1 sample' : `median of ${plural(s.texture.n, 'sample')}`}</div>
           </div>
         )}
       </div>
@@ -78,7 +107,7 @@ const refBits = [
           <div class="b-t nut-hd">Key nutrients <span class="mono sub">median, ppm</span></div>
           <div class="nut-grid">
             {nutrients.map(([name, v]) => (
-              <div class="nut-row"><span>{name}</span><span class="mono">{v.p50.toLocaleString()} ppm</span></div>
+              <div class="nut-row"><span>{name}</span><span class="mono">{v.p50.toLocaleString()} ppm <span class="n">· {plural(v.n, 'sample')}</span></span></div>
             ))}
           </div>
           <p class="caveat">Labs use different extraction methods (for example Mehlich-3 and Modified Morgan), so treat nutrient values as rough guides.</p>
@@ -88,13 +117,8 @@ const refBits = [
   ) : (
     <div class="empty">
       <div class="q mono">?</div>
-      <h3>Not enough community data yet</h3>
-      <p>
-        {n === 0
-          ? 'Nobody has added a soil test for this species yet.'
-          : `${plural(n, 'sample')} from ${plural(c, 'contributor')} so far.`}
-        {' '}A snapshot appears once there are at least {thresholds.min_samples} samples from {thresholds.min_contributors} or more people.
-      </p>
+      <h3>No community soil data yet</h3>
+      <p>Nobody has added a soil test for this species yet. The first one shows up here, with its sample count.</p>
       <a href={APP_URL} class="btn btn-gold" rel="noopener">Add a soil test for this plant →</a>
       {refBits.length > 0 && (
         <div class="ref">
@@ -150,6 +174,8 @@ const refBits = [
   .nut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
   .nut-row { padding: 12px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 16px; color: var(--ink-soft); }
   .nut-row .mono { color: var(--charcoal); white-space: nowrap; }
+  .nut-row .n { color: var(--ink-muted); font-size: 12px; }
+  .early { margin-top: 10px; font-size: 15px; color: var(--bark); line-height: 1.45; }
   .caveat { font-size: 14.5px; color: var(--bark); padding: 4px 14px 12px; line-height: 1.45; }
   .empty { margin-top: 18px; background: var(--paper); border: 1px dashed rgba(211, 155, 53, 0.65); border-radius: 16px; padding: clamp(26px, 4vw, 40px); text-align: center; }
   .q { width: 52px; height: 52px; margin: 0 auto; border-radius: 50%; background: rgba(211, 155, 53, 0.16); display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--gold-ink); }
