@@ -1,4 +1,5 @@
-// POST /api/extract  { filename, media_type, data }  (data = base64 file)
+// POST /api/extract  { filename, media_type, data }  (data = base64 PDF or image)
+//                 or { filename, media_type: 'text/plain', text }  (RTF/TXT/CSV, converted in the browser)
 // -> { soil, texture, sample_date, notes, warnings, found, extractions_left }
 //
 // Reads a soil lab report (PDF or photo) with Claude so the contribute form
@@ -10,7 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { verifyFirebaseToken, AuthError } from '../lib/auth.mjs';
 import { withClient, json } from '../lib/db.mjs';
-import { EXTRACT_MODEL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, MAX_FILE_BYTES, MEDIA_TYPES, cleanExtraction } from '../lib/extract.mjs';
+import { EXTRACT_MODEL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, MAX_FILE_BYTES, MAX_TEXT_CHARS, MEDIA_TYPES, cleanExtraction } from '../lib/extract.mjs';
 
 const ORIGIN_OK = /^(https:\/\/(www\.)?edaphicflora\.org|https:\/\/([a-z0-9-]+--)?edaphicflora\.netlify\.app|http:\/\/localhost:(8888|4321))$/;
 const MAX_BODY = Math.ceil((MAX_FILE_BYTES * 4) / 3) + 4096;
@@ -42,11 +43,20 @@ export default async (req) => {
     return json({ error: 'The upload was not understood.' }, 400);
   }
   const mediaType = body?.media_type;
+  const isText = mediaType === 'text/plain';
   const data = typeof body?.data === 'string' ? body.data : '';
+  const reportText = typeof body?.text === 'string' ? body.text.trim() : '';
   const filename = typeof body?.filename === 'string' ? body.filename.slice(0, 120) : 'report';
-  if (!MEDIA_TYPES.includes(mediaType)) return json({ error: 'Upload a PDF or a photo (JPG, PNG, WebP or GIF).' }, 400);
-  if (!data || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return json({ error: 'The upload was not understood.' }, 400);
-  if ((data.length * 3) / 4 > MAX_FILE_BYTES) return json({ error: 'That file is too large. Use a file under 4 MB.' }, 413);
+  if (!MEDIA_TYPES.includes(mediaType)) {
+    return json({ error: 'Upload a PDF, a photo, or an RTF, TXT or CSV file.' }, 400);
+  }
+  if (isText) {
+    if (reportText.length < 20) return json({ error: 'That file has no readable text.' }, 400);
+    if (reportText.length > MAX_TEXT_CHARS) return json({ error: 'That file is too long to read.' }, 413);
+  } else {
+    if (!data || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return json({ error: 'The upload was not understood.' }, 400);
+    if ((data.length * 3) / 4 > MAX_FILE_BYTES) return json({ error: 'That file is too large. Use a file under 4 MB.' }, 413);
+  }
 
   const db = process.env.SITE_WRITER_DATABASE_URL;
   let userId;
@@ -74,8 +84,9 @@ export default async (req) => {
   const release = () =>
     withClient(db, (c) => c.query('SELECT site_api.release_extraction($1, $2)', [userId, claim.id])).catch(() => {});
 
-  const fileBlock =
-    mediaType === 'application/pdf'
+  const fileBlock = isText
+    ? { type: 'document', source: { type: 'text', media_type: 'text/plain', data: reportText }, title: filename }
+    : mediaType === 'application/pdf'
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
       : { type: 'image', source: { type: 'base64', media_type: mediaType, data } };
 
