@@ -1,5 +1,5 @@
 ---
-import { APP_URL, PH_SCALE } from '../config.js';
+import { CONTRIBUTE_URL, PH_SCALE } from '../config.js';
 import { thresholds } from '../lib/data.js';
 import { plural } from '../lib/names.js';
 const { sp } = Astro.props;
@@ -119,7 +119,7 @@ const refBits = [
       <div class="q mono">?</div>
       <h3>No community soil data yet</h3>
       <p>Nobody has added a soil test for this species yet. The first one shows up here, with its sample count.</p>
-      <a href={APP_URL} class="btn btn-gold" rel="noopener">Add a soil test for this plant →</a>
+      <a href={`${CONTRIBUTE_URL}?species=${encodeURIComponent(sp.scientific_name)}`} class="btn btn-gold">Add a soil test for this plant →</a>
       {refBits.length > 0 && (
         <div class="ref">
           <div class="ref-hd">USDA PLANTS reference</div>

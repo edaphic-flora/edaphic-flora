@@ -1,10 +1,11 @@
 ---
-import { APP_URL } from '../config.js';
+import { CONTRIBUTE_URL } from '../config.js';
 const { active = '' } = Astro.props;
 const links = [
   { href: '/', label: 'Home', key: 'home' },
   { href: '/species/', label: 'Browse species', key: 'browse' },
   { href: '/about/', label: 'About', key: 'about' },
+  { href: '/account/', label: 'Your account', key: 'account' },
 ];
 ---
 <header class="nav">
@@ -19,7 +20,7 @@ const links = [
         </a>
       ))}
     </nav>
-    <a href={APP_URL} class="btn btn-gold btn-sm cta" rel="noopener">Open the app →</a>
+    <a href={CONTRIBUTE_URL} class="btn btn-gold btn-sm cta">Add a soil test →</a>
   </div>
 </header>
 

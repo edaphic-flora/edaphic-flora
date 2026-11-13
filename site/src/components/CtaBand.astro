@@ -1,8 +1,8 @@
 ---
-import { APP_URL } from '../config.js';
+import { CONTRIBUTE_URL } from '../config.js';
 const {
   heading = 'have a soil test? add it to the data.',
-  body = 'The workshop lives in the app: enter your soil results, see how your site compares, and help sharpen the picture of each species for everyone.',
+  body = 'Enter your lab results and the plants growing in that soil, and help sharpen the picture of each species for everyone.',
 } = Astro.props;
 ---
 <section class="wrap section">
@@ -11,7 +11,7 @@ const {
     <div class="inner">
       <h2>{heading}</h2>
       <p>{body}</p>
-      <a href={APP_URL} class="btn btn-gold big" rel="noopener">Open the app →</a>
+      <a href={CONTRIBUTE_URL} class="btn btn-gold big">Add a soil test →</a>
     </div>
   </div>
 </section>

@@ -1,0 +1,289 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base
+  title="Your account"
+  description="Sign in to add soil tests to Edaphic Flora and see the samples you have added."
+  active="account"
+  noindex
+>
+  <div class="narrow acct">
+    <span class="eyebrow">Your account</span>
+    <h1 class="h1" id="acct-h">Sign in</h1>
+
+    <p id="st-loading" class="small">Loading…</p>
+    <p id="st-off" class="small" hidden>Sign-in isn't available on this copy of the site yet.</p>
+
+    <!-- Signed out -->
+    <section id="st-signin" hidden>
+      <p class="lede">Sign in to add soil tests and see the ones you've added. Accounts from the Edaphic Flora app work here too.</p>
+      <div class="card pad box">
+        <button type="button" id="google" class="btn btn-sage full">Continue with Google</button>
+        <div class="or"><span>or use your email</span></div>
+        <form id="email-form" novalidate>
+          <label class="fld">Email
+            <input class="input" type="email" id="email" autocomplete="email" required />
+          </label>
+          <label class="fld">Password
+            <input class="input" type="password" id="password" autocomplete="current-password" minlength="8" required />
+          </label>
+          <p id="terms-note" class="small" hidden>
+            By creating an account you agree to the <a href="/terms/">terms of service</a> and the
+            <a href="/privacy/">privacy policy</a>.
+          </p>
+          <button type="submit" id="email-submit" class="btn btn-gold full">Sign in</button>
+        </form>
+        <p class="switch small">
+          <span id="mode-text">New here?</span>
+          <button type="button" id="mode" class="link">Create an account</button>
+          <span class="sep">·</span>
+          <button type="button" id="forgot" class="link">Forgot your password?</button>
+        </p>
+      </div>
+    </section>
+
+    <!-- Email not verified yet -->
+    <section id="st-verify" hidden>
+      <div class="card pad box">
+        <p class="lede">We sent a link to <strong id="verify-email"></strong>. Click it to confirm your email, then come back here.</p>
+        <div class="row">
+          <button type="button" id="verified" class="btn btn-gold">I've confirmed my email</button>
+          <button type="button" id="resend" class="btn btn-sage">Send the link again</button>
+        </div>
+        <p class="small">Can't find it? Check your spam folder. <button type="button" class="link signout">Sign out</button></p>
+      </div>
+    </section>
+
+    <!-- Signed in -->
+    <section id="st-home" hidden>
+      <p class="small who">Signed in as <span id="who" class="mono"></span>. <button type="button" class="link signout">Sign out</button></p>
+      <p id="disabled-note" class="note" hidden>
+        This account can't add new samples. If you think that's a mistake, email
+        <a href="mailto:edaphicflora@gmail.com">edaphicflora@gmail.com</a>.
+      </p>
+      <div class="head-row">
+        <h2 class="h3">Your soil tests</h2>
+        <a href="/contribute/" id="add-btn" class="btn btn-gold btn-sm">Add a soil test</a>
+      </div>
+      <p class="small" id="remaining"></p>
+      <p class="small">New samples show up on species pages after the weekly site refresh.</p>
+      <div id="samples" class="samples"></div>
+    </section>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  </div>
+</Base>
+
+<script>
+  import {
+    signInConfigured, watchUser, needsVerification, signInWithGoogle, signInWithEmail, createAccount,
+    resendVerification, resetPassword, signOut, refreshUser, api, authMessage, safeNext,
+  } from '../lib/firebase.js';
+
+  const $ = (id) => document.getElementById(id);
+  const sections = ['st-loading', 'st-off', 'st-signin', 'st-verify', 'st-home'];
+  const show = (id, heading) => {
+    for (const s of sections) $(s).hidden = s !== id;
+    if (heading) $('acct-h').textContent = heading;
+  };
+  const say = (text, kind = 'info') => {
+    $('msg').textContent = text || '';
+    $('msg').dataset.kind = kind;
+  };
+  const next = safeNext(new URLSearchParams(location.search));
+  let creating = false;
+
+  function setMode(create) {
+    creating = create;
+    $('email-submit').textContent = create ? 'Create account' : 'Sign in';
+    $('mode-text').textContent = create ? 'Already have an account?' : 'New here?';
+    $('mode').textContent = create ? 'Sign in instead' : 'Create an account';
+    $('terms-note').hidden = !create;
+    $('password').autocomplete = create ? 'new-password' : 'current-password';
+    say('');
+  }
+
+  const fmt = (v, d = 1) => (v == null ? '' : Number(v).toFixed(d));
+
+  function renderSamples(list) {
+    const box = $('samples');
+    box.replaceChildren();
+    if (!list.length) {
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = "You haven't added any soil tests yet.";
+      box.append(p);
+      return;
+    }
+    const table = document.createElement('table');
+    const head = table.createTHead().insertRow();
+    for (const h of ['Date', 'Plant', 'pH', 'OM %', 'Texture', 'Outcome', '']) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      head.append(th);
+    }
+    const body = table.createTBody();
+    for (const s of list) {
+      const tr = body.insertRow();
+      const cells = [
+        s.date || '',
+        s.cultivar ? `${s.species} '${s.cultivar}'` : s.species,
+        fmt(s.ph),
+        fmt(s.organic_matter),
+        s.texture_class || '',
+        s.outcome || '',
+      ];
+      cells.forEach((text, i) => {
+        const td = tr.insertCell();
+        td.textContent = text;
+        if (i === 1) td.className = 'sci';
+        if (i === 2 || i === 3) td.className = 'mono';
+      });
+      if (s.flagged) tr.cells[1].append(' (flagged for review)');
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'link';
+      del.textContent = 'Delete';
+      del.setAttribute('aria-label', `Delete ${s.species}, ${s.date || ''}`);
+      del.addEventListener('click', async () => {
+        if (!confirm(`Delete the ${s.species} sample from ${s.date || 'this test'}? This can't be undone.`)) return;
+        del.disabled = true;
+        const r = await api(`/api/samples/${s.id}`, { method: 'DELETE' });
+        if (r.ok) {
+          tr.remove();
+          say('Deleted.');
+          if (!body.rows.length) renderSamples([]);
+        } else {
+          del.disabled = false;
+          say(r.data?.error || 'Could not delete that sample.', 'error');
+        }
+      });
+      tr.insertCell().append(del);
+    }
+    box.append(table);
+  }
+
+  async function loadHome(user) {
+    show('st-home', 'Your account');
+    $('who').textContent = user.email || '';
+    const [me, list] = await Promise.all([api('/api/me'), api('/api/samples')]);
+    if (!me.ok) {
+      say(me.data?.error || 'Could not load your account. Please try again.', 'error');
+      return;
+    }
+    $('disabled-note').hidden = !me.data.disabled;
+    $('add-btn').hidden = !!me.data.disabled;
+    const n = me.data.remaining_today;
+    $('remaining').textContent = me.data.disabled ? '' : `You can add ${n} more ${n === 1 ? 'sample' : 'samples'} today.`;
+    if (list.ok) renderSamples(list.data.samples || []);
+    else say(list.data?.error || 'Could not load your samples.', 'error');
+  }
+
+  if (!signInConfigured) show('st-off', 'Sign in');
+
+  watchUser(async (user) => {
+    if (!signInConfigured) return;
+    say('');
+    if (!user) {
+      show('st-signin', creating ? 'Create an account' : 'Sign in');
+      return;
+    }
+    if (needsVerification(user)) {
+      $('verify-email').textContent = user.email || 'your email';
+      show('st-verify', 'Confirm your email');
+      return;
+    }
+    if (next) {
+      location.replace(next);
+      return;
+    }
+    await loadHome(user);
+  });
+
+  $('google').addEventListener('click', () => {
+    say('');
+    signInWithGoogle().catch((e) => {
+      const m = authMessage(e);
+      if (m) say(m, 'error');
+    });
+  });
+
+  $('mode').addEventListener('click', () => {
+    setMode(!creating);
+    $('acct-h').textContent = creating ? 'Create an account' : 'Sign in';
+  });
+
+  $('email-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    if (!email || !password) return say('Enter your email and a password.', 'error');
+    if (creating && password.length < 8) return say('Use a password of at least 8 characters.', 'error');
+    $('email-submit').disabled = true;
+    try {
+      if (creating) await createAccount(email, password);
+      else await signInWithEmail(email, password);
+    } catch (e) {
+      const m = authMessage(e);
+      if (m) say(m, 'error');
+    } finally {
+      $('email-submit').disabled = false;
+    }
+  });
+
+  $('forgot').addEventListener('click', async () => {
+    const email = $('email').value.trim();
+    if (!email) return say('Enter your email above, then click "Forgot your password?" again.', 'error');
+    try {
+      await resetPassword(email);
+      say(`If there is an account for ${email}, a reset link is on its way.`);
+    } catch (e) {
+      say(authMessage(e) || '', 'error');
+    }
+  });
+
+  $('verified').addEventListener('click', async () => {
+    const u = await refreshUser().catch(() => null);
+    if (u && !needsVerification(u)) {
+      if (next) location.replace(next);
+      else await loadHome(u);
+    } else {
+      say("It doesn't look confirmed yet. Click the link in the email, then try again.", 'error');
+    }
+  });
+
+  $('resend').addEventListener('click', async () => {
+    try {
+      await resendVerification();
+      say('Sent. Check your inbox.');
+    } catch (e) {
+      say(authMessage(e) || '', 'error');
+    }
+  });
+
+  document.querySelectorAll('.signout').forEach((b) => b.addEventListener('click', () => signOut()));
+</script>
+
+<style>
+  .acct { padding-top: clamp(40px, 6vw, 72px); padding-bottom: 32px; }
+  .acct h1 { margin-top: 10px; }
+  .acct .lede { margin-top: 14px; }
+  .box { margin-top: 22px; max-width: 520px; }
+  .full { width: 100%; }
+  .or { display: flex; align-items: center; gap: 12px; margin: 18px 0; font-family: var(--f-head); font-size: 13px; color: var(--ink-muted); }
+  .or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--line-strong); }
+  .fld { display: grid; gap: 6px; margin-bottom: 14px; font-family: var(--f-head); font-weight: 600; font-size: 14px; }
+  .switch { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+  .sep { color: var(--ink-muted); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 12px; }
+  .who { margin-top: 14px; }
+  .note { margin-top: 16px; padding: 14px 16px; border-radius: 10px; background: rgba(211, 155, 53, 0.16); color: var(--charcoal); }
+  .head-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+  .samples { margin-top: 16px; overflow-x: auto; }
+  .samples :global(table) { width: 100%; border-collapse: collapse; font-size: 16px; }
+  .samples :global(th) { text-align: left; font-family: var(--f-head); font-weight: 600; font-size: 13px; padding: 8px 10px; border-bottom: 1px solid var(--line-strong); }
+  .samples :global(td) { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .samples :global(.empty) { color: var(--bark); }
+  .msg { margin-top: 18px; min-height: 1.4em; font-size: 17px; }
+  .msg[data-kind='error'] { color: #9b3d22; }
+</style>

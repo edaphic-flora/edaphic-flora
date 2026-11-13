@@ -1,0 +1,25 @@
+---
+// Renders the repo's PRIVACY.md, so the policy has one source.
+import Base from '../layouts/Base.astro';
+import { Content } from '../../../PRIVACY.md';
+---
+<Base title="Privacy policy" description="How Edaphic Flora collects, uses, and protects your information.">
+  <article class="narrow legal">
+    <Content />
+  </article>
+</Base>
+
+<style>
+  .legal { padding-top: clamp(40px, 6vw, 72px); padding-bottom: 24px; }
+  .legal :global(h1) { font-weight: 700; font-size: clamp(30px, 4vw, 42px); letter-spacing: -0.5px; }
+  .legal :global(h2) { font-weight: 700; font-size: 24px; margin-top: 36px; }
+  .legal :global(h3) { font-weight: 600; font-size: 18px; margin-top: 22px; }
+  .legal :global(p), .legal :global(li) { font-size: 18px; line-height: 1.6; color: var(--ink-soft); }
+  .legal :global(p) { margin-top: 12px; }
+  .legal :global(ul) { margin-top: 10px; padding-left: 22px; }
+  .legal :global(li) { margin-top: 6px; }
+  .legal :global(a) { color: var(--sage-ink); text-decoration: underline; text-underline-offset: 3px; }
+  .legal :global(table) { margin-top: 14px; border-collapse: collapse; width: 100%; font-size: 16px; }
+  .legal :global(th), .legal :global(td) { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line-strong); }
+  .legal :global(th) { font-family: var(--f-head); font-weight: 600; font-size: 14px; }
+</style>

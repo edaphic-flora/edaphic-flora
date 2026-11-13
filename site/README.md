@@ -12,6 +12,10 @@ site/
 ├── sql/species_photos.sql  photo table + view (one openly licensed photo per species)
 ├── scripts/export-data.mjs reads the views, writes src/data/generated/species.json
 ├── scripts/fetch-photos.mjs finds photos on iNaturalist / Wikimedia, saves them to Neon
+├── sql/contribute.sql      sign-in + submit: reference tables, site_api functions, site_writer role
+├── netlify/functions/      lookup.mjs (species search, zip) and api.mjs (signed-in submit)
+├── netlify/lib/            token check, validation, texture (shared with the contribute page)
+├── test/                   `npm test` unit tests; test/db/ checks the database functions
 ├── public/                 logos, favicon, og image, robots.txt
 └── src/
     ├── config.js           APP_URL, which hero ships, site URL
@@ -66,6 +70,26 @@ production build without `DATABASE_URL` fails on purpose so sample numbers never
 | `native`  | curated + every species native to at least one US state with USDA traits   |
 | `all`     | curated + every species with any US state record                           |
 
+## Contributing soil tests (sign-in and submit)
+
+`/contribute/` and `/account/` let people add soil tests without the Shiny app. They sign in with Firebase (the
+same Firebase project as the app, so app accounts work), and two Netlify functions do the rest:
+
+- `netlify/functions/lookup.mjs`: public species search and zip lookup, read-only (`DATABASE_URL`), cached at the edge.
+- `netlify/functions/api.mjs`: verifies the Firebase ID token, validates with `netlify/lib/validate.mjs` (the same
+  rules as the app), then calls the `site_api` database functions with `SITE_WRITER_DATABASE_URL`.
+
+The `site_writer` login can only call `site_api` functions (`sql/contribute.sql`), never read or write tables
+directly, because Netlify's free plan exposes every environment variable to builds too. The functions cap samples
+at 20 per person per day (300 overall), check for duplicates, skip disabled users and write the audit log, like the
+app. Existing app contributors are linked to their Polished id by verified email on first sign-in (`legacy_users`).
+New samples show in the person's account right away and on species pages after the weekly rebuild. Firebase loads
+only on these two pages, which get a strict content security policy (`netlify.toml`).
+
+Tests: `npm test` (validation, texture against the app's R code, token checks) and, from the repo root,
+`Rscript site/test/db/contribute_functions_test.R` (database functions, run in a transaction that is rolled back).
+Locally, `npx netlify dev` from `site/` serves the site and the functions on http://localhost:8888.
+
 ## One-time setup
 
 **Neon**
@@ -89,6 +113,12 @@ production build without `DATABASE_URL` fails on purpose so sample numbers never
    for `main` and add its URL to GitHub as the `NETLIFY_BUILD_HOOK` secret. For photos, run
    `sql/species_photos.sql`, create the `photo_loader` role (bottom of that file) and add its connection string as
    the `PHOTOS_DATABASE_URL` secret. Every Monday the workflow finds photos for 2,500 more species, then rebuilds.
+7. Contributing: run `sql/contribute.sql`, then `Rscript scripts/load_site_reference.R` from the repo root (species
+   list, zip codes, ecoregion grid, app accounts). Create the `site_writer` role (bottom of `contribute.sql`) and add
+   `SITE_WRITER_DATABASE_URL` in Netlify (branch deploys can point at a Neon dev branch). Add
+   `PUBLIC_FIREBASE_API_KEY`, `PUBLIC_FIREBASE_AUTH_DOMAIN` and `PUBLIC_FIREBASE_PROJECT_ID` (the app's
+   `FIREBASE_*` values; public by design). In Firebase > Authentication > Settings > Authorized domains, add
+   `edaphicflora.org`, `www.edaphicflora.org` and `dev--edaphicflora.netlify.app`.
 
 ## Everyday workflow
 

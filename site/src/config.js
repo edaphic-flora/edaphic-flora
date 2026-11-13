@@ -3,8 +3,9 @@
 export const SITE_URL = 'https://edaphicflora.org';
 export const SITE_NAME = 'Edaphic Flora';
 
-// Where "contribute" and "open the app" buttons go. When the new
-// contribution flow replaces Shiny, change this one line.
+// "Add a soil test" buttons go to the site's own contribute page. The
+// Shiny app (analysis, My Garden) is still linked from the footer.
+export const CONTRIBUTE_URL = '/contribute/';
 export const APP_URL = 'https://edaphicflora.shinyapps.io/edaphic-flora/';
 
 // Which home page hero ships to production: 'a' (editorial, dark) or 'b'

@@ -6,7 +6,7 @@ import WildlifeCard from '../../components/WildlifeCard.astro';
 import TraitsCard from '../../components/TraitsCard.astro';
 import SpeciesCard from '../../components/SpeciesCard.astro';
 import { species, related, countLabel, STATUS_STYLE, isSample } from '../../lib/data.js';
-import { APP_URL, SITE_URL, SITE_NAME } from '../../config.js';
+import { CONTRIBUTE_URL, SITE_URL, SITE_NAME } from '../../config.js';
 import { photoSize } from '../../lib/photos.js';
 
 export function getStaticPaths() {
@@ -116,9 +116,9 @@ const jsonLd = [
       <div class="contrib">
         <div class="c-copy">
           <h3>Have a soil test for this plant?</h3>
-          <p>Add it and see how your site compares to everyone else growing {sp.common_name || sp.common || 'it'}.</p>
+          <p>Add it to the community data for {sp.common || sp.common_name || sp.scientific_name}. It takes about five minutes.</p>
         </div>
-        <a href={APP_URL} class="btn btn-sage" rel="noopener">Open the app →</a>
+        <a href={`${CONTRIBUTE_URL}?species=${encodeURIComponent(sp.scientific_name)}`} class="btn btn-sage">Add a soil test →</a>
       </div>
     </div>
 
