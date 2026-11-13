@@ -23,6 +23,17 @@ The WCVP data is used under CC BY 4.0, which permits sharing and adaptation for 
 
 As a work of the U.S. Government, USDA PLANTS data is not subject to copyright within the United States.
 
+## Native Status by State
+
+- **Source**: BONAP Taxonomic Data Center
+- **Provider**: Biota of North America Program (John T. Kartesz), Chapel Hill, N.C.
+- **License**: Used with permission from BONAP
+- **URL**: https://bonap.net/tdc
+- **Citation**: Kartesz, J.T., The Biota of North America Program (BONAP). 2015. Taxonomic Data Center. Chapel Hill, N.C. (https://bonap.net/tdc)
+- **Files**: `data/bonap_state_nativity_compiled.csv`, database table `ref_state_distribution` (`source = 'BONAP'`)
+
+State-level native and introduced status shown in the app and on the public site (edaphicflora.org) comes from BONAP and is credited on every species page and on the About page. Where BONAP has no record for a species, USDA PLANTS state data fills in and is labeled as USDA.
+
 ## Wetland Indicators
 
 - **Source**: National Wetland Plant List (NWPL)
@@ -72,6 +83,16 @@ Data compiled from official state sources including state Exotic Pest Plant Coun
 - **URL**: https://www.invasiveplantatlas.org/
 
 Supplementary invasive species distribution data used to enhance state-level coverage.
+
+## Wildlife Associations
+
+- **Moths and butterflies**: caterpillar host plant associations from Tallamy, D.W. & Shropshire, K.J. (National Wildlife Federation)
+- **Specialist bees**: native bee and host plant associations from Jarrod Fowler
+- **Birds**: bird and plant associations adapted from the Audubon native plants database
+- **Occurrence data**: GBIF and eBird (Cornell Lab of Ornithology) for state-level wildlife presence in the app's dashboard
+- **Files**: compiled source workbooks are proprietary and never committed (`data/wildlife_source/`); loaded into the `ref_wildlife_*` tables
+
+The public site publishes only per-plant counts and highlight flags (moth and butterfly species count, specialist bee count, songbird value, bird food, keystone genus, hummingbird plant) through the `public_site.wildlife_*` views in `site/sql/public_views.sql`. Interaction lists and wildlife species names are not published.
 
 ## Geocoding
 

@@ -192,6 +192,16 @@ The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (da
 - **Data collection**: `scripts/fetch_gbif_wildlife_presence.R` (Lep+Bees), `scripts/fetch_ebird_wildlife_presence.R` (Birds)
 - **Module**: `app/R/mod_my_garden.R` — donut charts showing wildlife coverage per family, state-filtered when presence data available
 
+## Public Site (site/)
+
+Static Astro site for edaphicflora.org (and .com, which redirects), deployed by Netlify from this repo with base directory `site` on the edaphicflora@gmail.com Netlify account. Details in `site/README.md`.
+
+- The site reads ONLY the `public_site` views in `site/sql/public_views.sql`, using the read-only `site_reader` role (`DATABASE_URL` in Netlify). Privacy rules live in those views: thresholds (keep in sync with `helpers.R`), flagged and disabled-user samples excluded, no `created_by`, no locations. Wildlife is counts and highlight flags only.
+- `npm run build` runs `scripts/export-data.mjs` then `astro build`. Without `DATABASE_URL` it uses `src/data/sample/` and shows a sample-data ribbon; a production build without it fails on purpose.
+- Work on the `dev` branch (free branch deploys). Merges to `main` are production deploys (15 of 300 free credits each). Weekly data refresh: `.github/workflows/site-weekly-rebuild.yml`.
+- No em dashes in site copy.
+- Plan: next phase moves accounts, data entry, and PDF extraction from Shiny into the site (Netlify Functions + Neon), then shinyapps.io is retired.
+
 ## Important Conventions
 - Brand name is capitalized in text: "Edaphic Flora" (logos/navbar stay lowercase per brand design)
 - Admin access requires BOTH Polished admin status AND listing in `ADMIN_EMAILS` env var

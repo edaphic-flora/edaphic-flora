@@ -1,0 +1,25 @@
+---
+import { STATUS_STYLE } from '../lib/data.js';
+const { sp, showFoot = false } = Astro.props;
+const st = sp.kind ? STATUS_STYLE[sp.kind] : null;
+const soilLabel = sp.soilReady ? `${sp.sampleCount} samples` : 'Needs soil data';
+const statesFoot = sp.nativeCodes.length
+  ? `Native in ${sp.nativeCodes.length} ${sp.nativeCodes.length === 1 ? 'state' : 'states'}`
+  : sp.introducedCodes.length
+    ? `Introduced in ${sp.introducedCodes.length} ${sp.introducedCodes.length === 1 ? 'state' : 'states'}`
+    : 'No state records';
+---
+<a href={sp.url} class="sp-card">
+  <div class="swatch" style={`background:${sp.swatchCss}`}>
+    {sp.photoHint && <span class="hint">{sp.photoHint}</span>}
+  </div>
+  <div class="body">
+    <div class="meta">
+      {st && <span class="pill" style={`background:${st.bg};color:${st.fg}`}>{st.label}</span>}
+      <span class:list={['soil-tag', sp.soilReady ? 'ready' : 'needs']}>{soilLabel}</span>
+    </div>
+    <h3>{sp.displayName}</h3>
+    {sp.common && <div class="sci">{sp.scientific_name}</div>}
+    {showFoot && <div class="foot">{sp.type} · {statesFoot}</div>}
+  </div>
+</a>

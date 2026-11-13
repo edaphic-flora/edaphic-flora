@@ -1,0 +1,159 @@
+---
+import { APP_URL, PH_SCALE } from '../config.js';
+import { thresholds } from '../lib/data.js';
+const { sp } = Astro.props;
+const s = sp.soil;
+const u = sp.usda;
+const ready = !!s?.meets_threshold;
+const pos = (v) => Math.max(0, Math.min(100, ((v - PH_SCALE.min) / (PH_SCALE.max - PH_SCALE.min)) * 100));
+const pct = (v) => `${pos(v).toFixed(1)}%`;
+const usdaPh = u?.ph_min != null && u?.ph_max != null ? { min: u.ph_min, max: u.ph_max } : null;
+const ticks = [4.0, 5.5, 7.0, 8.5].map((v) => ({ v, at: pct(v), label: v === 4 ? '4.0 acidic' : v === 7 ? '7.0 neutral' : v === 8.5 ? '8.5 alkaline' : v.toFixed(1) }));
+const nutrients = ready
+  ? [
+      ['Phosphorus (P)', s.nutrients?.phosphorus],
+      ['Potassium (K)', s.nutrients?.potassium],
+      ['Calcium (Ca)', s.nutrients?.calcium],
+      ['Magnesium (Mg)', s.nutrients?.magnesium],
+    ].filter(([, v]) => v)
+  : [];
+const n = s?.sample_count || 0;
+const c = s?.contributor_count || 0;
+const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+const refBits = [
+  usdaPh && `pH ${usdaPh.min.toFixed(1)} to ${usdaPh.max.toFixed(1)}`,
+  u?.moisture_use && `moisture use ${u.moisture_use.toLowerCase()}`,
+  u?.drought_tolerance && `drought tolerance ${u.drought_tolerance.toLowerCase()}`,
+  u?.salinity_tolerance && `salinity tolerance ${u.salinity_tolerance.toLowerCase()}`,
+].filter(Boolean);
+---
+<section aria-labelledby="soil-h">
+  <h2 id="soil-h" class="sec-h">Soil snapshot</h2>
+
+  {ready ? (
+    <div class="ready">
+      <div class="based"><span class="dot" style="background:var(--sage)"></span>based on {plural(n, 'sample')} from {plural(c, 'contributor')}</div>
+
+      {s.ph && (
+        <div class="card pad block">
+          <div class="b-hd">
+            <span class="b-t">Soil pH</span>
+            <span class="mono b-v">{s.ph.p10.toFixed(1)} to {s.ph.p90.toFixed(1)} · median <span class="gold">{s.ph.p50.toFixed(1)}</span></span>
+          </div>
+          <div class="ph">
+            <div class="ph-grad"></div>
+            <div class="ph-range" style={`left:${pct(s.ph.p10)};width:${(pos(s.ph.p90) - pos(s.ph.p10)).toFixed(1)}%`}></div>
+            <div class="ph-mark" style={`left:${pct(s.ph.p50)}`}></div>
+            {usdaPh && <div class="ph-usda" style={`left:${pct(usdaPh.min)};width:${(pos(usdaPh.max) - pos(usdaPh.min)).toFixed(1)}%`}></div>}
+          </div>
+          <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.label}</span>)}</div>
+          <p class="key">
+            <span class="sw sw-range"></span> middle 80% of samples
+            <span class="sw sw-mark"></span> median
+            {usdaPh && (<><span class="sw sw-usda"></span> USDA PLANTS range</>)}
+          </p>
+        </div>
+      )}
+
+      <div class="two">
+        {s.organic_matter && (
+          <div class="card pad">
+            <div class="b-t">Organic matter</div>
+            <div class="mono big">{s.organic_matter.p50.toFixed(1)}%</div>
+            <div class="mono sub">middle 80%: {s.organic_matter.p10.toFixed(1)} to {s.organic_matter.p90.toFixed(1)}%</div>
+          </div>
+        )}
+        {s.texture && (
+          <div class="card pad">
+            <div class="b-hd"><span class="b-t">Texture</span><span class="mono b-v">{s.texture.class}</span></div>
+            <div class="tex"><div style={`width:${s.texture.sand}%;background:#C9A86A`}></div><div style={`width:${s.texture.silt}%;background:#8A9A86`}></div><div style={`width:${s.texture.clay}%;background:#6B5D49`}></div></div>
+            <div class="tex-lbl mono"><span>{s.texture.sand}% sand</span><span>{s.texture.silt}% silt</span><span>{s.texture.clay}% clay</span></div>
+            <div class="mono sub">median of {plural(s.texture.n, 'sample')}</div>
+          </div>
+        )}
+      </div>
+
+      {nutrients.length > 0 && (
+        <div class="card nut">
+          <div class="b-t nut-hd">Key nutrients <span class="mono sub">median, ppm</span></div>
+          <div class="nut-grid">
+            {nutrients.map(([name, v]) => (
+              <div class="nut-row"><span>{name}</span><span class="mono">{v.p50.toLocaleString()} ppm</span></div>
+            ))}
+          </div>
+          <p class="caveat">Labs use different extraction methods (for example Mehlich-3 and Modified Morgan), so treat nutrient values as rough guides.</p>
+        </div>
+      )}
+    </div>
+  ) : (
+    <div class="empty">
+      <div class="q mono">?</div>
+      <h3>Not enough community data yet</h3>
+      <p>
+        {n === 0
+          ? 'Nobody has added a soil test for this species yet.'
+          : `${plural(n, 'sample')} from ${plural(c, 'contributor')} so far.`}
+        {' '}A snapshot appears once there are at least {thresholds.min_samples} samples from {thresholds.min_contributors} or more people.
+      </p>
+      <a href={APP_URL} class="btn btn-gold" rel="noopener">Add a soil test for this plant →</a>
+      {refBits.length > 0 && (
+        <div class="ref">
+          <div class="ref-hd">USDA PLANTS reference</div>
+          <div class="mono ref-v">{refBits.join(' · ')}</div>
+          {usdaPh && (
+            <div class="ph slim">
+              <div class="ph-grad"></div>
+              <div class="ph-usda solid" style={`left:${pct(usdaPh.min)};width:${(pos(usdaPh.max) - pos(usdaPh.min)).toFixed(1)}%`}></div>
+            </div>
+          )}
+          {usdaPh && <div class="ticks">{ticks.map((t) => <span style={`left:${t.at}`}>{t.label}</span>)}</div>}
+        </div>
+      )}
+    </div>
+  )}
+</section>
+
+<style>
+  .sec-h { font-weight: 700; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.3px; }
+  .based { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-data); font-size: 12px; color: var(--sage-ink); background: rgba(122, 154, 134, 0.16); padding: 7px 13px; border-radius: 20px; margin-top: 18px; }
+  .block { margin-top: 16px; }
+  .b-hd { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  .b-t { font-family: var(--f-head); font-weight: 600; font-size: 16px; }
+  .b-v { font-size: 14px; color: var(--ink-soft); }
+  .gold { color: var(--gold-ink); }
+  .ph { position: relative; height: 14px; margin-top: 18px; }
+  .ph.slim { height: 10px; margin-top: 12px; }
+  .ph-grad { position: absolute; inset: 0; border-radius: 7px; background: linear-gradient(90deg, #c97b5a, #d3b05a, #7a9a86, #5e7468); opacity: 0.35; }
+  .ph-range { position: absolute; top: 0; bottom: 0; border-radius: 7px; border: 2px solid var(--sage-ink); background: rgba(122, 154, 134, 0.35); }
+  .ph-mark { position: absolute; top: -4px; width: 3px; height: 22px; border-radius: 2px; background: var(--gold); transform: translateX(-1px); }
+  .ph-usda { position: absolute; bottom: -9px; height: 4px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--brown) 0 6px, transparent 6px 10px); }
+  .ph-usda.solid { top: 0; bottom: 0; height: auto; border-radius: 6px; background: rgba(107, 93, 73, 0.45); border: 2px solid var(--brown); }
+  .ticks { position: relative; height: 16px; margin-top: 18px; font-family: var(--f-data); font-size: 10.5px; color: var(--bark); }
+  .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .ticks span:first-child { transform: none; }
+  .ticks span:last-child { transform: translateX(-100%); }
+  .key { margin-top: 14px; font-family: var(--f-data); font-size: 11px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sw { display: inline-block; width: 16px; height: 8px; border-radius: 3px; margin-left: 8px; }
+  .sw:first-child { margin-left: 0; }
+  .sw-range { background: rgba(122, 154, 134, 0.35); border: 2px solid var(--sage-ink); }
+  .sw-mark { width: 3px; height: 12px; background: var(--gold); }
+  .sw-usda { height: 4px; background: repeating-linear-gradient(90deg, var(--brown) 0 6px, transparent 6px 10px); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 14px; }
+  .big { font-size: 26px; margin-top: 8px; }
+  .sub { font-size: 12px; color: var(--ink-muted); margin-top: 4px; font-weight: 400; }
+  .tex { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 14px; }
+  .tex-lbl { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--bark); margin-top: 8px; }
+  .nut { margin-top: 14px; padding: 8px; }
+  .nut-hd { padding: 12px 14px 6px; font-size: 15px; }
+  .nut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .nut-row { padding: 12px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 16px; color: var(--ink-soft); }
+  .nut-row .mono { color: var(--charcoal); white-space: nowrap; }
+  .caveat { font-size: 14.5px; color: var(--bark); padding: 4px 14px 12px; line-height: 1.45; }
+  .empty { margin-top: 18px; background: var(--paper); border: 1px dashed rgba(211, 155, 53, 0.65); border-radius: 16px; padding: clamp(26px, 4vw, 40px); text-align: center; }
+  .q { width: 52px; height: 52px; margin: 0 auto; border-radius: 50%; background: rgba(211, 155, 53, 0.16); display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--gold-ink); }
+  .empty h3 { font-weight: 600; font-size: 21px; margin-top: 16px; }
+  .empty > p { font-weight: 300; font-size: 18px; line-height: 1.55; color: var(--ink-soft); margin: 10px auto 22px; max-width: 50ch; }
+  .ref { text-align: left; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .ref-hd { font-family: var(--f-head); font-weight: 600; font-size: 13px; letter-spacing: 0.3px; }
+  .ref-v { font-size: 13px; color: var(--ink-soft); margin-top: 6px; line-height: 1.6; }
+</style>

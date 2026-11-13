@@ -1,0 +1,153 @@
+---
+import { STATES, STATE_NAME, stateStatus, countLabel, invasiveLink } from '../lib/data.js';
+const { sp } = Astro.props;
+const LABEL = { native: 'Native', both: 'Native and introduced', introduced: 'Introduced', invasive: 'Listed invasive' };
+const tiles = STATES.map((s) => {
+  const st = stateStatus(sp, s.code);
+  return { ...s, st };
+});
+const groups = ['native', 'both', 'introduced', 'invasive']
+  .map((k) => ({ k, label: LABEL[k], items: tiles.filter((t) => t.st === k) }))
+  .filter((g) => g.items.length);
+const src = sp.state_source === 'BONAP' ? 'BONAP' : sp.state_source === 'USDA' ? 'USDA PLANTS' : sp.state_source ? 'BONAP and USDA PLANTS' : null;
+const inv = Object.fromEntries((sp.invasive || []).map((i) => [i.state, i]));
+const summary = [
+  sp.nativeCodes.length && `Native in ${countLabel(sp.nativeCodes)}`,
+  sp.introducedCodes.length && `introduced in ${countLabel(sp.introducedCodes)}`,
+  sp.invasiveCodes.length && `listed invasive or noxious in ${countLabel(sp.invasiveCodes)}`,
+].filter(Boolean);
+const sumText = summary.length ? summary.join(', ').replace(/^./, (ch) => ch.toUpperCase()) + '.' : 'No US state records for this species yet.';
+// Data for the "your state" line, rendered client-side
+// Only states with a record are included; anything missing means "no record".
+const lookup = Object.fromEntries(
+  tiles
+    .filter((t) => t.st)
+    .map((t) => [t.code, t.st === 'invasive' ? [t.st, inv[t.code]?.designation || null, inv[t.code]?.url || invasiveLink(t.code)] : [t.st]])
+);
+---
+<section class="states" aria-labelledby="states-h">
+  <div class="hd">
+    <h2 id="states-h" class="sec-h">{sp.nativeCodes.length ? "Where it's native" : 'Status by state'}</h2>
+    <label class="pick">
+      <span>Your state</span>
+      <select id="state-pick" class="select" data-lookup={JSON.stringify(lookup)} data-src={src || ''}>
+        <option value="">Choose…</option>
+        {[...STATES].sort((a, b) => a.name.localeCompare(b.name)).map((s) => <option value={s.code}>{s.name}</option>)}
+      </select>
+    </label>
+  </div>
+  <p class="sum">
+    {sumText}
+    {src && <span class="src"> Source: {src}{sp.invasiveCodes.length ? ' and state invasive lists' : ''}.</span>}
+  </p>
+  <p class="yours" id="state-line" aria-live="polite" hidden></p>
+
+  <div class="map" role="img" aria-label={`Tile map of US states. ${sumText}`}>
+    {tiles.map((t) => (
+      <div
+        class:list={['tile', t.st || 'none']}
+        style={`grid-row:${t.row + 1};grid-column:${t.col + 1}`}
+        title={`${t.name}: ${t.st ? LABEL[t.st] : 'no record'}`}
+        data-code={t.code}
+      >
+        {t.code}
+      </div>
+    ))}
+  </div>
+  <div class="legend">
+    {sp.nativeCodes.length > 0 && <span><i class="tile native"></i>Native</span>}
+    {sp.introducedCodes.length > 0 && <span><i class="tile introduced"></i>Introduced</span>}
+    {groups.some((g) => g.k === 'both') && <span><i class="tile both"></i>Native and introduced</span>}
+    {sp.invasiveCodes.length > 0 && <span><i class="tile invasive"></i>Listed invasive</span>}
+    <span><i class="tile none"></i>No record</span>
+  </div>
+
+  {groups.length > 0 && (
+    <details>
+      <summary>List by state</summary>
+      {groups.map((g) => (
+        <p><strong>{g.label}:</strong> {g.items.map((t) => t.name).join(', ')}.</p>
+      ))}
+      {(sp.invasive || []).length > 0 && (
+        <ul class="inv">
+          {sp.invasive.map((i) => {
+            const url = i.url || invasiveLink(i.state);
+            const where = i.state === 'US' ? 'Federal' : STATE_NAME[i.state] || i.state;
+            return (
+              <li>
+                {where}: {i.designation}{i.source && ` (${i.source})`}
+                {url && <> · <a href={url} rel="noopener">state list</a></>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </details>
+  )}
+</section>
+
+<script>
+  const sel = document.getElementById('state-pick') as HTMLSelectElement | null;
+  const line = document.getElementById('state-line');
+  if (sel && line) {
+    const data = JSON.parse(sel.dataset.lookup || '{}');
+    const src = sel.dataset.src;
+    const words: Record<string, string> = { native: 'Native', both: 'Native and introduced', introduced: 'Introduced', invasive: 'Listed invasive' };
+    const show = (code: string) => {
+      document.querySelectorAll('.map .tile.on').forEach((t) => t.classList.remove('on'));
+      if (!code) { line.hidden = true; return; }
+      const name = sel.selectedOptions[0]?.textContent || code;
+      const [st, des, url] = data[code] || [];
+      document.querySelector(`.map .tile[data-code="${code}"]`)?.classList.add('on');
+      let text = st ? `${words[st]} in ${name}` : `No record for ${name}`;
+      if (st === 'invasive' && des) text = `${des} in ${name} (state list)`;
+      else if (st && src) text += ` (${src})`;
+      line.textContent = text;
+      if (st === 'invasive' && url) {
+        const a = document.createElement('a');
+        a.href = url; a.rel = 'noopener'; a.textContent = 'See the state list';
+        line.append(' · ', a);
+      }
+      line.hidden = false;
+    };
+    let saved = '';
+    try { saved = localStorage.getItem('ef-state') || ''; } catch {}
+    if (saved && sel.querySelector(`option[value="${saved}"]`)) { sel.value = saved; show(saved); }
+    sel.addEventListener('change', () => {
+      show(sel.value);
+      try { sel.value ? localStorage.setItem('ef-state', sel.value) : localStorage.removeItem('ef-state'); } catch {}
+    });
+  }
+</script>
+
+<style>
+  .states { margin-top: 36px; }
+  .hd { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .sec-h { font-weight: 700; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.3px; }
+  .pick { display: inline-flex; align-items: center; gap: 10px; font-family: var(--f-head); font-weight: 600; font-size: 13px; }
+  .pick .select { padding: 9px 12px; font-size: 13px; }
+  .sum { margin-top: 12px; font-size: 17px; color: var(--ink-soft); }
+  .src { color: var(--bark); font-size: 15px; }
+  .yours { margin-top: 10px; display: inline-block; font-family: var(--f-head); font-weight: 600; font-size: 14px; background: rgba(211, 155, 53, 0.16); color: var(--gold-deep); padding: 8px 14px; border-radius: 20px; }
+  .yours a { color: inherit; }
+  .map { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; margin-top: 18px; max-width: 520px; }
+  .tile {
+    aspect-ratio: 1; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--f-data); font-size: clamp(8px, 1.6vw, 11px); font-weight: 500; line-height: 1;
+  }
+  .tile.native { background: var(--sage-fill); color: var(--charcoal); }
+  .tile.both { background: linear-gradient(135deg, var(--sage-fill) 50%, var(--brown) 50%); color: var(--limestone); }
+  .tile.introduced { background: var(--brown); color: var(--limestone); }
+  .tile.invasive { background: var(--gold); color: var(--charcoal); }
+  .tile.none { background: var(--tile-empty); color: rgba(55, 61, 60, 0.45); }
+  .tile.on { outline: 3px solid var(--charcoal); outline-offset: 1px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-family: var(--f-data); font-size: 11px; color: var(--ink-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i.tile { width: 12px; height: 12px; aspect-ratio: auto; border-radius: 3px; display: inline-block; }
+  details { margin-top: 16px; font-size: 16px; color: var(--ink-soft); }
+  summary { cursor: pointer; font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--sage-ink); }
+  details p { margin-top: 10px; line-height: 1.55; }
+  details strong { font-weight: 600; color: var(--charcoal); }
+  .inv { margin: 12px 0 0; padding-left: 20px; line-height: 1.6; }
+  .inv a { color: var(--sage-ink); }
+</style>

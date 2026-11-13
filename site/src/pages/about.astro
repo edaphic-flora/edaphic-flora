@@ -1,0 +1,126 @@
+---
+import Base from '../layouts/Base.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { thresholds, meta, isSample } from '../lib/data.js';
+import { CONTACT_EMAIL, GITHUB_URL } from '../config.js';
+const t = thresholds;
+const updated = meta.generated_at
+  ? new Date(meta.generated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  : null;
+---
+<Base
+  title="About and methodology"
+  description="How Edaphic Flora sources soil, native status, and wildlife data, how community soil stats are computed, and how we handle thin data honestly."
+  active="about"
+>
+  <div class="narrow intro">
+    <span class="eyebrow">About and methodology</span>
+    <h1 class="h1">An open picture of what plants grow in.</h1>
+    <p class="lede">
+      Edaphic Flora is an open-source soil database for gardeners, researchers, restorationists, and land managers. We pair
+      lab soil tests with the real sites where plants grow, and how they're doing there, to build a clearer, sourced picture
+      of the conditions each species actually thrives in.
+    </p>
+  </div>
+
+  <div class="narrow block">
+    <h2 class="h2s">What's plentiful, what's thin</h2>
+    <div class="pair">
+      <div class="card pad ok">
+        <div class="ph"><span class="dot" style="background:var(--sage)"></span>Plentiful</div>
+        <ul>
+          <li>USDA PLANTS traits for tens of thousands of taxa</li>
+          <li>Native and introduced status for every US state and DC (BONAP)</li>
+          <li>State invasive and noxious lists for all 50 states</li>
+          <li>Wildlife support counts for hundreds of native plant genera</li>
+        </ul>
+      </div>
+      <div class="card pad thin">
+        <div class="ph"><span class="dot" style="background:var(--gold)"></span>Still thin</div>
+        <p>
+          Community soil samples. Soil stats only appear once a species clears a sample and contributor threshold, so many
+          soil snapshots are still empty. That's expected, and we show it plainly rather than guessing.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="narrow block">
+    <h2 class="h2s">How the soil stats are computed</h2>
+    <ol class="steps">
+      <li>Soil tests are entered in the app and tied to a species and a site. Contributor names, emails, and sample locations are <strong>never published</strong>.</li>
+      <li>Samples flagged during moderation, and samples from suspended accounts, are <strong>left out</strong> of every public number.</li>
+      <li>A species gets a soil snapshot only with <strong>at least {t.min_samples} samples from at least {t.min_contributors} different people</strong>. Each measurement (pH, organic matter, texture, each nutrient) also needs {t.min_samples} values of its own before it is shown.</li>
+      <li>Ranges show the <strong>middle 80%</strong> of samples (10th to 90th percentile), so one odd reading can't stretch the range. The highlighted value is the median.</li>
+      <li>Texture class comes from the median sand, silt, and clay percentages, classified with the USDA soil texture triangle.</li>
+      <li>Nutrient values come from different labs using different extraction methods (for example Mehlich-3 and Modified Morgan), so treat them as rough guides.</li>
+    </ol>
+  </div>
+
+  <div class="narrow block">
+    <h2 class="h2s">Data sources and credits</h2>
+    <ul class="cites">
+      <li>
+        <strong>Native status by state:</strong> Kartesz, J.T., The Biota of North America Program (BONAP). 2015.
+        Taxonomic Data Center. Chapel Hill, N.C. <a href="https://bonap.net/tdc" rel="noopener">bonap.net/tdc</a>.
+        Used with permission. Where BONAP has no record for a species, USDA PLANTS state data fills in.
+      </li>
+      <li><strong>Plant traits:</strong> USDA NRCS PLANTS Database, <a href="https://plants.usda.gov/" rel="noopener">plants.usda.gov</a> (public domain).</li>
+      <li>
+        <strong>Taxonomy:</strong> Govaerts, R. et al. (2021). The World Checklist of Vascular Plants, a continuously updated
+        resource for exploring global plant diversity. <em>Scientific Data</em> 8, 215 (CC BY 4.0).
+      </li>
+      <li><strong>Invasive and noxious listings:</strong> official state lists from invasive species councils, departments of agriculture, and natural resource agencies. Each species page links to the relevant state list.</li>
+      <li><strong>Moths and butterflies:</strong> caterpillar host plant associations from Tallamy, D.W. and Shropshire, K.J. (National Wildlife Federation).</li>
+      <li><strong>Specialist bees:</strong> native bee and host plant associations from Jarrod Fowler.</li>
+      <li><strong>Birds:</strong> bird and plant associations adapted from the Audubon native plants database.</li>
+      <li><strong>Soil samples:</strong> contributed by Edaphic Flora users.</li>
+    </ul>
+    <p class="small" style="margin-top:14px">
+      Code is open source under AGPL-3.0 on <a href={GITHUB_URL} rel="noopener">GitHub</a>. Community soil data is shared
+      under CC BY-NC 4.0. Third-party data keeps its original license.
+      {updated && ` Data on this site was last updated ${updated}.`}
+      {isSample && ' This build uses illustrative sample data.'}
+    </p>
+  </div>
+
+  <div class="narrow block">
+    <h2 class="h2s">Who's behind it</h2>
+    <p class="lede" style="margin-top:14px">
+      Edaphic Flora is an open-source project maintained by Todd Testerman, a microbiologist and ecological landscape
+      designer in Connecticut. Questions, corrections, and data partnerships are welcome at
+      <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+    </p>
+  </div>
+
+  <div class="narrow block">
+    <h2 class="h2s">Honest about coverage</h2>
+    <p class="lede" style="margin-top:14px">
+      This is a young, growing dataset. Reference data is rich; community soil data is early. We'd rather show a confident
+      "not yet" than a confident wrong number. Every soil snapshot carries the sample count behind it so you can judge for
+      yourself.
+    </p>
+  </div>
+
+  <CtaBand heading="help the picture sharpen." body="Every soil test you add makes the community data better for the next person searching." />
+</Base>
+
+<style>
+  .intro { padding-top: clamp(44px, 6vw, 72px); }
+  .intro .h1 { margin-top: 14px; font-size: clamp(32px, 4.4vw, 50px); }
+  .intro .lede { margin-top: 20px; }
+  .block { padding-top: clamp(40px, 5vw, 60px); }
+  .h2s { font-weight: 700; font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.3px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 22px; }
+  .ok { border-color: rgba(122, 154, 134, 0.4); }
+  .thin { border: 1px dashed rgba(211, 155, 53, 0.6); }
+  .ph { display: flex; align-items: center; gap: 8px; font-family: var(--f-head); font-weight: 600; font-size: 14px; letter-spacing: 0.3px; text-transform: uppercase; }
+  .pair ul { font-weight: 300; font-size: 17px; line-height: 1.7; color: var(--ink-soft); margin: 12px 0 0; padding-left: 20px; }
+  .pair p { font-weight: 300; font-size: 17px; line-height: 1.65; color: var(--ink-soft); margin-top: 12px; }
+  .steps { margin: 20px 0 0; padding-left: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 14px; }
+  .steps li { counter-increment: s; display: flex; gap: 16px; font-weight: 300; font-size: 18px; line-height: 1.55; color: var(--ink-soft); }
+  .steps li::before { content: counter(s, decimal-leading-zero); font-family: var(--f-data); font-size: 13px; color: var(--sage-ink); margin-top: 4px; }
+  .steps strong, .cites strong { font-weight: 600; color: var(--charcoal); }
+  .cites { margin: 18px 0 0; padding-left: 20px; font-weight: 300; font-size: 17px; line-height: 1.6; color: var(--ink-soft); display: flex; flex-direction: column; gap: 10px; }
+  .cites a, .small a, .lede a { color: var(--sage-ink); }
+</style>

@@ -1,0 +1,48 @@
+---
+import { APP_URL, CONTACT_EMAIL, GITHUB_URL } from '../config.js';
+import { isSample } from '../lib/data.js';
+const year = new Date().getFullYear();
+---
+<footer>
+  <div class="wrap top">
+    <div class="about">
+      <img src="/logo-sage.svg" alt="edaphic flora" width="85" height="36" />
+      <p>An open soil and plant database. Peer-reviewed data meets running barefoot through the tall grass.</p>
+    </div>
+    <div class="cols">
+      <div class="col">
+        <div class="hd">Explore</div>
+        <a href="/">Home</a>
+        <a href="/species/">Browse species</a>
+        <a href="/about/">About and methodology</a>
+      </div>
+      <div class="col">
+        <div class="hd">Contribute</div>
+        <a href={APP_URL} rel="noopener">Open the app</a>
+        <a href={GITHUB_URL} rel="noopener">Source code on GitHub</a>
+        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+      </div>
+    </div>
+  </div>
+  <div class="base">
+    <div class="wrap">
+      © {year} Edaphic Flora · Native status: BONAP · Traits: USDA PLANTS · Community data CC BY-NC 4.0
+      {isSample && <span> · Sample values are illustrative</span>}
+    </div>
+  </div>
+</footer>
+
+<style>
+  footer { background: var(--charcoal-night); border-top: 1px solid rgba(247, 244, 232, 0.08); margin-top: clamp(40px, 5vw, 72px); }
+  .top { padding-top: clamp(40px, 5vw, 60px); padding-bottom: clamp(40px, 5vw, 60px); display: flex; gap: 40px; flex-wrap: wrap; justify-content: space-between; }
+  .about { max-width: 320px; }
+  .about img { height: 36px; width: auto; }
+  .about p { font-weight: 300; font-size: 16px; line-height: 1.55; color: rgba(247, 244, 232, 0.62); margin-top: 16px; }
+  .cols { display: flex; gap: 56px; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .hd { font-family: var(--f-head); font-weight: 600; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--sage-muted); }
+  .col a { font-size: 16px; color: rgba(247, 244, 232, 0.72); text-decoration: none; }
+  .col a:hover { color: var(--limestone); text-decoration: underline; }
+  .base { border-top: 1px solid rgba(247, 244, 232, 0.08); }
+  .base .wrap { padding-top: 18px; padding-bottom: 18px; font-family: var(--f-data); font-size: 11px; color: rgba(247, 244, 232, 0.45); line-height: 1.7; }
+</style>

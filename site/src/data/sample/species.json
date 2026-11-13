@@ -1,0 +1,1321 @@
+{
+ "meta": {
+  "source": "sample",
+  "generated_at": "2026-11-12T23:57:38.425Z",
+  "scope": "curated",
+  "thresholds": {
+   "min_samples": 5,
+   "min_contributors": 2
+  },
+  "species_count": 13,
+  "public_sample_count": 106
+ },
+ "species": [
+  {
+   "key": "acer platanoides",
+   "slug": "acer-platanoides",
+   "scientific_name": "Acer platanoides",
+   "genus": "Acer",
+   "family": "Sapindaceae",
+   "common_name": "Norway maple",
+   "usda_symbol": "ACPL",
+   "usda": {
+    "growth_habit": "Tree",
+    "duration": "Perennial",
+    "native_status_na": "Introduced to North America",
+    "na_status": "introduced",
+    "ph_min": 4.5,
+    "ph_max": 7.5,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Tolerant",
+    "drought_tolerance": "Low",
+    "salinity_tolerance": "Low",
+    "bloom_period": "Spring"
+   },
+   "states": {
+    "NY": "introduced",
+    "VT": "introduced",
+    "MI": "introduced",
+    "OH": "introduced",
+    "NJ": "introduced",
+    "RI": "introduced",
+    "OR": "introduced",
+    "MA": "introduced",
+    "ME": "introduced",
+    "IL": "introduced",
+    "CT": "introduced",
+    "WV": "introduced",
+    "IN": "introduced",
+    "PA": "introduced",
+    "NH": "introduced",
+    "DE": "introduced",
+    "MT": "introduced",
+    "ID": "introduced",
+    "MD": "introduced",
+    "VA": "introduced",
+    "WA": "introduced",
+    "WI": "introduced",
+    "MN": "introduced"
+   },
+   "state_source": "BONAP",
+   "invasive": [
+    {
+     "state": "NH",
+     "designation": "Prohibited Invasive",
+     "source": "New Hampshire Prohibited Invasive Species List",
+     "url": null
+    },
+    {
+     "state": "MA",
+     "designation": "Prohibited",
+     "source": "Massachusetts Prohibited Plant List",
+     "url": null
+    },
+    {
+     "state": "CT",
+     "designation": "Invasive",
+     "source": "Connecticut Invasive Plants Council",
+     "url": null
+    }
+   ],
+   "soil": {
+    "sample_count": 1,
+    "contributor_count": 1,
+    "meets_threshold": false,
+    "ph": null,
+    "organic_matter": null,
+    "texture": null,
+    "nutrients": {
+     "phosphorus": null,
+     "potassium": null,
+     "calcium": null,
+     "magnesium": null
+    }
+   },
+   "wildlife": null
+  },
+  {
+   "key": "andropogon gerardii",
+   "slug": "andropogon-gerardii",
+   "scientific_name": "Andropogon gerardii",
+   "genus": "Andropogon",
+   "family": "Poaceae",
+   "common_name": "big bluestem",
+   "usda_symbol": "ANGE",
+   "usda": {
+    "growth_habit": "Graminoid",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 6,
+    "ph_max": 7.5,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intolerant",
+    "drought_tolerance": "High",
+    "salinity_tolerance": "Medium",
+    "bloom_period": "Late Summer"
+   },
+   "states": {
+    "MA": "native",
+    "SD": "native",
+    "NE": "native",
+    "WY": "native",
+    "MO": "native",
+    "CT": "native",
+    "PA": "native",
+    "DC": "native",
+    "CO": "native",
+    "NJ": "native",
+    "AR": "native",
+    "VA": "native",
+    "SC": "native",
+    "FL": "native",
+    "KS": "native",
+    "NY": "native",
+    "TN": "native",
+    "ME": "native",
+    "MI": "native",
+    "MS": "native",
+    "IA": "native",
+    "OH": "native",
+    "IL": "native",
+    "AZ": "native",
+    "MT": "native",
+    "MN": "native",
+    "WV": "native",
+    "LA": "native",
+    "NC": "native",
+    "IN": "native",
+    "ND": "native",
+    "AL": "native",
+    "OK": "native",
+    "NM": "native",
+    "MD": "native",
+    "DE": "native",
+    "VT": "native",
+    "NH": "native",
+    "WI": "native",
+    "UT": "native",
+    "GA": "native",
+    "RI": "native",
+    "TX": "native",
+    "KY": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 16,
+    "contributor_count": 5,
+    "meets_threshold": true,
+    "ph": {
+     "n": 16,
+     "p10": 6.1,
+     "p50": 6.7,
+     "p90": 7.3
+    },
+    "organic_matter": {
+     "n": 16,
+     "p10": 4.3,
+     "p50": 5.8,
+     "p90": 7.2
+    },
+    "texture": {
+     "n": 16,
+     "sand": 35,
+     "silt": 39,
+     "clay": 26,
+     "class": "Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 16,
+      "p50": 28
+     },
+     "potassium": {
+      "n": 16,
+      "p50": 131
+     },
+     "calcium": {
+      "n": 16,
+      "p50": 1290
+     },
+     "magnesium": {
+      "n": 16,
+      "p50": 162
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Andropogon",
+    "lepidoptera": 4,
+    "specialist_bees": 0,
+    "songbird_value": "Low",
+    "bird_food": "Seeds",
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "aquilegia canadensis",
+   "slug": "aquilegia-canadensis",
+   "scientific_name": "Aquilegia canadensis",
+   "genus": "Aquilegia",
+   "family": "Ranunculaceae",
+   "common_name": "red columbine",
+   "usda_symbol": "AQCA",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 5,
+    "ph_max": 7.5,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Tolerant",
+    "drought_tolerance": "Medium",
+    "salinity_tolerance": "None",
+    "bloom_period": "Spring"
+   },
+   "states": {
+    "SD": "native",
+    "MN": "native",
+    "CT": "native",
+    "IA": "native",
+    "ME": "native",
+    "NJ": "native",
+    "IL": "native",
+    "FL": "native",
+    "NC": "native",
+    "NH": "native",
+    "GA": "native",
+    "KY": "native",
+    "MO": "native",
+    "MI": "native",
+    "LA": "native",
+    "MA": "native",
+    "NE": "native",
+    "MD": "native",
+    "SC": "native",
+    "AR": "native",
+    "NY": "native",
+    "VA": "native",
+    "TX": "native",
+    "KS": "native",
+    "WV": "native",
+    "AL": "native",
+    "WI": "native",
+    "OK": "native",
+    "IN": "native",
+    "RI": "native",
+    "TN": "native",
+    "OH": "native",
+    "DC": "native",
+    "ND": "native",
+    "PA": "native",
+    "MS": "native",
+    "DE": "native",
+    "VT": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 1,
+    "contributor_count": 1,
+    "meets_threshold": false,
+    "ph": null,
+    "organic_matter": null,
+    "texture": null,
+    "nutrients": {
+     "phosphorus": null,
+     "potassium": null,
+     "calcium": null,
+     "magnesium": null
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Aquilegia",
+    "lepidoptera": 5,
+    "specialist_bees": 1,
+    "songbird_value": null,
+    "bird_food": null,
+    "hummingbird": true,
+    "keystone": false
+   }
+  },
+  {
+   "key": "asclepias syriaca",
+   "slug": "asclepias-syriaca",
+   "scientific_name": "Asclepias syriaca",
+   "genus": "Asclepias",
+   "family": "Apocynaceae",
+   "common_name": "common milkweed",
+   "usda_symbol": "ASSY",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 5.5,
+    "ph_max": 7.5,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intolerant",
+    "drought_tolerance": "Medium",
+    "salinity_tolerance": "None",
+    "bloom_period": "Early Summer"
+   },
+   "states": {
+    "MA": "native",
+    "GA": "native",
+    "SC": "native",
+    "NC": "native",
+    "MD": "native",
+    "OH": "native",
+    "IA": "native",
+    "ND": "native",
+    "ME": "native",
+    "AR": "native",
+    "DC": "native",
+    "NJ": "native",
+    "TN": "native",
+    "IN": "native",
+    "OK": "native",
+    "VA": "native",
+    "AL": "native",
+    "MO": "native",
+    "DE": "native",
+    "MI": "native",
+    "PA": "native",
+    "ID": "introduced",
+    "VT": "native",
+    "KY": "native",
+    "WV": "native",
+    "SD": "native",
+    "IL": "native",
+    "MN": "native",
+    "WA": "introduced",
+    "OR": "introduced",
+    "NE": "native",
+    "WI": "native",
+    "RI": "native",
+    "KS": "native",
+    "NH": "native",
+    "CT": "native",
+    "NY": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 3,
+    "contributor_count": 2,
+    "meets_threshold": false,
+    "ph": null,
+    "organic_matter": null,
+    "texture": null,
+    "nutrients": {
+     "phosphorus": null,
+     "potassium": null,
+     "calcium": null,
+     "magnesium": null
+    }
+   },
+   "wildlife": {
+    "level": "genus",
+    "genus": "Asclepias",
+    "lepidoptera": 12,
+    "specialist_bees": 0,
+    "songbird_value": null,
+    "bird_food": null,
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "asclepias tuberosa",
+   "slug": "asclepias-tuberosa",
+   "scientific_name": "Asclepias tuberosa",
+   "genus": "Asclepias",
+   "family": "Apocynaceae",
+   "common_name": "butterfly milkweed",
+   "usda_symbol": "ASTU",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 4.5,
+    "ph_max": 7.5,
+    "moisture_use": "Low",
+    "shade_tolerance": "Intolerant",
+    "drought_tolerance": "High",
+    "salinity_tolerance": "None",
+    "bloom_period": "Mid Summer"
+   },
+   "states": {
+    "SC": "native",
+    "GA": "native",
+    "DE": "native",
+    "CO": "native",
+    "RI": "native",
+    "AL": "native",
+    "CT": "native",
+    "TX": "native",
+    "CA": "native",
+    "TN": "native",
+    "IN": "native",
+    "OH": "native",
+    "ME": "native",
+    "NE": "native",
+    "OK": "native",
+    "NJ": "native",
+    "NC": "native",
+    "NY": "native",
+    "FL": "native",
+    "IA": "native",
+    "VA": "native",
+    "MO": "native",
+    "DC": "native",
+    "AR": "native",
+    "MI": "native",
+    "WV": "native",
+    "IL": "native",
+    "VT": "native",
+    "KS": "native",
+    "MD": "native",
+    "MN": "native",
+    "SD": "native",
+    "AZ": "native",
+    "MA": "native",
+    "MS": "native",
+    "PA": "native",
+    "LA": "native",
+    "WI": "native",
+    "NM": "native",
+    "KY": "native",
+    "NH": "native",
+    "UT": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 1,
+    "contributor_count": 1,
+    "meets_threshold": false,
+    "ph": null,
+    "organic_matter": null,
+    "texture": null,
+    "nutrients": {
+     "phosphorus": null,
+     "potassium": null,
+     "calcium": null,
+     "magnesium": null
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Asclepias",
+    "lepidoptera": 12,
+    "specialist_bees": 0,
+    "songbird_value": null,
+    "bird_food": null,
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "echinacea purpurea",
+   "slug": "echinacea-purpurea",
+   "scientific_name": "Echinacea purpurea",
+   "genus": "Echinacea",
+   "family": "Asteraceae",
+   "common_name": "eastern purple coneflower",
+   "usda_symbol": "ECPU",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 6,
+    "ph_max": 7.5,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intermediate",
+    "drought_tolerance": "High",
+    "salinity_tolerance": "Low",
+    "bloom_period": "Mid Summer"
+   },
+   "states": {
+    "IL": "native",
+    "LA": "native",
+    "CT": "introduced",
+    "TN": "native",
+    "MO": "native",
+    "OH": "native",
+    "VT": "introduced",
+    "MA": "introduced",
+    "MI": "native",
+    "PA": "introduced",
+    "IN": "native",
+    "MD": "introduced",
+    "GA": "native",
+    "OK": "native",
+    "NY": "introduced",
+    "MS": "native",
+    "NC": "native",
+    "WI": "native",
+    "VA": "native",
+    "NJ": "introduced",
+    "IA": "native",
+    "KS": "native",
+    "TX": "native",
+    "KY": "native",
+    "AR": "native",
+    "AL": "native",
+    "MN": "introduced",
+    "NE": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 21,
+    "contributor_count": 6,
+    "meets_threshold": true,
+    "ph": {
+     "n": 21,
+     "p10": 6,
+     "p50": 6.6,
+     "p90": 7.2
+    },
+    "organic_matter": {
+     "n": 21,
+     "p10": 3.6,
+     "p50": 5.6,
+     "p90": 6.1
+    },
+    "texture": {
+     "n": 21,
+     "sand": 37,
+     "silt": 43,
+     "clay": 20,
+     "class": "Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 21,
+      "p50": 24
+     },
+     "potassium": {
+      "n": 21,
+      "p50": 139
+     },
+     "calcium": {
+      "n": 21,
+      "p50": 1122
+     },
+     "magnesium": {
+      "n": 21,
+      "p50": 173
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Echinacea",
+    "lepidoptera": 9,
+    "specialist_bees": 3,
+    "songbird_value": "Medium",
+    "bird_food": "Seeds",
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "eutrochium maculatum",
+   "slug": "eutrochium-maculatum",
+   "scientific_name": "Eutrochium maculatum",
+   "genus": "Eutrochium",
+   "family": "Asteraceae",
+   "common_name": "spotted joe pye weed",
+   "usda_symbol": "EUMA9",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 5.5,
+    "ph_max": 7.5,
+    "moisture_use": "High",
+    "shade_tolerance": "Intermediate",
+    "drought_tolerance": "Low",
+    "salinity_tolerance": "None",
+    "bloom_period": "Late Summer"
+   },
+   "states": {
+    "OH": "native",
+    "ME": "native",
+    "PA": "native",
+    "IA": "native",
+    "MA": "native",
+    "IL": "native",
+    "RI": "native",
+    "NM": "native",
+    "MD": "native",
+    "VT": "native",
+    "MI": "native",
+    "WV": "native",
+    "NC": "native",
+    "NJ": "native",
+    "CO": "native",
+    "SD": "native",
+    "VA": "native",
+    "WA": "native",
+    "IN": "native",
+    "WI": "native",
+    "DE": "native",
+    "NE": "native",
+    "MN": "native",
+    "ND": "native",
+    "KY": "native",
+    "NY": "native",
+    "CT": "native",
+    "TN": "native",
+    "NH": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 8,
+    "contributor_count": 3,
+    "meets_threshold": true,
+    "ph": {
+     "n": 8,
+     "p10": 6.1,
+     "p50": 6.6,
+     "p90": 7.2
+    },
+    "organic_matter": {
+     "n": 8,
+     "p10": 6.4,
+     "p50": 7.1,
+     "p90": 9.4
+    },
+    "texture": {
+     "n": 8,
+     "sand": 26,
+     "silt": 46,
+     "clay": 28,
+     "class": "Clay Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 8,
+      "p50": 26
+     },
+     "potassium": {
+      "n": 8,
+      "p50": 138
+     },
+     "calcium": {
+      "n": 8,
+      "p50": 1318
+     },
+     "magnesium": {
+      "n": 8,
+      "p50": 172
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Eutrochium",
+    "lepidoptera": 42,
+    "specialist_bees": 0,
+    "songbird_value": null,
+    "bird_food": null,
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "monarda fistulosa",
+   "slug": "monarda-fistulosa",
+   "scientific_name": "Monarda fistulosa",
+   "genus": "Monarda",
+   "family": "Lamiaceae",
+   "common_name": "wild bergamot",
+   "usda_symbol": "MOFI",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 6,
+    "ph_max": 8,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intermediate",
+    "drought_tolerance": "Medium",
+    "salinity_tolerance": "None",
+    "bloom_period": "Mid Summer"
+   },
+   "states": {
+    "ME": "native",
+    "MS": "native",
+    "NC": "native",
+    "MA": "native",
+    "MN": "native",
+    "VT": "native",
+    "AL": "native",
+    "NM": "native",
+    "GA": "native",
+    "CT": "native",
+    "NY": "native",
+    "OK": "native",
+    "NJ": "native",
+    "TN": "native",
+    "IA": "native",
+    "OR": "native",
+    "AR": "native",
+    "MT": "native",
+    "IN": "native",
+    "SD": "native",
+    "WI": "native",
+    "WV": "native",
+    "AZ": "native",
+    "NE": "native",
+    "LA": "native",
+    "CO": "native",
+    "UT": "native",
+    "VA": "native",
+    "RI": "native",
+    "WY": "native",
+    "KS": "native",
+    "MD": "native",
+    "NH": "native",
+    "DE": "native",
+    "IL": "native",
+    "WA": "native",
+    "PA": "native",
+    "SC": "native",
+    "TX": "native",
+    "MO": "native",
+    "KY": "native",
+    "DC": "native",
+    "OH": "native",
+    "ID": "native",
+    "ND": "native",
+    "MI": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 9,
+    "contributor_count": 3,
+    "meets_threshold": true,
+    "ph": {
+     "n": 9,
+     "p10": 6.3,
+     "p50": 7,
+     "p90": 7.4
+    },
+    "organic_matter": {
+     "n": 9,
+     "p10": 4.2,
+     "p50": 6,
+     "p90": 6.8
+    },
+    "texture": {
+     "n": 9,
+     "sand": 29,
+     "silt": 44,
+     "clay": 27,
+     "class": "Clay Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 9,
+      "p50": 31
+     },
+     "potassium": {
+      "n": 9,
+      "p50": 164
+     },
+     "calcium": {
+      "n": 9,
+      "p50": 1191
+     },
+     "magnesium": {
+      "n": 9,
+      "p50": 189
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Monarda",
+    "lepidoptera": 7,
+    "specialist_bees": 2,
+    "songbird_value": null,
+    "bird_food": null,
+    "hummingbird": true,
+    "keystone": false
+   }
+  },
+  {
+   "key": "packera aurea",
+   "slug": "packera-aurea",
+   "scientific_name": "Packera aurea",
+   "genus": "Packera",
+   "family": null,
+   "common_name": null,
+   "usda_symbol": null,
+   "usda": null,
+   "states": {},
+   "state_source": null,
+   "invasive": [],
+   "soil": {
+    "sample_count": 1,
+    "contributor_count": 1,
+    "meets_threshold": false,
+    "ph": null,
+    "organic_matter": null,
+    "texture": null,
+    "nutrients": {
+     "phosphorus": null,
+     "potassium": null,
+     "calcium": null,
+     "magnesium": null
+    }
+   },
+   "wildlife": null
+  },
+  {
+   "key": "panicum virgatum",
+   "slug": "panicum-virgatum",
+   "scientific_name": "Panicum virgatum",
+   "genus": "Panicum",
+   "family": "Poaceae",
+   "common_name": "switchgrass",
+   "usda_symbol": "PAVI2",
+   "usda": {
+    "growth_habit": "Graminoid",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 4.5,
+    "ph_max": 8,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intolerant",
+    "drought_tolerance": "Medium",
+    "salinity_tolerance": "Medium",
+    "bloom_period": "Late Summer"
+   },
+   "states": {
+    "CO": "native",
+    "NJ": "native",
+    "NC": "native",
+    "IA": "native",
+    "WV": "native",
+    "FL": "native",
+    "UT": "native",
+    "TX": "native",
+    "KS": "native",
+    "CA": "introduced",
+    "NV": "native",
+    "NM": "native",
+    "KY": "native",
+    "WI": "native",
+    "CT": "native",
+    "LA": "native",
+    "OR": "introduced",
+    "SC": "native",
+    "NE": "native",
+    "TN": "native",
+    "WA": "introduced",
+    "AZ": "native",
+    "ME": "native",
+    "PA": "native",
+    "OH": "native",
+    "OK": "native",
+    "VT": "native",
+    "NH": "native",
+    "WY": "native",
+    "MO": "native",
+    "DC": "native",
+    "AR": "native",
+    "MS": "native",
+    "ND": "native",
+    "ID": "introduced",
+    "MA": "native",
+    "SD": "native",
+    "IL": "native",
+    "RI": "native",
+    "AL": "native",
+    "VA": "native",
+    "NY": "native",
+    "DE": "native",
+    "MI": "native",
+    "GA": "native",
+    "MN": "native",
+    "MD": "native",
+    "MT": "native",
+    "IN": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 18,
+    "contributor_count": 5,
+    "meets_threshold": true,
+    "ph": {
+     "n": 18,
+     "p10": 5.9,
+     "p50": 6.1,
+     "p90": 6.6
+    },
+    "organic_matter": {
+     "n": 18,
+     "p10": 3.2,
+     "p50": 4.8,
+     "p90": 6.2
+    },
+    "texture": {
+     "n": 18,
+     "sand": 45,
+     "silt": 33,
+     "clay": 22,
+     "class": "Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 18,
+      "p50": 32
+     },
+     "potassium": {
+      "n": 18,
+      "p50": 141
+     },
+     "calcium": {
+      "n": 18,
+      "p50": 1021
+     },
+     "magnesium": {
+      "n": 18,
+      "p50": 178
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Panicum",
+    "lepidoptera": 17,
+    "specialist_bees": 0,
+    "songbird_value": "High",
+    "bird_food": "Seeds",
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "rudbeckia hirta",
+   "slug": "rudbeckia-hirta",
+   "scientific_name": "Rudbeckia hirta",
+   "genus": "Rudbeckia",
+   "family": "Asteraceae",
+   "common_name": "blackeyed Susan",
+   "usda_symbol": "RUHI2",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Annual, Biennial, Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 5.5,
+    "ph_max": 7.5,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intermediate",
+    "drought_tolerance": "Medium",
+    "salinity_tolerance": "Low",
+    "bloom_period": "Mid Summer"
+   },
+   "states": {
+    "RI": "native",
+    "VA": "native",
+    "MN": "native",
+    "WI": "native",
+    "MO": "native",
+    "MI": "native",
+    "MD": "native",
+    "NC": "native",
+    "PA": "native",
+    "NJ": "native",
+    "NM": "native",
+    "MA": "native",
+    "CO": "native",
+    "OK": "native",
+    "SC": "native",
+    "ND": "native",
+    "AR": "native",
+    "SD": "native",
+    "DC": "native",
+    "WV": "native",
+    "WY": "native",
+    "GA": "native",
+    "MS": "native",
+    "NY": "native",
+    "VT": "native",
+    "IL": "native",
+    "TX": "native",
+    "AL": "native",
+    "IN": "native",
+    "FL": "native",
+    "NE": "native",
+    "CA": "introduced",
+    "ID": "introduced",
+    "ME": "native",
+    "LA": "native",
+    "KY": "native",
+    "OH": "native",
+    "TN": "native",
+    "CT": "native",
+    "DE": "native",
+    "IA": "native",
+    "KS": "native",
+    "WA": "introduced",
+    "NH": "native",
+    "OR": "introduced",
+    "UT": "introduced",
+    "MT": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 11,
+    "contributor_count": 4,
+    "meets_threshold": true,
+    "ph": {
+     "n": 11,
+     "p10": 5.9,
+     "p50": 6.5,
+     "p90": 7
+    },
+    "organic_matter": {
+     "n": 11,
+     "p10": 3.4,
+     "p50": 4.6,
+     "p90": 5.2
+    },
+    "texture": {
+     "n": 11,
+     "sand": 38,
+     "silt": 40,
+     "clay": 22,
+     "class": "Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 11,
+      "p50": 24
+     },
+     "potassium": {
+      "n": 11,
+      "p50": 116
+     },
+     "calcium": {
+      "n": 11,
+      "p50": 1094
+     },
+     "magnesium": {
+      "n": 11,
+      "p50": 182
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Rudbeckia",
+    "lepidoptera": 17,
+    "specialist_bees": 4,
+    "songbird_value": "Medium",
+    "bird_food": "Seeds",
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "schizachyrium scoparium",
+   "slug": "schizachyrium-scoparium",
+   "scientific_name": "Schizachyrium scoparium",
+   "genus": "Schizachyrium",
+   "family": "Poaceae",
+   "common_name": "little bluestem",
+   "usda_symbol": "SCSC",
+   "usda": {
+    "growth_habit": "Graminoid",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 5,
+    "ph_max": 8,
+    "moisture_use": "Low",
+    "shade_tolerance": "Intolerant",
+    "drought_tolerance": "High",
+    "salinity_tolerance": "Medium",
+    "bloom_period": "Late Summer"
+   },
+   "states": {
+    "AR": "native",
+    "TX": "native",
+    "AL": "native",
+    "VA": "native",
+    "WI": "native",
+    "MD": "native",
+    "WV": "native",
+    "NM": "native",
+    "WY": "native",
+    "MT": "native",
+    "IA": "native",
+    "OK": "native",
+    "NY": "native",
+    "NC": "native",
+    "VT": "native",
+    "FL": "native",
+    "DC": "native",
+    "MS": "native",
+    "RI": "native",
+    "ND": "native",
+    "CT": "native",
+    "SC": "native",
+    "WA": "introduced",
+    "NJ": "native",
+    "PA": "native",
+    "GA": "native",
+    "ME": "native",
+    "MA": "native",
+    "OH": "native",
+    "IL": "native",
+    "MI": "native",
+    "AZ": "native",
+    "TN": "native",
+    "KS": "native",
+    "NH": "native",
+    "ID": "native",
+    "LA": "native",
+    "KY": "native",
+    "IN": "native",
+    "MO": "native",
+    "MN": "native",
+    "CO": "native",
+    "OR": "introduced",
+    "NE": "native",
+    "UT": "native",
+    "DE": "native",
+    "SD": "native"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 14,
+    "contributor_count": 4,
+    "meets_threshold": true,
+    "ph": {
+     "n": 14,
+     "p10": 6.1,
+     "p50": 6.4,
+     "p90": 6.8
+    },
+    "organic_matter": {
+     "n": 14,
+     "p10": 3.2,
+     "p50": 3.8,
+     "p90": 5.7
+    },
+    "texture": {
+     "n": 14,
+     "sand": 59,
+     "silt": 30,
+     "clay": 11,
+     "class": "Sandy Loam"
+    },
+    "nutrients": {
+     "phosphorus": {
+      "n": 14,
+      "p50": 28
+     },
+     "potassium": {
+      "n": 14,
+      "p50": 145
+     },
+     "calcium": {
+      "n": 14,
+      "p50": 1349
+     },
+     "magnesium": {
+      "n": 14,
+      "p50": 178
+     }
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Schizachyrium",
+    "lepidoptera": 6,
+    "specialist_bees": 0,
+    "songbird_value": "Medium",
+    "bird_food": "Seeds",
+    "hummingbird": false,
+    "keystone": false
+   }
+  },
+  {
+   "key": "symphyotrichum novae-angliae",
+   "slug": "symphyotrichum-novae-angliae",
+   "scientific_name": "Symphyotrichum novae-angliae",
+   "genus": "Symphyotrichum",
+   "family": "Asteraceae",
+   "common_name": "New England aster",
+   "usda_symbol": "SYNO2",
+   "usda": {
+    "growth_habit": "Forb/herb",
+    "duration": "Perennial",
+    "native_status_na": "Native to North America",
+    "na_status": "native",
+    "ph_min": 5,
+    "ph_max": 7.8,
+    "moisture_use": "Medium",
+    "shade_tolerance": "Intolerant",
+    "drought_tolerance": "Low",
+    "salinity_tolerance": "None",
+    "bloom_period": "Late Summer"
+   },
+   "states": {
+    "DE": "native",
+    "CO": "native",
+    "WA": "introduced",
+    "ME": "native",
+    "VA": "native",
+    "MA": "native",
+    "WI": "native",
+    "WY": "native",
+    "MD": "native",
+    "MT": "native",
+    "NE": "native",
+    "KY": "native",
+    "SC": "native",
+    "PA": "native",
+    "IN": "native",
+    "AR": "native",
+    "WV": "native",
+    "CT": "native",
+    "TN": "native",
+    "DC": "native",
+    "MS": "native",
+    "AL": "native",
+    "NJ": "native",
+    "OR": "introduced",
+    "VT": "native",
+    "NC": "native",
+    "GA": "native",
+    "OK": "native",
+    "NH": "native",
+    "MN": "native",
+    "IL": "native",
+    "NY": "native",
+    "SD": "native",
+    "IA": "native",
+    "MO": "native",
+    "KS": "native",
+    "RI": "native",
+    "ND": "native",
+    "MI": "native",
+    "NM": "native",
+    "OH": "native",
+    "CA": "introduced"
+   },
+   "state_source": "BONAP",
+   "invasive": [],
+   "soil": {
+    "sample_count": 2,
+    "contributor_count": 2,
+    "meets_threshold": false,
+    "ph": null,
+    "organic_matter": null,
+    "texture": null,
+    "nutrients": {
+     "phosphorus": null,
+     "potassium": null,
+     "calcium": null,
+     "magnesium": null
+    }
+   },
+   "wildlife": {
+    "level": "species",
+    "genus": "Symphyotrichum",
+    "lepidoptera": 110,
+    "specialist_bees": 4,
+    "songbird_value": "Medium",
+    "bird_food": "Seeds",
+    "hummingbird": false,
+    "keystone": true
+   }
+  }
+ ]
+}
