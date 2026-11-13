@@ -65,7 +65,7 @@ production build without `DATABASE_URL` fails on purpose so sample numbers never
 
 ## Everyday workflow
 
-- Work on the `dev` branch and push. Netlify builds `dev--<site-name>.netlify.app`. Branch deploys are free.
+- Work on the `dev` branch and push. Netlify builds `dev--edaphicflora.netlify.app`. Branch deploys are free.
 - Merge to `main` when it looks right. That's a production deploy.
 - Commits that only touch the R app don't trigger a build (Netlify skips builds when `site/` is unchanged).
 
