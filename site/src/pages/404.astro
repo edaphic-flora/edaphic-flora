@@ -1,23 +1,38 @@
 ---
 import Base from '../layouts/Base.astro';
+import { sitePhotos } from '../lib/sitePhotos.js';
+const sp = sitePhotos.notFound;
 ---
 <Base title="Page not found" description="That page isn't here." noindex>
-  <div class="narrow nf">
-    <span class="eyebrow">404</span>
-    <h1 class="h1">Nothing growing here.</h1>
-    <p class="lede">That page doesn't exist, or the species may have moved. Try searching for it.</p>
-    <form action="/species/" method="get" class="search" role="search">
-      <label for="q404" class="sr-only">Search for a plant</label>
-      <input id="q404" name="q" class="input" placeholder="Search a plant" />
-      <button class="btn btn-gold" type="submit">Search</button>
-    </form>
+  <div class="wrap nf">
+    <div class="copy">
+      <span class="eyebrow">404</span>
+      <h1 class="h1">Nothing growing here.</h1>
+      <p class="lede">That page doesn't exist, or the species may have moved. Try searching for it.</p>
+      <form action="/species/" method="get" class="search" role="search">
+        <label for="q404" class="sr-only">Search for a plant</label>
+        <input id="q404" name="q" class="input" placeholder="Search a plant" />
+        <button class="btn btn-gold" type="submit">Search</button>
+      </form>
+    </div>
+    {sp && (
+      <figure class="pic">
+        <img src={sp.photo.src} alt={`${sp.displayName} (${sp.scientific_name})`} decoding="async" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()" />
+        <figcaption><a href={sp.url}>{sp.displayName}</a>. {sp.photoCredit.text}</figcaption>
+      </figure>
+    )}
   </div>
 </Base>
 
 <style>
-  .nf { padding-top: clamp(64px, 9vw, 120px); padding-bottom: 40px; }
-  .nf .h1 { margin-top: 14px; }
+  .nf { padding-top: clamp(48px, 8vw, 100px); padding-bottom: 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: clamp(28px, 5vw, 64px); align-items: center; }
+  .nf .h1 { margin-top: 8px; }
   .nf .lede { margin-top: 16px; }
   .search { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; max-width: 520px; }
   .search .input { flex: 1; min-width: 220px; }
+  .pic { margin: 0; }
+  .pic img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 18px; background: var(--tile-empty); }
+  .pic figcaption { font-size: 13.5px; color: var(--bark); margin-top: 8px; }
+  .pic figcaption a { color: inherit; text-underline-offset: 2px; }
+  @media (max-width: 760px) { .nf { grid-template-columns: 1fr; } }
 </style>

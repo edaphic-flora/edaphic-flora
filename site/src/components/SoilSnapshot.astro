@@ -82,29 +82,29 @@ const refBits = [
             {s.organic_matter.p10 != null ? (
               <>
                 <div class="mono big">{s.organic_matter.p50.toFixed(1)}%</div>
-                <div class="mono sub">middle 80%: {s.organic_matter.p10.toFixed(1)} to {s.organic_matter.p90.toFixed(1)}% · {plural(s.organic_matter.n, 'sample')}</div>
+                <div class="sub">middle 80%: {s.organic_matter.p10.toFixed(1)} to {s.organic_matter.p90.toFixed(1)}% · {plural(s.organic_matter.n, 'sample')}</div>
               </>
             ) : (
               <>
                 <div class="mono big">{readings(s.organic_matter, '%')}</div>
-                <div class="mono sub">{plural(s.organic_matter.n, 'sample')}</div>
+                <div class="sub">{plural(s.organic_matter.n, 'sample')}</div>
               </>
             )}
           </div>
         )}
         {s.texture && (
           <div class="card pad">
-            <div class="b-hd"><span class="b-t">Texture</span><span class="mono b-v">{s.texture.class}</span></div>
+            <div class="b-hd"><span class="b-t">Texture</span><span class="b-v tx-name">{s.texture.class}</span></div>
             <div class="tex"><div style={`width:${s.texture.sand}%;background:#C9A86A`}></div><div style={`width:${s.texture.silt}%;background:#8A9A86`}></div><div style={`width:${s.texture.clay}%;background:#6B5D49`}></div></div>
-            <div class="tex-lbl mono"><span>{s.texture.sand}% sand</span><span>{s.texture.silt}% silt</span><span>{s.texture.clay}% clay</span></div>
-            <div class="mono sub">{s.texture.n === 1 ? 'from 1 sample' : `median of ${plural(s.texture.n, 'sample')}`}</div>
+            <div class="tex-lbl"><span>{s.texture.sand}% sand</span><span>{s.texture.silt}% silt</span><span>{s.texture.clay}% clay</span></div>
+            <div class="sub">{s.texture.n === 1 ? 'from 1 sample' : `median of ${plural(s.texture.n, 'sample')}`}</div>
           </div>
         )}
       </div>
 
       {nutrients.length > 0 && (
         <div class="card nut">
-          <div class="b-t nut-hd">Key nutrients <span class="mono sub">median, ppm</span></div>
+          <div class="b-t nut-hd">Key nutrients <span class="sub">median, ppm</span></div>
           <div class="nut-grid">
             {nutrients.map(([name, v]) => (
               <div class="nut-row"><span>{name}</span><span class="mono">{v.p50.toLocaleString()} ppm <span class="n">· {plural(v.n, 'sample')}</span></span></div>
@@ -123,7 +123,7 @@ const refBits = [
       {refBits.length > 0 && (
         <div class="ref">
           <div class="ref-hd">USDA PLANTS reference</div>
-          <div class="mono ref-v">{refBits.join(' · ')}</div>
+          <div class="ref-v">{refBits.join(' · ')}</div>
           {usdaPh && (
             <div class="ph slim">
               <div class="ph-grad"></div>
@@ -138,12 +138,13 @@ const refBits = [
 </section>
 
 <style>
-  .sec-h { font-weight: 700; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.3px; }
-  .based { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-data); font-size: 12px; color: var(--sage-ink); background: rgba(122, 154, 134, 0.16); padding: 7px 13px; border-radius: 20px; margin-top: 18px; }
+  .sec-h { font-weight: 600; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.3px; }
+  .based { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--sage-ink); background: rgba(122, 154, 134, 0.16); padding: 7px 13px; border-radius: 20px; margin-top: 18px; }
   .block { margin-top: 16px; }
   .b-hd { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
   .b-t { font-family: var(--f-head); font-weight: 600; font-size: 16px; }
   .b-v { font-size: 14px; color: var(--ink-soft); }
+  .tx-name { font-size: 17px; color: var(--charcoal); }
   .gold { color: var(--gold-ink); }
   .ph { position: relative; height: 14px; margin-top: 18px; }
   .ph.slim { height: 10px; margin-top: 12px; }
@@ -158,7 +159,7 @@ const refBits = [
   .ticks span:last-child { transform: translateX(-100%); }
   .ticks i { font-style: normal; }
   @media (max-width: 480px) { .ticks i { display: none; } }
-  .key { margin-top: 14px; font-family: var(--f-data); font-size: 11px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .key { margin-top: 14px; font-size: 14px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .sw { display: inline-block; width: 16px; height: 8px; border-radius: 3px; margin-left: 8px; }
   .sw:first-child { margin-left: 0; }
   .sw-range { background: rgba(122, 154, 134, 0.35); border: 2px solid var(--sage-ink); }
@@ -166,9 +167,9 @@ const refBits = [
   .sw-usda { height: 4px; background: repeating-linear-gradient(90deg, var(--brown) 0 6px, transparent 6px 10px); }
   .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 14px; }
   .big { font-size: 26px; margin-top: 8px; }
-  .sub { font-size: 12px; color: var(--ink-muted); margin-top: 4px; font-weight: 400; }
+  .sub { font-size: 14px; color: var(--ink-muted); margin-top: 4px; font-weight: 400; }
   .tex { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 14px; }
-  .tex-lbl { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--bark); margin-top: 8px; }
+  .tex-lbl { display: flex; justify-content: space-between; font-size: 14px; color: var(--bark); margin-top: 8px; }
   .nut { margin-top: 14px; padding: 8px; }
   .nut-hd { padding: 12px 14px 6px; font-size: 15px; }
   .nut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
@@ -183,5 +184,5 @@ const refBits = [
   .empty > p { font-weight: 300; font-size: 18px; line-height: 1.55; color: var(--ink-soft); margin: 10px auto 22px; max-width: 50ch; }
   .ref { text-align: left; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
   .ref-hd { font-family: var(--f-head); font-weight: 600; font-size: 13px; letter-spacing: 0.3px; }
-  .ref-v { font-size: 13px; color: var(--ink-soft); margin-top: 6px; line-height: 1.6; }
+  .ref-v { font-size: 16px; color: var(--ink-soft); margin-top: 6px; line-height: 1.6; }
 </style>

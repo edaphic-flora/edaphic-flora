@@ -4,6 +4,10 @@ import CtaBand from '../components/CtaBand.astro';
 import { thresholds, meta, isSample, species, totals } from '../lib/data.js';
 import { CONTACT_EMAIL, GITHUB_URL } from '../config.js';
 import { COMMUNITY_FILE } from '../../netlify/lib/csv.mjs';
+import { sitePhotos } from '../lib/sitePhotos.js';
+import { photoSize } from '../lib/photos.js';
+const banner = sitePhotos.about;
+const bannerSize = banner && photoSize(banner.photo, 1280);
 const t = thresholds;
 const soilSpecies = species.filter((s) => s.sampleCount > 0).length;
 const updated = meta.generated_at
@@ -15,9 +19,18 @@ const updated = meta.generated_at
   description="How Edaphic Flora sources soil, native status, and wildlife data, how community soil stats are computed, and how we handle thin data honestly."
   active="about"
 >
+  {banner && (
+    <figure class="wrap banner">
+      <img src={banner.photo.large} alt={`${banner.displayName} (${banner.scientific_name})`} width={bannerSize.width} height={bannerSize.height} fetchpriority="high" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()" />
+      <figcaption>
+        <a href={banner.url}>{banner.displayName}</a>. Photo: {banner.photoCredit.page ? <a href={banner.photoCredit.page} rel="noopener">{banner.photoCredit.creator}</a> : banner.photoCredit.creator},
+        {' '}{banner.photoCredit.licenseUrl ? <a href={banner.photoCredit.licenseUrl} rel="noopener license">{banner.photoCredit.licenseLabel}</a> : banner.photoCredit.licenseLabel}
+        {banner.photoCredit.via && `, via ${banner.photoCredit.via}`}
+      </figcaption>
+    </figure>
+  )}
   <div class="narrow intro">
-    <span class="eyebrow">About and methodology</span>
-    <h1 class="h1">An open picture of what plants grow in.</h1>
+    <h1 class="h1">About and methodology</h1>
     <p class="lede">
       Edaphic Flora is an open-source soil database for gardeners, researchers, restorationists, and land managers. We pair
       lab soil tests with the real sites where plants grow, and how they're doing there, to build a clearer, sourced picture
@@ -141,24 +154,20 @@ const updated = meta.generated_at
     </p>
   </div>
 
-  <div class="narrow block">
-    <h2 class="h2s">Honest about coverage</h2>
-    <p class="lede" style="margin-top:14px">
-      This is a young, growing dataset. Reference data is rich; community soil data is early. We'd rather show a confident
-      "not yet" than a confident wrong number. Every soil number carries the sample count behind it so you can judge for
-      yourself.
-    </p>
-  </div>
-
-  <CtaBand heading="help the picture sharpen." body="Every soil test you add makes the community data better for the next person searching." />
+  <CtaBand body="Every soil test you add makes the community data better for the next person searching." />
 </Base>
 
 <style>
-  .intro { padding-top: clamp(44px, 6vw, 72px); }
-  .intro .h1 { margin-top: 14px; font-size: clamp(32px, 4.4vw, 50px); }
+  .banner { margin: clamp(18px, 3vw, 30px) auto 0; }
+  .banner img { width: 100%; height: auto; aspect-ratio: 21 / 8; object-fit: cover; border-radius: 18px; background: var(--tile-empty); display: block; }
+  .banner figcaption { font-size: 13.5px; color: var(--bark); margin-top: 8px; text-align: right; }
+  .banner figcaption a { color: inherit; text-underline-offset: 2px; }
+  @media (max-width: 720px) { .banner img { aspect-ratio: 3 / 2; } .banner figcaption { text-align: left; } }
+  .intro { padding-top: clamp(28px, 4vw, 48px); }
+  .intro .h1 { font-size: clamp(32px, 4.4vw, 50px); }
   .intro .lede { margin-top: 20px; }
   .block { padding-top: clamp(40px, 5vw, 60px); }
-  .h2s { font-weight: 700; font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.3px; }
+  .h2s { font-weight: 600; font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.3px; }
   .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 22px; }
   .ok { border-color: rgba(122, 154, 134, 0.4); }
   .thin { border: 1px dashed rgba(211, 155, 53, 0.6); }
@@ -166,8 +175,9 @@ const updated = meta.generated_at
   .pair ul { font-weight: 300; font-size: 17px; line-height: 1.7; color: var(--ink-soft); margin: 12px 0 0; padding-left: 20px; }
   .pair p { font-weight: 300; font-size: 17px; line-height: 1.65; color: var(--ink-soft); margin-top: 12px; }
   .steps { margin: 20px 0 0; padding-left: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 14px; }
-  .steps li { counter-increment: s; display: flex; gap: 16px; font-weight: 300; font-size: 18px; line-height: 1.55; color: var(--ink-soft); }
-  .steps li::before { content: counter(s, decimal-leading-zero); font-family: var(--f-data); font-size: 13px; color: var(--sage-ink); margin-top: 4px; }
+  /* Number sits in the left margin so the sentence (with its bold phrases) flows as normal text */
+  .steps li { counter-increment: s; position: relative; padding-left: 34px; font-weight: 300; font-size: 18px; line-height: 1.55; color: var(--ink-soft); }
+  .steps li::before { content: counter(s); position: absolute; left: 2px; top: -1px; font-style: italic; font-size: 22px; line-height: 1.3; color: var(--sage-ink); }
   .steps strong, .cites strong { font-weight: 600; color: var(--charcoal); }
   .cites { margin: 18px 0 0; padding-left: 20px; font-weight: 300; font-size: 17px; line-height: 1.6; color: var(--ink-soft); display: flex; flex-direction: column; gap: 10px; }
   .cites a, .small a, .lede a { color: var(--sage-ink); }

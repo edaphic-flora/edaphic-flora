@@ -11,7 +11,7 @@ const links = [
 <header class="nav">
   <div class="wrap bar">
     <a href="/" class="logo" aria-label="Edaphic Flora home">
-      <img src="/logo-sage.svg" alt="edaphic flora" width="95" height="40" />
+      <img src="/logo-wide-charcoal.svg" alt="edaphic flora" width="95" height="40" />
     </a>
     <nav aria-label="Main">
       {links.map((l) => (
@@ -26,8 +26,8 @@ const links = [
 
 <style>
   .nav {
-    position: sticky; top: 0; z-index: 50; background: var(--charcoal);
-    border-bottom: 1px solid rgba(247, 244, 232, 0.08);
+    position: sticky; top: 0; z-index: 50; background: var(--sand);
+    border-bottom: 1px solid var(--line);
   }
   .bar { height: 66px; display: flex; align-items: center; gap: 24px; }
   .logo { flex-shrink: 0; }
@@ -35,10 +35,10 @@ const links = [
   nav { display: flex; align-items: center; gap: 24px; margin-left: 10px; }
   nav a {
     font-family: var(--f-head); font-weight: 600; font-size: 13.5px; letter-spacing: 0.4px;
-    color: var(--limestone); text-decoration: none; white-space: nowrap;
+    color: var(--charcoal); text-decoration: none; white-space: nowrap;
   }
-  nav a:hover { color: var(--gold-hover); }
-  nav a.on { color: var(--gold); }
+  nav a:hover { color: var(--gold-ink); }
+  nav a.on { color: var(--gold-ink); }
   .cta { margin-left: auto; }
 
   @media (max-width: 720px) {
@@ -46,7 +46,8 @@ const links = [
     .logo img { height: 34px; }
     nav {
       order: 3; width: 100%; margin: 0; gap: 22px; padding: 12px 0 12px;
-      overflow-x: auto; border-top: 1px solid rgba(247, 244, 232, 0.08); margin-top: 12px;
+      overflow-x: auto; border-top: 1px solid var(--line); margin-top: 12px; scrollbar-width: none;
     }
+    nav::-webkit-scrollbar { display: none; }
   }
 </style>

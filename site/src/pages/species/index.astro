@@ -41,7 +41,7 @@ const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     </form>
 
     <div class="status-row">
-      <div class="mono count" id="count" aria-live="polite">{totals.species.toLocaleString()} species</div>
+      <div class="count" id="count" aria-live="polite">{totals.species.toLocaleString()} species</div>
       <button type="button" class="link" id="clear">Clear filters</button>
     </div>
 
@@ -182,7 +182,7 @@ const states = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
   .check { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-head); font-weight: 500; font-size: 14px; cursor: pointer; }
   .check input { width: 18px; height: 18px; accent-color: var(--sage); }
   .status-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
-  .count { font-size: 13px; color: var(--ink-muted); }
+  .count { font-size: 17px; color: var(--ink-muted); }
   .empty { text-align: center; padding: 64px 24px; color: var(--ink-muted); font-size: 19px; }
   .more { text-align: center; margin-top: 28px; }
   @media (max-width: 560px) { .select { flex: 1 1 45%; } }

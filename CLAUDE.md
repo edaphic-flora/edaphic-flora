@@ -137,6 +137,7 @@ Reference: `branding/Branding Overview.docx`
 | Data | JetBrains Mono | Species names, numeric values, code |
 
 The app uses Montserrat (headings), Rokkitt Light (body), and JetBrains Mono (data/species names) per brand guidelines.
+The public site (`site/`, "Meadow" design chosen 2026-11-13) departs on purpose: scientific names are Rokkitt italic, as in a field guide, and JetBrains Mono is kept for numbers and code only. Headings stay Montserrat (600).
 
 ### Design Rules
 
@@ -200,6 +201,7 @@ Static Astro site for edaphicflora.org (and .com, which redirects), deployed by 
 - `npm run build` runs `scripts/export-data.mjs` then `astro build`. Without `DATABASE_URL` it uses `src/data/sample/` and shows a sample-data ribbon; a production build without it fails on purpose.
 - Work on the `dev` branch (free branch deploys). Merges to `main` are production deploys (15 of 300 free credits each). Weekly refresh (photos + rebuild): `.github/workflows/site-weekly-rebuild.yml`. Scheduled runs only happen once it is on `main`.
 - No em dashes in site copy.
+- Design ("Meadow", 2026-11-13): sand nav with the charcoal wide logo (`public/logo-wide-charcoal.svg`), home hero is a photo mosaic ending in a soil-layer band (`src/components/Hero.astro`), feature cards and the call-to-action band carry photos, species and About pages open with a wide photo banner, 404 has a photo. Photos outside species pages are picked in `src/lib/sitePhotos.js` (species slugs with fallbacks) and credited where shown. Soil card uses an SVG illustration (`SoilArt.astro`) until real soil photos exist.
 - Photos: `site/scripts/fetch-photos.mjs` stores one openly licensed photo per species in `ref_species_photos` (`site/sql/species_photos.sql`), iNaturalist first, Wikimedia Commons fallback, in tiers (soil snapshot, any samples, wildlife plants, natives, rest). Images are hotlinked, never stored in the repo. Locked rows are hand-picked and never overwritten.
 - Local preview: `cd site && npm run dev` (reads `site/.env`, see `.env.example`) serves http://localhost:4321 with live reload.
 - Contributing on the site: `/contribute/` and `/account/` (Firebase sign-in, same project as the app) call Netlify functions in `site/netlify/functions/`; the `site_writer` login can only call `site_api` functions from `site/sql/contribute.sql`. Existing contributors link to their Polished uid by email via `legacy_users` (loaded by `scripts/load_site_reference.R`). Tests: `npm test` in site/, `Rscript site/test/db/contribute_functions_test.R`.
