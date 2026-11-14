@@ -73,8 +73,8 @@ const updated = meta.generated_at
     <p class="small">
       Shared under <a href="https://creativecommons.org/licenses/by-nc/4.0/" rel="license noopener">CC BY-NC 4.0</a>. You may
       use and adapt it for noncommercial work with attribution. Suggested citation: "Edaphic Flora dataset (CC BY-NC 4.0).
-      Maintained by Todd Testerman and contributors." For commercial use, email
-      <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+      Maintained by Todd Testerman and contributors." For commercial use,
+      email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
     </p>
     <details class="cols">
       <summary>What the columns mean</summary>
@@ -85,8 +85,8 @@ const updated = meta.generated_at
         <dd>How many samples, and from how many people, are behind the row.</dd>
         <dt><code>ph_*</code>, <code>organic_matter_pct_*</code></dt>
         <dd>
-          <code>_n</code> is the number of samples with that measurement and <code>_median</code> is the median.
-          <code>_p10</code> and <code>_p90</code> give the middle 80% once there are at least {t.min_range_samples} values.
+          <code>_n</code> is the number of samples with that measurement and <code>_median</code> is the median.{' '}
+          <code>_p10</code> and <code>_p90</code> give the middle 80% once there are at least {t.min_range_samples} values.{' '}
           With fewer, <code>_min</code> and <code>_max</code> are the readings themselves.
         </dd>
         <dt><code>texture_n</code>, <code>sand_pct</code>, <code>silt_pct</code>, <code>clay_pct</code>, <code>texture_class</code></dt>
