@@ -29,6 +29,13 @@
     X-Frame-Options = "DENY"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
+# Community soil data download (built by src/pages/data/), licensed CC BY-NC 4.0
+[[headers]]
+  for = "/data/*.csv"
+  [headers.values]
+    Content-Type = "text/csv; charset=utf-8"
+    Link = "<https://creativecommons.org/licenses/by-nc/4.0/>; rel=\"license\""
+
 # Sign-in pages: Firebase loads only here, so they get a strict content
 # security policy (Google sign-in popup, Firebase auth APIs, nothing else).
 [[headers]]

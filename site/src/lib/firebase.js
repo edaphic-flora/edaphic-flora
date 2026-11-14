@@ -92,6 +92,30 @@ export async function api(path, { method = 'GET', body } = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// Downloads a signed-in file (GET) and saves it under the server's filename.
+// Errors come back like api(): { ok: false, status, data: { error } }.
+export async function apiDownload(path, fallbackName = 'download.csv') {
+  const u = getA().currentUser;
+  if (!u) return { ok: false, status: 401, data: { error: 'Please sign in.' } };
+  const token = await u.getIdToken();
+  let res;
+  try {
+    res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    return { ok: false, status: 0, data: { error: 'Could not reach the server. Check your connection and try again.' } };
+  }
+  if (!res.ok) return { ok: false, status: res.status, data: await res.json().catch(() => null) };
+  const blob = await res.blob();
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: name, hidden: true });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  return { ok: true, status: res.status, headers: res.headers };
+}
+
 // Plain-language messages for Firebase sign-in errors (null = say nothing)
 export function authMessage(e) {
   const code = e?.code || '';

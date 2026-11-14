@@ -13,7 +13,8 @@ site/
 ├── scripts/export-data.mjs reads the views, writes src/data/generated/species.json
 ├── scripts/fetch-photos.mjs finds photos on iNaturalist / Wikimedia, saves them to Neon
 ├── sql/contribute.sql      sign-in + submit: reference tables, site_api functions, site_writer role
-├── netlify/functions/      lookup.mjs (species search, zip) and api.mjs (signed-in submit)
+├── sql/export.sql          "Download my samples (CSV)": site_api.export_my_samples
+├── netlify/functions/      lookup.mjs (species search, zip), api.mjs (signed-in submit), export.mjs (my samples CSV)
 ├── netlify/lib/            token check, validation, texture (shared with the contribute page)
 ├── test/                   `npm test` unit tests; test/db/ checks the database functions
 ├── public/                 logos, favicon, og image, robots.txt
@@ -92,8 +93,26 @@ person to check; the file is never stored. Limits match the earlier app (3 per p
 enforced in the database so failed calls don't count). Needs `ANTHROPIC_API_KEY` in Netlify. The account page also
 saves a home zip or state (`user_preferences`), which fills in the contribute form.
 
-Tests: `npm test` (validation, texture against the app's R code, token checks, report cleanup) and, from the repo root,
-`Rscript site/test/db/contribute_functions_test.R` (database functions, run in a transaction that is rolled back).
+## Downloads (CSV)
+
+Both replace the Shiny app's CSV exports, which are gone with the app.
+
+- **Download my samples** on `/account/`: `netlify/functions/export.mjs` (`GET /api/export/my-samples`) calls
+  `site_api.export_my_samples` (`sql/export.sql`). It returns every column the person entered, their own location and
+  notes included, and never `created_by`. Same rules as the app: 10 downloads per person per 24 hours, none for
+  disabled accounts, each one logged to `audit_log` as `export`.
+- **Community soil data** on `/about/#download`: `src/pages/data/edaphic-flora-community-soil.csv.js` writes
+  `/data/edaphic-flora-community-soil.csv` at build time, so downloads cost no function calls. One row per species with
+  samples, built from the same exported records as the species pages (so from `public_site.soil_species_summary`):
+  sample and contributor counts, pH and organic matter medians with ranges or readings, texture, and P, K, Ca and Mg
+  medians. No per-sample rows, contributors, locations or notes. Licensed CC BY-NC 4.0 (About page, plus a
+  `Link: rel="license"` header in `netlify.toml`). It refreshes with the weekly rebuild.
+
+Both use `netlify/lib/csv.mjs` (column lists, quoting, spreadsheet formula guard), tested in `test/csv.test.mjs`.
+
+Tests: `npm test` (validation, texture against the app's R code, token checks, report cleanup, CSV building) and,
+from the repo root, `Rscript site/test/db/contribute_functions_test.R` and `Rscript site/test/db/export_functions_test.R`
+(database functions, run in a transaction that is rolled back; the export test applies `sql/export.sql` inside it).
 Locally, `npx netlify dev` from `site/` serves the site and the functions on http://localhost:8888.
 
 ## One-time setup
@@ -119,7 +138,7 @@ Locally, `npx netlify dev` from `site/` serves the site and the functions on htt
    for `main` and add its URL to GitHub as the `NETLIFY_BUILD_HOOK` secret. For photos, run
    `sql/species_photos.sql`, create the `photo_loader` role (bottom of that file) and add its connection string as
    the `PHOTOS_DATABASE_URL` secret. Every Monday the workflow finds photos for 2,500 more species, then rebuilds.
-7. Contributing: run `sql/contribute.sql`, then `Rscript scripts/load_site_reference.R` from the repo root (species
+7. Contributing: run `sql/contribute.sql` and `sql/export.sql`, then `Rscript scripts/load_site_reference.R` from the repo root (species
    list, zip codes, ecoregion grid, app accounts). Create the `site_writer` role (bottom of `contribute.sql`) and add
    `SITE_WRITER_DATABASE_URL` in Netlify (branch deploys can point at a Neon dev branch). Add
    `PUBLIC_FIREBASE_API_KEY`, `PUBLIC_FIREBASE_AUTH_DOMAIN` and `PUBLIC_FIREBASE_PROJECT_ID` (the app's
