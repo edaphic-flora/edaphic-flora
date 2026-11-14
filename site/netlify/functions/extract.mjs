@@ -105,6 +105,8 @@ export default async (req) => {
   } catch (e) {
     await release();
     if (e instanceof Anthropic.BadRequestError) {
+      // Usually our request, not the person's file: log the API's reason
+      console.error('extract rejected by API:', e.message);
       return json({ error: 'That file could not be read. Try a clearer photo, or a PDF.' }, 422);
     }
     if (e instanceof Anthropic.RateLimitError || e instanceof Anthropic.APIConnectionTimeoutError) {

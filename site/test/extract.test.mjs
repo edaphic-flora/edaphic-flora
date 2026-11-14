@@ -11,6 +11,8 @@ test('schema: every property required, no extras allowed (structured outputs rul
   assert.deepEqual([...EXTRACTION_SCHEMA.required].sort(), Object.keys(EXTRACTION_SCHEMA.properties).sort());
   const s = JSON.stringify(EXTRACTION_SCHEMA);
   for (const unsupported of ['minimum', 'maximum', 'minLength', 'maxLength']) assert.ok(!s.includes(unsupported), unsupported);
+  // The API allows at most 16 nullable/union parameters; this schema uses none
+  assert.ok(!s.includes('anyOf') && !s.includes('"null"') && !/"type":\[/.test(s), 'no unions');
   assert.ok(!EXTRACTION_PROMPT.includes(String.fromCharCode(0x2014)));
 });
 
@@ -32,6 +34,23 @@ test('a typical report fills the form and passes validation', () => {
     { today: TODAY }
   );
   assert.deepEqual(v.errors, []);
+});
+
+test('the list form the model returns ({measurements: [{field, value}]}) fills the form', () => {
+  const out = cleanExtraction(
+    {
+      measurements: [{ field: 'ph', value: 5.1 }, { field: 'phosphorus_ppm', value: 19 }, { field: 'not_a_field', value: 3 }],
+      texture_class: 'Sandy Loam', sample_date: '2023-07-11', lab_name: '', sample_id: '514', notes: '',
+      extraction_warnings: ['Report contains 3 samples; only the first was read'],
+    },
+    { today: TODAY }
+  );
+  assert.deepEqual(out.soil, { ph: 5.1, phosphorus_ppm: 19 });
+  assert.deepEqual(out.texture, { mode: 'class', class: 'Sandy Loam' });
+  assert.equal(out.sample_date, '2023-07-11');
+  assert.equal(out.notes, 'Sample ID: 514');
+  assert.equal(out.warnings.length, 1);
+  assert.equal(cleanExtraction({ measurements: [], texture_class: 'none', sample_date: '', lab_name: '', sample_id: '', notes: '', extraction_warnings: [] }).found, 0);
 });
 
 test('out-of-range and non-numeric values are dropped with a warning', () => {

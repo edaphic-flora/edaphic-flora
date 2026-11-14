@@ -13,26 +13,27 @@ export const MEDIA_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image
 // RTF, TXT and CSV reports are turned into plain text in the browser
 export const MAX_TEXT_CHARS = 200_000;
 
-export const EXTRACTION_PROMPT = `You are extracting soil test data from a soil lab report. Fill in each field if it is present and use null when it is missing.
+export const EXTRACTION_PROMPT = `You are extracting soil test data from a soil lab report.
 
-Field meanings:
-- ph: soil pH
-- organic_matter: organic matter as a percentage
-- cec_meq: cation exchange capacity in meq/100g
-- *_ppm fields: concentrations in parts per million (mg/kg)
-- texture_sand, texture_silt, texture_clay: percentages
-- texture_class: the report's texture class, using the closest name from the allowed list ("Silt Loam" is "Silty Loam")
-- sample_date: the date the sample was collected (or received, if that is the only date), as YYYY-MM-DD
-- lab_name, sample_id: the laboratory and its sample number or ID
-- notes: any other relevant information, such as the extraction method (for example Mehlich-3 or Modified Morgan)
+Fields:
+- measurements: one entry for each numeric value the report gives, with "field" naming what it is and "value" the number. Leave out anything the report does not give a number for. Field names:
+  - ph: soil pH
+  - organic_matter: organic matter as a percentage
+  - cec_meq: cation exchange capacity in meq/100g
+  - the *_ppm names: concentrations in parts per million (mg/kg)
+  - texture_sand, texture_silt, texture_clay: percentages
+- texture_class: the report's texture class, using the closest name from the allowed list ("Silt Loam" is "Silty Loam"), or "none" if the report gives none
+- sample_date: the date the sample was collected (or received, if that is the only date) as YYYY-MM-DD, or "" if there is no date
+- lab_name, sample_id: the laboratory and its sample number or ID, or ""
+- notes: any other relevant information, such as the extraction method (for example Mehlich-3 or Modified Morgan), or ""
 - extraction_warnings: data quality issues, or an empty list
 
 Extraction rules:
 - If a value is given as "Qualitative (numeric ppm)", such as "Medium High (50 ppm)", use the number (50)
-- If ONLY a qualitative descriptor is given (such as "Medium") with no numeric ppm or %, use null for that field and add a warning naming which fields were descriptor-only; the person must look up the number on their lab's chart
-- If only a texture class is given without percentages, fill in texture_class and leave the percentages null
+- If ONLY a qualitative descriptor is given (such as "Medium") with no numeric ppm or %, leave that measurement out and add a warning naming which fields were descriptor-only; the person must look up the number on their lab's chart
+- If only a texture class is given without percentages, fill in texture_class and leave the percentages out
 - If a value is given as a range, use the midpoint
-- Do not convert units. If a nutrient is reported in lb/acre or another unit that is not ppm, use null for that field and add a warning naming the field and its unit
+- Do not convert units. If a nutrient is reported in lb/acre or another unit that is not ppm, leave it out and add a warning naming the field and its unit
 
 Multi-sample reports:
 - If the report contains MULTIPLE soil samples, extract ONLY THE FIRST sample's data
@@ -44,25 +45,45 @@ Add to extraction_warnings if:
 - Units are ambiguous
 - Data appears incomplete`;
 
-const nullable = (schema) => ({ anyOf: [schema, { type: 'null' }] });
 const NUMBER_KEYS = [...SOIL_FIELDS.map((f) => f.key), 'texture_sand', 'texture_silt', 'texture_clay'];
 
+// No nullable or union fields: the API allows at most 16 of those in a
+// structured-output schema. Measurements are a list of {field, value}, and
+// missing text is an empty string (or "none" for the texture class).
 export const EXTRACTION_SCHEMA = {
   type: 'object',
   properties: {
-    ...Object.fromEntries(NUMBER_KEYS.map((k) => [k, nullable({ type: 'number' })])),
-    texture_class: nullable({ type: 'string', enum: TEXTURE_CLASS_NAMES }),
-    sample_date: nullable({ type: 'string', format: 'date' }),
-    lab_name: nullable({ type: 'string' }),
-    sample_id: nullable({ type: 'string' }),
-    notes: nullable({ type: 'string' }),
+    measurements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { field: { type: 'string', enum: NUMBER_KEYS }, value: { type: 'number' } },
+        required: ['field', 'value'],
+        additionalProperties: false,
+      },
+    },
+    texture_class: { type: 'string', enum: [...TEXTURE_CLASS_NAMES, 'none'] },
+    sample_date: { type: 'string' },
+    lab_name: { type: 'string' },
+    sample_id: { type: 'string' },
+    notes: { type: 'string' },
     extraction_warnings: { type: 'array', items: { type: 'string' } },
   },
-  required: [...NUMBER_KEYS, 'texture_class', 'sample_date', 'lab_name', 'sample_id', 'notes', 'extraction_warnings'],
+  required: ['measurements', 'texture_class', 'sample_date', 'lab_name', 'sample_id', 'notes', 'extraction_warnings'],
   additionalProperties: false,
 };
 
 const clip = (s, n) => (typeof s === 'string' && s.trim() ? s.trim().slice(0, n) : null);
+
+// {measurements: [{field, value}], ...} -> {ph: 6.1, ...}; flat input passes through
+function flatten(raw) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.measurements)) return raw;
+  const flat = { ...raw };
+  for (const m of raw.measurements) {
+    if (m && NUMBER_KEYS.includes(m.field) && !(m.field in flat)) flat[m.field] = m.value;
+  }
+  return flat;
+}
 
 /**
  * Turns the model's JSON into values the contribute form can use. Anything out
@@ -70,7 +91,8 @@ const clip = (s, n) => (typeof s === 'string' && s.trim() ? s.trim().slice(0, n)
  * @param {object} raw  parsed JSON from the model
  * @param {{today: string}} opts  YYYY-MM-DD
  */
-export function cleanExtraction(raw, { today } = {}) {
+export function cleanExtraction(input, { today } = {}) {
+  const raw = flatten(input);
   const warnings = Array.isArray(raw?.extraction_warnings)
     ? raw.extraction_warnings.map((w) => clip(w, 300)).filter(Boolean).slice(0, 10)
     : [];
