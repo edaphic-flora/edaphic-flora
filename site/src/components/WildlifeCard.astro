@@ -14,10 +14,10 @@ const highlights = w
         <div class="hl">{highlights.map((h) => <span>★ {h}</span>)}</div>
       )}
       <dl>
-        <div><dt>Moths and butterflies (caterpillar host)</dt><dd class="mono strong">{count(w.lepidoptera)}</dd></div>
-        <div><dt>Specialist bees</dt><dd class="mono">{count(w.specialist_bees)}</dd></div>
-        {w.songbird_value && <div><dt>Songbird value</dt><dd class="mono">{w.songbird_value}</dd></div>}
-        {w.bird_food && <div><dt>Food for birds</dt><dd class="mono">{w.bird_food}</dd></div>}
+        <div><dt>Moths and butterflies (caterpillar host)</dt><dd class="strong">{count(w.lepidoptera)}</dd></div>
+        <div><dt>Specialist bees</dt><dd>{count(w.specialist_bees)}</dd></div>
+        {w.songbird_value && <div><dt>Songbird value</dt><dd>{w.songbird_value}</dd></div>}
+        {w.bird_food && <div><dt>Food for birds</dt><dd>{w.bird_food}</dd></div>}
       </dl>
       {w.level === 'genus' && (
         <p class="note">Counts are for the genus <em class="sci">{w.genus}</em>. Host plant records are usually kept at the genus level.</p>
@@ -34,15 +34,15 @@ const highlights = w
 </div>
 
 <style>
-  .t { font-weight: 700; font-size: 18px; }
+  .t { font-weight: 600; font-size: 18px; }
   .hl { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .hl span { background: rgba(211, 155, 53, 0.16); color: var(--gold-deep); border-radius: 10px; padding: 8px 12px; font-size: 15px; }
   dl { margin: 12px 0 0; }
   dl div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(55, 61, 60, 0.08); }
   dt { font-size: 16px; color: var(--ink-soft); }
-  dd { margin: 0; font-size: 14px; color: var(--charcoal); text-align: right; white-space: nowrap; }
-  dd.strong { color: var(--sage-ink); font-weight: 500; }
+  dd { margin: 0; font-size: 17px; color: var(--charcoal); text-align: right; white-space: nowrap; }
+  dd.strong { color: var(--sage-ink); font-weight: 600; }
   .note { font-size: 14.5px; color: var(--bark); margin-top: 12px; line-height: 1.45; }
   .none { font-size: 16px; color: var(--ink-soft); margin-top: 12px; line-height: 1.5; }
-  .src { font-family: var(--f-data); font-size: 10.5px; color: var(--bark); margin-top: 14px; line-height: 1.6; }
+  .src { font-size: 14px; color: var(--bark); margin-top: 14px; line-height: 1.6; }
 </style>

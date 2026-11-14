@@ -261,7 +261,7 @@ repo outside OneDrive (for example `C:\dev\edaphic-flora`) avoids it; GitHub is 
 ## Editing content
 
 - **Blurbs, featured species, display names:** `src/data/curated.json`.
-- **Home page hero:** `HERO` in `src/config.js` (`'a'` or `'b'`). Non-production builds show both with a switcher.
+- **Home page and banner photos:** species slugs in `src/lib/sitePhotos.js` (home mosaic, feature cards, call-to-action band, About banner, 404). Each list falls back to the next slug if a species drops out.
 - **Where app buttons go:** `APP_URL` in `src/config.js`.
 - **About page, credits:** `src/pages/about.astro`.
 - **Thresholds:** `public_site.settings` in `sql/public_views.sql` (re-run the file after changing).

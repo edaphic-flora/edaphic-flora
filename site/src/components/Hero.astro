@@ -1,0 +1,79 @@
+---
+// Home page hero: copy and search beside a mosaic of plant photos, ending in a
+// band of soil layers. Photos are credited on hover (title) and in the line below.
+import { featured } from '../lib/data.js';
+import { sitePhotos } from '../lib/sitePhotos.js';
+
+const tiles = sitePhotos.mosaic.slice(0, 5);
+const examples = featured(2);
+const credits = tiles.map((s) => `${s.photoCredit.creator} (${s.photoCredit.licenseLabel})`).join(', ');
+---
+<section class="hm">
+  <div class="wrap hm-in">
+    <div class="hm-copy">
+      <p class="hm-kicker">The soil database for what you grow</p>
+      <h1>Know the soil a plant actually grows in.</h1>
+      <p class="hm-lead">
+        Look up a species and see its native range plus the real pH, organic matter, and texture from soil tests that
+        gardeners and researchers contributed.
+      </p>
+      <form action="/species/" method="get" class="hm-search" role="search">
+        <label for="q-m" class="sr-only">Search for a plant</label>
+        <input id="q-m" name="q" class="input" placeholder="Search a plant, e.g. butterfly weed" autocomplete="off" />
+        <button type="submit" class="btn btn-gold">Search</button>
+      </form>
+      {examples.length > 0 && (
+        <div class="hm-try">
+          Try {examples.map((e, i) => (<>{i > 0 && ' · '}<a href={e.url}>{e.common_name || e.displayName}</a></>))}
+        </div>
+      )}
+    </div>
+    <div class="hm-mosaic">
+      {tiles.map((s, i) => (
+        <a href={s.url} class={`tile t${i}`} title={s.photoCredit.text}>
+          <img src={i === 0 ? s.photo.large : s.photo.src} alt={`${s.displayName} (${s.scientific_name})`} loading={i < 2 ? 'eager' : 'lazy'} decoding="async" referrerpolicy="no-referrer" />
+          <span class="cap">{s.displayName}</span>
+        </a>
+      ))}
+    </div>
+  </div>
+  <p class="wrap hm-credits">Photos via iNaturalist and Wikimedia Commons: {credits}.</p>
+  <svg class="horizon" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 40 C 180 18, 360 58, 540 38 S 900 14, 1080 36 S 1320 56, 1440 34 L1440 120 L0 120 Z" fill="#9c8a66" />
+    <path d="M0 64 C 220 48, 420 80, 640 62 S 1000 44, 1200 66 S 1380 74, 1440 60 L1440 120 L0 120 Z" fill="#6f6248" />
+    <path d="M0 92 C 240 80, 480 104, 720 90 S 1120 78, 1440 94 L1440 120 L0 120 Z" fill="#4c4234" />
+  </svg>
+</section>
+
+<style>
+  .hm { background: var(--sand); position: relative; }
+  .hm-in { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(32px, 5vw, 64px); align-items: center; padding-top: clamp(40px, 6vw, 76px); padding-bottom: 18px; }
+  .hm-kicker { font-family: var(--f-body); font-style: italic; font-size: 19px; color: var(--bark); }
+  .hm h1 { font-weight: 600; font-size: clamp(38px, 5vw, 60px); line-height: 1.06; margin-top: 12px; letter-spacing: -0.4px; }
+  .hm-lead { font-weight: 300; color: var(--ink-soft); font-size: clamp(18px, 2.1vw, 22px); line-height: 1.55; margin-top: 20px; max-width: 46ch; }
+  .hm-search { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; max-width: 520px; }
+  .hm-search .input { flex: 1; min-width: 220px; }
+  .hm-try { font-size: 17px; color: var(--ink-muted); margin-top: 14px; }
+  .hm-try a { color: var(--sage-ink); text-underline-offset: 3px; }
+  .hm-mosaic { display: grid; grid-template-columns: 1.25fr 1fr 1fr; grid-template-rows: 170px 170px 150px; gap: 10px; }
+  .tile { position: relative; overflow: hidden; border-radius: 18px; display: block; background: var(--tile-empty); }
+  .tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+  .tile:hover img { transform: scale(1.04); }
+  .t0 { grid-row: 1 / 4; }
+  .t1 { grid-column: 2 / 4; }
+  .t4 { grid-column: 2 / 4; }
+  .cap {
+    position: absolute; left: 10px; bottom: 10px; background: rgba(46, 52, 51, 0.82); color: var(--limestone);
+    font-family: var(--f-head); font-weight: 600; font-size: 12px; padding: 5px 10px; border-radius: 20px;
+    opacity: 0; transform: translateY(4px); transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .tile:hover .cap, .tile:focus-visible .cap { opacity: 1; transform: none; }
+  .hm-credits { font-size: 13px; color: var(--bark); padding-top: 10px; padding-bottom: 6px; text-align: right; }
+  .horizon { display: block; width: 100%; height: clamp(48px, 7vw, 96px); margin-top: 6px; }
+  @media (max-width: 860px) {
+    .hm-in { grid-template-columns: 1fr; }
+    .hm-mosaic { grid-template-rows: 130px 130px 110px; }
+    .hm-credits { text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tile img, .cap { transition: none; } }
+</style>

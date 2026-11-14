@@ -1,13 +1,17 @@
 ---
 import Base from '../layouts/Base.astro';
-import HeroA from '../components/HeroA.astro';
-import HeroB from '../components/HeroB.astro';
+import Hero from '../components/Hero.astro';
+import SoilArt from '../components/SoilArt.astro';
 import SpeciesCard from '../components/SpeciesCard.astro';
 import CtaBand from '../components/CtaBand.astro';
 import { featured, totals, thresholds } from '../lib/data.js';
-import { HERO, IS_PRODUCTION, SITE_URL, SITE_NAME } from '../config.js';
+import { SITE_URL, SITE_NAME } from '../config.js';
+import { sitePhotos } from '../lib/sitePhotos.js';
 
-const showSwitch = !IS_PRODUCTION;
+// Feature card photos (credited in the title attribute, like species cards)
+const cardPhoto = (sp) => sp && { src: sp.photo.src, alt: `${sp.displayName} (${sp.scientific_name})`, title: sp.photoCredit.text };
+const nativePhoto = cardPhoto(sitePhotos.native);
+const wildlifePhoto = cardPhoto(sitePhotos.wildlife);
 const picks = featured(4);
 const t = thresholds;
 const jsonLd = [
@@ -25,43 +29,32 @@ const jsonLd = [
 ];
 ---
 <Base
-  description="A free, no-login soil and plant database: real pH, organic matter, and texture from community soil tests, plus native status by state and wildlife value for the plants you grow."
+  description="A soil and plant database: real pH, organic matter, and texture from community soil tests, plus native status by state and wildlife value for the plants you grow."
   active="home"
   jsonLd={jsonLd}
 >
-  {(showSwitch || HERO === 'a') && <HeroA hidden={HERO !== 'a'} />}
-  {(showSwitch || HERO === 'b') && <HeroB hidden={HERO !== 'b'} />}
-
-  {showSwitch && (
-    <div class="switch" aria-label="Preview: choose a hero">
-      <span>HERO</span>
-      <button type="button" data-hero="a" aria-pressed={HERO === 'a' ? 'true' : 'false'}>1a</button>
-      <button type="button" data-hero="b" aria-pressed={HERO === 'b' ? 'true' : 'false'}>1b</button>
-    </div>
-  )}
+  <Hero />
 
   <section class="wrap section">
     <div class="why">
-      <span class="eyebrow">Why it's different</span>
-      <h2 class="h2">Plant guides say "well-drained soil." We show the numbers.</h2>
       <p class="lede">
-        Most references repeat the same vague advice. Edaphic Flora is built from real measurements at real sites,
-        aggregated, sourced, and shown with the sample counts behind them. When the data is thin, we say so.
+        Edaphic Flora is built from real measurements at real sites, aggregated, sourced, and shown with the sample
+        counts behind them.
       </p>
     </div>
     <div class="pillars">
       <div class="card pad">
-        <div class="mono num">01</div>
+        <SoilArt />
         <h3 class="h3">Soil, sourced</h3>
         <p>pH, organic matter, texture, and nutrients, shown as ranges with the number of samples behind them.</p>
       </div>
       <div class="card pad">
-        <div class="mono num">02</div>
+        {nativePhoto && <div class="p-photo"><img {...nativePhoto} loading="lazy" decoding="async" referrerpolicy="no-referrer" /></div>}
         <h3 class="h3">Native, by state</h3>
         <p>Native, introduced, and invasive status for all 50 states and DC, from BONAP and state invasive lists.</p>
       </div>
       <div class="card pad">
-        <div class="mono num">03</div>
+        {wildlifePhoto && <div class="p-photo"><img {...wildlifePhoto} loading="lazy" decoding="async" referrerpolicy="no-referrer" /></div>}
         <h3 class="h3">Wildlife value</h3>
         <p>How many moths, butterflies, and specialist bees a plant supports, and what it offers birds.</p>
       </div>
@@ -73,7 +66,7 @@ const jsonLd = [
       <div class="row-head">
         <div>
           <span class="eyebrow">Start exploring</span>
-          <h2 class="h2" style="font-size:clamp(26px,3.4vw,38px);margin-top:12px">Featured species</h2>
+          <h2 class="h2" style="font-size:clamp(26px,3.4vw,38px);margin-top:6px">Featured species</h2>
         </div>
         <a href="/species/" class="link">Browse all {totals.species.toLocaleString()} →</a>
       </div>
@@ -86,8 +79,7 @@ const jsonLd = [
   <section class="wrap section">
     <div class="honest">
       <div class="h-copy">
-        <span class="eyebrow gold">Honest by design</span>
-        <h2 class="h2" style="font-size:clamp(24px,3vw,34px);margin-top:12px">We never fake the numbers.</h2>
+        <h2 class="h2" style="font-size:clamp(24px,3vw,34px)">How to read the soil numbers</h2>
         <p class="lede" style="margin-top:16px">
           Community soil data is still growing. Every soil number shows how many samples back it, even when that's
           one. A measurement gets a range once it has {t.min_range_samples} or more samples; before that you see the
@@ -110,29 +102,16 @@ const jsonLd = [
   <CtaBand />
 </Base>
 
-<script>
-  const btns = document.querySelectorAll<HTMLButtonElement>('.switch button');
-  btns.forEach((b) =>
-    b.addEventListener('click', () => {
-      const v = b.dataset.hero;
-      document.getElementById('hero-a')?.toggleAttribute('hidden', v !== 'a');
-      document.getElementById('hero-b')?.toggleAttribute('hidden', v !== 'b');
-      btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    })
-  );
-</script>
-
 <style>
   .why { max-width: 760px; }
-  .why .h2 { margin-top: 14px; }
-  .why .lede { margin-top: 18px; }
   .pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; margin-top: 44px; }
-  .pillars .pad { padding: 26px; }
-  .num { font-size: 13px; color: var(--sage-ink); }
-  .pillars h3 { margin-top: 12px; }
-  .pillars p { font-weight: 300; font-size: 17px; line-height: 1.55; color: var(--ink-soft); margin-top: 8px; }
+  .pillars .card { padding: 0 0 24px; overflow: hidden; border: none; border-radius: 18px; box-shadow: 0 10px 26px rgba(55, 61, 60, 0.07); }
+  .pillars :global(.p-photo) { height: 180px; overflow: hidden; background: var(--tile-empty); }
+  .pillars .p-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .pillars h3 { margin: 18px 24px 0; }
+  .pillars p { font-weight: 300; font-size: 17px; line-height: 1.55; color: var(--ink-soft); margin: 8px 24px 0; }
   .row-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
-  .honest { background: var(--sand); border: 1px solid var(--line); border-radius: 18px; padding: clamp(28px, 4vw, 48px); display: flex; gap: clamp(28px, 4vw, 56px); flex-wrap: wrap; align-items: center; }
+  .honest { background: var(--sand); border-radius: 24px; padding: clamp(28px, 4vw, 48px); display: flex; gap: clamp(28px, 4vw, 56px); flex-wrap: wrap; align-items: center; }
   .h-copy { flex: 1; min-width: min(280px, 100%); }
   .h-states { flex: 0.8; min-width: min(260px, 100%); display: flex; flex-direction: column; gap: 12px; }
   .state { background: var(--paper); border-radius: 12px; padding: 16px 18px; }
@@ -140,18 +119,7 @@ const jsonLd = [
   .state.not { border: 1px dashed rgba(211, 155, 53, 0.6); }
   .st-hd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .st-hd strong { font-family: var(--f-head); font-weight: 600; font-size: 13px; }
-  .st-hd .mono { margin-left: auto; font-size: 11px; color: var(--ink-muted); }
+  .st-hd .mono { margin-left: auto; font-size: 12px; color: var(--ink-muted); }
   .state.not .st-hd .mono { color: var(--gold-ink); }
   .state p { font-size: 16px; color: var(--ink-soft); margin-top: 8px; }
-  .switch {
-    position: fixed; right: 18px; bottom: 18px; z-index: 60; background: var(--charcoal); color: var(--limestone);
-    border-radius: 12px; padding: 10px 12px; box-shadow: 0 8px 28px rgba(55, 61, 60, 0.28);
-    display: flex; align-items: center; gap: 10px; font-family: var(--f-data); font-size: 11px;
-  }
-  .switch span { opacity: 0.7; letter-spacing: 0.5px; }
-  .switch button {
-    font-family: var(--f-data); font-size: 12px; font-weight: 500; border: none; cursor: pointer;
-    padding: 6px 11px; border-radius: 7px; background: rgba(247, 244, 232, 0.12); color: var(--limestone);
-  }
-  .switch button[aria-pressed='true'] { background: var(--gold); color: var(--charcoal); }
 </style>

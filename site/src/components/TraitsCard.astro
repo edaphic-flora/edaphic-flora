@@ -16,10 +16,10 @@ const rows = [
 ].filter(([, v]) => v);
 ---
 <div class="card pad">
-  <div class="hd"><h3 class="t">USDA traits</h3><span class="mono tag">reference</span></div>
+  <div class="hd"><h3 class="t">USDA traits</h3><span class="tag">reference</span></div>
   {rows.length ? (
     <dl>
-      {rows.map(([k, v]) => <div><dt>{k}</dt><dd class="mono">{v}</dd></div>)}
+      {rows.map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}
     </dl>
   ) : (
     <p class="none">No USDA PLANTS record matched this name.</p>
@@ -31,12 +31,12 @@ const rows = [
 
 <style>
   .hd { display: flex; align-items: center; gap: 8px; }
-  .t { font-weight: 700; font-size: 18px; }
-  .tag { font-size: 11px; color: var(--ink-muted); }
+  .t { font-weight: 600; font-size: 18px; }
+  .tag { font-size: 15px; font-style: italic; color: var(--ink-muted); }
   dl { margin: 12px 0 0; }
   dl div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(55, 61, 60, 0.08); }
   dt { font-size: 16px; color: var(--ink-soft); }
-  dd { margin: 0; font-size: 13.5px; color: var(--charcoal); text-align: right; }
+  dd { margin: 0; font-size: 17px; color: var(--charcoal); text-align: right; }
   .none { font-size: 16px; color: var(--ink-soft); margin-top: 12px; }
   .src { margin-top: 14px; font-family: var(--f-head); font-weight: 600; font-size: 13px; }
   .src a { color: var(--sage-ink); }
