@@ -1,0 +1,601 @@
+---
+// Moderation tools. The page itself holds no data: everything comes from
+// /api/admin/* (netlify/lib/admin.mjs), which refuses anyone whose verified
+// email is not in ADMIN_EMAILS and in the database's site_admins list.
+import Base from '../layouts/Base.astro';
+---
+<Base title="Admin" description="Moderation tools for Edaphic Flora administrators." noindex>
+  <div class="wrap adm">
+    <span class="eyebrow">Admin</span>
+    <h1 class="h1">Moderation</h1>
+
+    <p id="st-loading" class="small">Loading…</p>
+    <p id="st-off" class="small" hidden>Sign-in isn't available on this copy of the site yet.</p>
+
+    <section id="st-signin" class="card pad gate" hidden>
+      <p id="signin-text">Sign in with an administrator account to moderate samples and contributors.</p>
+      <a class="btn btn-gold" href="/account/?next=/admin/">Sign in</a>
+    </section>
+
+    <section id="st-denied" class="card pad gate" hidden>
+      <p id="denied-text">This page is for site administrators.</p>
+      <p class="small">Signed in as <span id="denied-who" class="mono"></span>. <button type="button" class="link signout">Sign out</button></p>
+    </section>
+
+    <section id="st-admin" hidden>
+      <p class="small who">Signed in as <span id="who" class="mono"></span>. <button type="button" class="link signout">Sign out</button></p>
+      <dl class="stats">
+        <div><dt>Samples</dt><dd id="n-samples" class="mono"></dd></div>
+        <div><dt>Flagged</dt><dd id="n-flagged" class="mono"></dd></div>
+        <div><dt>Added in 24 h</dt><dd id="n-24h" class="mono"></dd></div>
+        <div><dt>Contributors</dt><dd id="n-contrib" class="mono"></dd></div>
+        <div><dt>Disabled</dt><dd id="n-disabled" class="mono"></dd></div>
+      </dl>
+      <p class="small explain">
+        Flagged samples, and every sample from a disabled account, drop off public pages at the next weekly rebuild.
+        Contributors see "flagged for review" on their account page right away, and a disabled account can't add
+        samples or read reports. Nothing here deletes data, and every change goes in the audit log.
+      </p>
+
+      <div class="tabs" role="tablist" aria-label="Moderation">
+        <button type="button" role="tab" id="tab-samples" aria-controls="p-samples" data-tab="samples">Samples</button>
+        <button type="button" role="tab" id="tab-contributors" aria-controls="p-contributors" data-tab="contributors">Contributors</button>
+        <button type="button" role="tab" id="tab-disabled" aria-controls="p-disabled" data-tab="disabled">Disabled accounts</button>
+        <button type="button" role="tab" id="tab-audit" aria-controls="p-audit" data-tab="audit">Audit log</button>
+      </div>
+
+      <section id="p-samples" role="tabpanel" aria-labelledby="tab-samples" class="panel">
+        <form id="s-filter" class="filters" novalidate>
+          <label class="fld">Search
+            <input class="input" id="s-q" type="search" maxlength="100" placeholder="Plant, notes or #id" />
+          </label>
+          <label class="fld">Contributor id
+            <input class="input mono" id="s-user" type="search" maxlength="128" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="check"><input type="checkbox" id="s-flagged" /> Flagged only</label>
+          <button type="submit" class="btn btn-sage btn-sm">Show</button>
+        </form>
+        <div id="s-table" class="tbl"></div>
+        <button type="button" id="s-more" class="btn btn-sage btn-sm more" hidden>Show older samples</button>
+      </section>
+
+      <section id="p-contributors" role="tabpanel" aria-labelledby="tab-contributors" class="panel" hidden>
+        <p class="small">Everyone who has added samples, most recently active first. Flag all hides every one of their samples; disable stops new samples and hides their existing ones while disabled.</p>
+        <div id="c-table" class="tbl"></div>
+      </section>
+
+      <section id="p-disabled" role="tabpanel" aria-labelledby="tab-disabled" class="panel" hidden>
+        <p class="small">Re-enabling lets the account add samples again, and its samples come back on public pages unless they are flagged.</p>
+        <div id="d-table" class="tbl"></div>
+      </section>
+
+      <section id="p-audit" role="tabpanel" aria-labelledby="tab-audit" class="panel" hidden>
+        <form id="a-filter" class="filters" novalidate>
+          <label class="fld">Action
+            <select class="select" id="a-action"><option value="">All actions</option></select>
+          </label>
+          <label class="fld">Search
+            <input class="input" id="a-q" type="search" maxlength="100" placeholder="User id, record id or text" />
+          </label>
+          <button type="submit" class="btn btn-sage btn-sm">Show</button>
+        </form>
+        <div id="a-table" class="tbl"></div>
+        <button type="button" id="a-more" class="btn btn-sage btn-sm more" hidden>Show older entries</button>
+      </section>
+    </section>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  </div>
+</Base>
+
+<script>
+  import { signInConfigured, watchUser, needsVerification, signOut, api } from '../lib/firebase.js';
+
+  const $ = (id) => document.getElementById(id);
+  const say = (text, kind = 'info') => {
+    $('msg').textContent = text || '';
+    $('msg').dataset.kind = kind;
+  };
+  const states = ['st-loading', 'st-off', 'st-signin', 'st-denied', 'st-admin'];
+  const show = (id) => states.forEach((s) => ($(s).hidden = s !== id));
+
+  // ---- small DOM helpers (all text goes in as text, never as HTML)
+  function el(tag, props = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+    n.append(...kids.flat().filter((k) => k != null && k !== false));
+    return n;
+  }
+  const btn = (text, onclick, cls = 'link', label) =>
+    el('button', { type: 'button', class: cls, text, onclick, 'aria-label': label });
+  const when = (iso) =>
+    iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const day = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '');
+  const fmt = (v, d = 1) => (v == null ? '' : Number(v).toFixed(d));
+  const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  const INAT = /^https:\/\/(www\.)?inaturalist\.org\/observations\/\d{1,12}$/;
+
+  function table(headers, rows) {
+    const t = el('table');
+    const head = t.createTHead().insertRow();
+    for (const h of headers) head.append(el('th', { scope: 'col', text: h }));
+    const body = t.createTBody();
+    rows.forEach((r) => body.append(r));
+    return t;
+  }
+  const empty = (text) => el('p', { class: 'empty', text });
+
+  // A contributor id: shortened, full id on hover, click to see their samples
+  function userCell(id, disabled) {
+    if (!id) return el('span', { class: 'muted', text: 'unknown' });
+    const short = id.length > 14 ? `${id.slice(0, 12)}…` : id;
+    return el(
+      'span',
+      { class: 'uid' },
+      btn(short, () => showUserSamples(id), 'link mono', `Show samples from ${id}`),
+      disabled ? el('span', { class: 'tag off', text: 'disabled' }) : null
+    );
+  }
+
+  // An inline "are you sure" with an optional reason box, in place of a dialog
+  function confirmBox({ prompt, action, reasonLabel, reasonDefault = '', extra, onConfirm, onCancel }) {
+    const reason = reasonLabel
+      ? el('input', { class: 'input', type: 'text', maxlength: '500', placeholder: reasonDefault, 'aria-label': reasonLabel })
+      : null;
+    const go = btn(action, null, 'btn btn-gold btn-sm');
+    const no = btn('Cancel', onCancel, 'link');
+    const box = el('div', { class: 'ask' }, el('p', { text: prompt }), reason, extra, el('div', { class: 'ask-row' }, go, no));
+    const submit = async () => {
+      go.disabled = no.disabled = true;
+      const ok = await onConfirm(reason ? reason.value.trim() : '');
+      if (!ok) go.disabled = no.disabled = false;
+    };
+    go.addEventListener('click', submit);
+    reason?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      if (e.key === 'Escape') onCancel();
+    });
+    queueMicrotask(() => (reason || go).focus());
+    return box;
+  }
+
+  async function post(path, body) {
+    const r = await api(path, { method: 'POST', body: body || {} });
+    if (!r.ok) say(r.data?.error || 'That did not work. Please try again.', 'error');
+    return r;
+  }
+
+  // ---- overview numbers
+  let me = null;
+  async function loadMe() {
+    const r = await api('/api/admin/me');
+    if (!r.ok) return r;
+    me = r.data;
+    $('who').textContent = me.email;
+    $('n-samples').textContent = me.samples.toLocaleString();
+    $('n-flagged').textContent = me.flagged.toLocaleString();
+    $('n-24h').textContent = me.samples_24h.toLocaleString();
+    $('n-contrib').textContent = me.contributors.toLocaleString();
+    $('n-disabled').textContent = me.disabled.toLocaleString();
+    const sel = $('a-action');
+    const keep = sel.value;
+    sel.replaceChildren(el('option', { value: '', text: 'All actions' }), ...(me.actions || []).map((a) => el('option', { value: a, text: a })));
+    sel.value = keep;
+    return r;
+  }
+
+  // Lists other than the open tab reload the next time they're opened
+  const stale = new Set();
+  function changed(...tabs) {
+    tabs.forEach((t) => stale.add(t));
+    loadMe();
+  }
+
+  // ---- samples
+  let sNext = null;
+  function sampleRow(s) {
+    const tr = el('tr', { class: s.flagged ? 'is-flagged' : '' });
+    const notes = s.notes ? (s.notes.length > 300 ? `${s.notes.slice(0, 300)}…` : s.notes) : '';
+    const plant = el(
+      'td',
+      { class: 'sci' },
+      s.cultivar ? `${s.species} '${s.cultivar}'` : s.species || '(no species)',
+      s.outcome ? el('span', { class: 'sub', text: s.outcome }) : null
+    );
+    const soil = [s.ph != null ? `pH ${fmt(s.ph)}` : '', s.organic_matter != null ? `OM ${fmt(s.organic_matter)}%` : '', s.texture_class || '']
+      .filter(Boolean)
+      .join(' · ');
+    const status = el(
+      'td',
+      {},
+      s.flagged ? el('span', { class: 'tag flag', text: 'flagged' }) : el('span', { class: 'muted', text: 'public' }),
+      s.flagged && s.flag_reason ? el('span', { class: 'sub', text: s.flag_reason }) : null
+    );
+    const act = el('td', { class: 'act' });
+    const reset = () => act.replaceChildren(actionFor());
+    const actionFor = () =>
+      s.flagged
+        ? btn('Unflag', async () => {
+            const r = await post(`/api/admin/samples/${s.id}/unflag`);
+            if (r.ok) {
+              Object.assign(s, { flagged: false, flag_reason: null });
+              tr.replaceWith(sampleRow(s));
+              say(`Sample #${s.id} unflagged.`);
+              changed('contributors', 'disabled', 'audit');
+            }
+          }, 'link', `Unflag sample ${s.id}`)
+        : btn('Flag', () =>
+            act.replaceChildren(confirmBox({
+              prompt: `Flag sample #${s.id}?`,
+              action: 'Flag',
+              reasonLabel: 'Reason (optional)',
+              reasonDefault: 'Reason (optional)',
+              onCancel: reset,
+              onConfirm: async (reason) => {
+                const r = await post(`/api/admin/samples/${s.id}/flag`, { reason });
+                if (!r.ok) return false;
+                Object.assign(s, { flagged: true, flag_reason: reason || 'Flagged by admin' });
+                tr.replaceWith(sampleRow(s));
+                say(`Sample #${s.id} flagged.`);
+                changed('contributors', 'disabled', 'audit');
+                return true;
+              },
+            })), 'link', `Flag sample ${s.id}`);
+    reset();
+    tr.append(
+      el('td', { class: 'mono' }, `#${s.id}`, el('span', { class: 'sub', text: day(s.added) })),
+      plant,
+      el('td', {}, userCell(s.user_id, s.user_disabled)),
+      el('td', { class: 'mono nowrap', text: soil }),
+      el('td', { class: 'notes', title: s.notes && s.notes.length > 300 ? s.notes : null },
+        notes,
+        s.inat_url && INAT.test(s.inat_url)
+          ? el('a', { href: s.inat_url, target: '_blank', rel: 'noopener noreferrer', class: 'sub', text: 'iNaturalist' })
+          : null),
+      status,
+      act
+    );
+    return tr;
+  }
+
+  async function loadSamples(more = false) {
+    const p = new URLSearchParams();
+    const q = $('s-q').value.trim();
+    const user = $('s-user').value.trim();
+    if (q) p.set('q', q);
+    if (user) p.set('user', user);
+    if ($('s-flagged').checked) p.set('flagged', '1');
+    if (more && sNext) p.set('before', String(sNext));
+    p.set('limit', '50');
+    const r = await api(`/api/admin/samples?${p}`);
+    if (!r.ok) return say(r.data?.error || 'Could not load samples.', 'error');
+    const box = $('s-table');
+    const rows = r.data.samples.map(sampleRow);
+    if (more && box.querySelector('tbody')) box.querySelector('tbody').append(...rows);
+    else if (!rows.length) box.replaceChildren(empty(q || user || $('s-flagged').checked ? 'No samples match.' : 'No samples yet.'));
+    else box.replaceChildren(table(['Sample', 'Plant', 'Contributor', 'Soil', 'Notes', 'Status', ''], rows));
+    sNext = r.data.next;
+    $('s-more').hidden = !sNext;
+  }
+
+  function showUserSamples(id) {
+    $('s-user').value = id;
+    $('s-q').value = '';
+    $('s-flagged').checked = false;
+    selectTab('samples');
+    loadSamples();
+  }
+
+  // ---- contributors
+  function contributorRow(c) {
+    const tr = el('tr');
+    const act = el('td', { class: 'act' });
+    const unflagged = c.n_samples - c.n_flagged;
+    const reset = () => act.replaceChildren(actions());
+    const actions = () =>
+      el(
+        'span',
+        { class: 'acts' },
+        unflagged > 0
+          ? btn('Flag all', () =>
+              act.replaceChildren(confirmBox({
+                prompt: `Flag all ${plural(unflagged, 'unflagged sample')} from this contributor?`,
+                action: 'Flag all',
+                reasonLabel: 'Reason (optional)',
+                reasonDefault: 'Reason (optional)',
+                onCancel: reset,
+                onConfirm: async (reason) => {
+                  const r = await post('/api/admin/users/flag', { user_id: c.user_id, reason });
+                  if (!r.ok) return false;
+                  c.n_flagged += r.data.flagged;
+                  tr.replaceWith(contributorRow(c));
+                  say(`Flagged ${plural(r.data.flagged, 'sample')}.`);
+                  changed('samples', 'disabled', 'audit');
+                  return true;
+                },
+              })), 'link', `Flag all samples from ${c.user_id}`)
+          : null,
+        c.disabled
+          ? btn('Re-enable', () => enableFlow(c.user_id, act, reset, () => {
+              Object.assign(c, { disabled: false, disable_reason: null });
+              tr.replaceWith(contributorRow(c));
+            }), 'link', `Re-enable ${c.user_id}`)
+          : me && c.user_id === me.actor
+            ? null
+            : btn('Disable', () => {
+                const also = el('input', { type: 'checkbox' });
+                act.replaceChildren(confirmBox({
+                  prompt: 'Disable this account? It can be re-enabled later.',
+                  action: 'Disable account',
+                  reasonLabel: 'Reason',
+                  reasonDefault: 'Reason, e.g. spam',
+                  extra: unflagged > 0
+                    ? el('label', { class: 'check' }, also,
+                        ` Also flag their ${plural(unflagged, 'unflagged sample')}, so they stay hidden if the account is re-enabled`)
+                    : null,
+                  onCancel: reset,
+                  onConfirm: async (reason) => {
+                    const r = await post('/api/admin/users/disable', { user_id: c.user_id, reason, flag_samples: also.checked });
+                    if (!r.ok) return false;
+                    Object.assign(c, { disabled: true, disable_reason: reason || 'Disabled by admin' });
+                    c.n_flagged += r.data.flagged;
+                    tr.replaceWith(contributorRow(c));
+                    say(r.data.flagged ? `Account disabled and ${plural(r.data.flagged, 'sample')} flagged.` : 'Account disabled.');
+                    changed('samples', 'disabled', 'audit');
+                    return true;
+                  },
+                }));
+              }, 'link danger', `Disable ${c.user_id}`)
+      );
+    reset();
+    tr.append(
+      el('td', {}, userCell(c.user_id, false)),
+      el('td', { class: 'mono num' }, String(c.n_samples)),
+      el('td', { class: 'mono num' }, String(c.n_flagged)),
+      el('td', { class: 'nowrap', text: day(c.first_seen) }),
+      el('td', { class: 'nowrap', text: day(c.last_seen) }),
+      el('td', {},
+        c.disabled ? el('span', { class: 'tag off', text: 'disabled' }) : el('span', { class: 'muted', text: 'active' }),
+        c.disabled && c.disable_reason ? el('span', { class: 'sub', text: c.disable_reason }) : null),
+      act
+    );
+    return tr;
+  }
+
+  async function loadContributors() {
+    const r = await api('/api/admin/contributors');
+    if (!r.ok) return say(r.data?.error || 'Could not load contributors.', 'error');
+    const list = r.data.contributors;
+    $('c-table').replaceChildren(
+      list.length
+        ? table(['Contributor', 'Samples', 'Flagged', 'First sample', 'Latest', 'Status', ''], list.map(contributorRow))
+        : empty('No one has added samples yet.')
+    );
+  }
+
+  // Re-enable, with an inline "are you sure"
+  function enableFlow(userId, cell, reset, done) {
+    cell.replaceChildren(confirmBox({
+      prompt: 'Re-enable this account?',
+      action: 'Re-enable',
+      onCancel: reset,
+      onConfirm: async () => {
+        const r = await post('/api/admin/users/enable', { user_id: userId });
+        if (!r.ok) return false;
+        done();
+        say('Account re-enabled.');
+        changed('samples', 'contributors', 'disabled', 'audit');
+        return true;
+      },
+    }));
+  }
+
+  // ---- disabled accounts
+  function disabledRow(d) {
+    const tr = el('tr');
+    const act = el('td', { class: 'act' });
+    const reset = () => act.replaceChildren(btn('Re-enable', () => enableFlow(d.user_id, act, reset, () => tr.remove()), 'link', `Re-enable ${d.user_id}`));
+    reset();
+    tr.append(
+      el('td', {}, userCell(d.user_id, false)),
+      el('td', { class: 'nowrap', text: when(d.disabled_at) }),
+      el('td', { class: 'mono', title: d.disabled_by || null, text: d.disabled_by ? (d.disabled_by.length > 14 ? `${d.disabled_by.slice(0, 12)}…` : d.disabled_by) : '' }),
+      el('td', { class: 'notes', text: d.reason || '' }),
+      el('td', { class: 'mono num', text: `${d.n_flagged} of ${d.n_samples}` }),
+      act
+    );
+    return tr;
+  }
+
+  async function loadDisabled() {
+    const r = await api('/api/admin/disabled');
+    if (!r.ok) return say(r.data?.error || 'Could not load disabled accounts.', 'error');
+    const list = r.data.disabled;
+    $('d-table').replaceChildren(
+      list.length
+        ? table(['Account', 'Disabled', 'By', 'Reason', 'Samples flagged', ''], list.map(disabledRow))
+        : empty('No accounts are disabled.')
+    );
+  }
+
+  // ---- audit log
+  let aNext = null;
+  const auditRow = (a) =>
+    el(
+      'tr',
+      {},
+      el('td', { class: 'nowrap', text: when(a.created_at) }),
+      el('td', { class: 'mono', text: a.action }),
+      el('td', { class: 'mono', text: a.record_id != null ? `${a.table_name || ''} #${a.record_id}` : a.table_name || '' }),
+      el('td', {}, a.user_id ? btn(a.user_id.length > 14 ? `${a.user_id.slice(0, 12)}…` : a.user_id, () => {
+        $('a-q').value = a.user_id;
+        loadAudit();
+      }, 'link mono', `Show audit entries for ${a.user_id}`) : ''),
+      el('td', { class: 'notes', text: a.details || '' })
+    );
+
+  async function loadAudit(more = false) {
+    const p = new URLSearchParams();
+    if ($('a-action').value) p.set('action', $('a-action').value);
+    if ($('a-q').value.trim()) p.set('q', $('a-q').value.trim());
+    if (more && aNext) p.set('before', String(aNext));
+    p.set('limit', '100');
+    const r = await api(`/api/admin/audit?${p}`);
+    if (!r.ok) return say(r.data?.error || 'Could not load the audit log.', 'error');
+    const box = $('a-table');
+    const rows = r.data.entries.map(auditRow);
+    if (more && box.querySelector('tbody')) box.querySelector('tbody').append(...rows);
+    else if (!rows.length) box.replaceChildren(empty('No entries match.'));
+    else box.replaceChildren(table(['When', 'Action', 'Record', 'By', 'Details'], rows));
+    aNext = r.data.next;
+    $('a-more').hidden = !aNext;
+  }
+
+  // ---- tabs (remembered in the address, e.g. /admin/#audit)
+  const TABS = ['samples', 'contributors', 'disabled', 'audit'];
+  const loaders = { samples: () => loadSamples(), contributors: loadContributors, disabled: loadDisabled, audit: () => loadAudit() };
+  const loaded = new Set();
+  function selectTab(name, { focus = false } = {}) {
+    for (const t of TABS) {
+      const on = t === name;
+      $(`tab-${t}`).setAttribute('aria-selected', String(on));
+      $(`tab-${t}`).tabIndex = on ? 0 : -1;
+      $(`p-${t}`).hidden = !on;
+    }
+    if (focus) $(`tab-${name}`).focus();
+    history.replaceState(null, '', `#${name}`);
+    return name;
+  }
+  function openTab(name, opts) {
+    selectTab(name, opts);
+    if (!loaded.has(name) || stale.has(name)) {
+      loaded.add(name);
+      stale.delete(name);
+      say('');
+      loaders[name]();
+    }
+  }
+  document.querySelectorAll('[role="tab"]').forEach((b) => {
+    b.addEventListener('click', () => openTab(b.dataset.tab));
+    b.addEventListener('keydown', (e) => {
+      const i = TABS.indexOf(b.dataset.tab);
+      const j = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
+      if (j === null) return;
+      e.preventDefault();
+      openTab(TABS[(j + TABS.length) % TABS.length], { focus: true });
+    });
+  });
+
+  $('s-filter').addEventListener('submit', (e) => {
+    e.preventDefault();
+    say('');
+    loadSamples();
+  });
+  $('s-more').addEventListener('click', () => loadSamples(true));
+  $('a-filter').addEventListener('submit', (e) => {
+    e.preventDefault();
+    say('');
+    loadAudit();
+  });
+  $('a-action').addEventListener('change', () => loadAudit());
+  $('a-more').addEventListener('click', () => loadAudit(true));
+  document.querySelectorAll('.signout').forEach((b) => b.addEventListener('click', () => signOut()));
+
+  // ---- start
+  if (!signInConfigured) show('st-off');
+  watchUser(async (user) => {
+    if (!signInConfigured) return;
+    say('');
+    if (!user) return show('st-signin');
+    if (needsVerification(user)) {
+      $('signin-text').textContent = 'Confirm your email address on your account page first.';
+      return show('st-signin');
+    }
+    const r = await loadMe();
+    if (!r.ok) {
+      $('denied-text').textContent = r.data?.error || 'Could not check your access. Please try again.';
+      $('denied-who').textContent = user.email || '';
+      return show('st-denied');
+    }
+    show('st-admin');
+    loaded.clear();
+    const start = location.hash.slice(1);
+    openTab(TABS.includes(start) ? start : 'samples');
+  });
+</script>
+
+<style>
+  .adm { padding-top: clamp(40px, 6vw, 72px); padding-bottom: 32px; }
+  .adm h1 { margin-top: 10px; }
+  .gate { margin-top: 22px; max-width: 560px; display: grid; gap: 14px; justify-items: start; }
+  .who { margin-top: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 20px 0 0; }
+  .stats div { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .stats dt { font-family: var(--f-head); font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: var(--ink-muted); }
+  .stats dd { margin: 4px 0 0; font-size: 22px; }
+  .explain { margin-top: 14px; max-width: 760px; }
+
+  .tabs { display: flex; gap: 4px; margin-top: 26px; border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; }
+  .tabs button {
+    font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--ink-soft); background: none; border: none;
+    padding: 12px 14px; cursor: pointer; white-space: nowrap;
+  }
+  .tabs button[aria-selected='true'] { color: var(--charcoal); box-shadow: inset 0 -3px 0 var(--gold); }
+  .tabs button:hover { color: var(--charcoal); }
+  .panel { padding-top: 18px; }
+  .panel > .small { margin-bottom: 12px; max-width: 760px; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin-bottom: 16px; }
+  .fld { display: grid; gap: 6px; font-family: var(--f-head); font-weight: 600; font-size: 13.5px; min-width: 200px; }
+  .fld .input, .fld .select { font-size: 16px; padding: 10px 12px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 17px; padding-bottom: 8px; }
+  .check input { width: 18px; height: 18px; }
+
+  .tbl { overflow-x: auto; }
+  .tbl :global(table) { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+  .tbl :global(th) {
+    text-align: left; font-family: var(--f-head); font-weight: 600; font-size: 12.5px; padding: 8px 10px;
+    border-bottom: 1px solid var(--line-strong); white-space: nowrap;
+  }
+  .tbl :global(td) { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .tbl :global(tr.is-flagged td) { background: rgba(211, 155, 53, 0.08); }
+  .tbl :global(.sub) { display: block; font-size: 13.5px; color: var(--bark); font-family: var(--f-body); margin-top: 2px; }
+  .tbl :global(.notes) { min-width: 180px; max-width: 360px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .tbl :global(.nowrap) { white-space: nowrap; }
+  .tbl :global(.num) { text-align: right; }
+  .tbl :global(.muted) { color: var(--ink-muted); font-size: 14px; }
+  .tbl :global(.uid) { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+  .tbl :global(.uid .link) { font-size: 13px; }
+  .tbl :global(.tag) {
+    display: inline-block; font-family: var(--f-head); font-weight: 600; font-size: 11px; letter-spacing: 0.4px;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
+  }
+  .tbl :global(.tag.flag) { background: rgba(211, 155, 53, 0.22); color: var(--charcoal); }
+  .tbl :global(.tag.off) { background: rgba(155, 61, 34, 0.12); color: #7d2f19; }
+  .tbl :global(.act) { min-width: 120px; }
+  .tbl :global(.acts) { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .tbl :global(.danger) { color: #9b3d22; }
+  .tbl :global(.empty) { color: var(--bark); padding: 8px 0; }
+  .tbl :global(.ask) { display: grid; gap: 8px; min-width: 240px; max-width: 340px; }
+  .tbl :global(.ask p) { font-size: 15px; }
+  .tbl :global(.ask .input) { font-size: 15px; padding: 8px 10px; }
+  .tbl :global(.ask .check) { font-size: 14.5px; align-items: flex-start; padding: 0; }
+  .tbl :global(.ask-row) { display: flex; gap: 12px; align-items: center; }
+  .more { margin-top: 14px; }
+  .msg { margin-top: 18px; min-height: 1.4em; font-size: 17px; }
+  .msg[data-kind='error'] { color: #9b3d22; }
+
+  @media (max-width: 560px) {
+    .fld { min-width: 0; width: 100%; }
+    .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .stats div { padding: 9px 10px; }
+    .stats dt { font-size: 11px; letter-spacing: 0; }
+    .stats dd { font-size: 18px; }
+  }
+</style>

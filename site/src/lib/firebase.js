@@ -1,5 +1,5 @@
-// Firebase sign-in, used only by /account/ and /contribute/ (no other page
-// loads Firebase). Same Firebase project as the Shiny app, so existing
+// Firebase sign-in, used only by /account/, /contribute/ and /admin/ (no other
+// page loads Firebase). Same Firebase project as the Shiny app, so existing
 // accounts work. Config comes from PUBLIC_FIREBASE_* environment variables
 // (public by design; set in Netlify).
 
