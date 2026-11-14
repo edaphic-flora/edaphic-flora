@@ -1,9 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
 import CtaBand from '../components/CtaBand.astro';
-import { thresholds, meta, isSample } from '../lib/data.js';
+import { thresholds, meta, isSample, species, totals } from '../lib/data.js';
 import { CONTACT_EMAIL, GITHUB_URL } from '../config.js';
+import { COMMUNITY_FILE } from '../../netlify/lib/csv.mjs';
 const t = thresholds;
+const soilSpecies = species.filter((s) => s.sampleCount > 0).length;
 const updated = meta.generated_at
   ? new Date(meta.generated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   : null;
@@ -55,6 +57,45 @@ const updated = meta.generated_at
       <li>Texture class comes from the median sand, silt, and clay percentages, classified with the USDA soil texture triangle.</li>
       <li>Nutrient values come from different labs using different extraction methods (for example Mehlich-3 and Modified Morgan), so treat them as rough guides.</li>
     </ol>
+  </div>
+
+  <div class="narrow block" id="download">
+    <h2 class="h2s">Download the community soil data</h2>
+    <p class="lede" style="margin-top:14px">
+      We share the community soil numbers as one CSV file, with one row for each species that has at least one sample.
+      It holds the same values and sample counts shown on the species pages. Individual samples, contributors, and
+      locations stay private. The file is rebuilt with the site each week.
+    </p>
+    <p class="dl">
+      <a class="btn btn-sage btn-sm" href={`/data/${COMMUNITY_FILE}`} download>Download the CSV</a>
+      <span class="small">{soilSpecies.toLocaleString('en-US')} species, {totals.samples.toLocaleString('en-US')} samples{isSample && ' (sample data on this copy of the site)'}</span>
+    </p>
+    <p class="small">
+      Shared under <a href="https://creativecommons.org/licenses/by-nc/4.0/" rel="license noopener">CC BY-NC 4.0</a>. You may
+      use and adapt it for noncommercial work with attribution. Suggested citation: "Edaphic Flora dataset (CC BY-NC 4.0).
+      Maintained by Todd Testerman and contributors." For commercial use, email
+      <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+    </p>
+    <details class="cols">
+      <summary>What the columns mean</summary>
+      <dl>
+        <dt><code>species</code>, <code>common_name</code>, <code>family</code>, <code>page</code></dt>
+        <dd>The plant, and a link to its page on this site.</dd>
+        <dt><code>sample_count</code>, <code>contributor_count</code></dt>
+        <dd>How many samples, and from how many people, are behind the row.</dd>
+        <dt><code>ph_*</code>, <code>organic_matter_pct_*</code></dt>
+        <dd>
+          <code>_n</code> is the number of samples with that measurement and <code>_median</code> is the median.
+          <code>_p10</code> and <code>_p90</code> give the middle 80% once there are at least {t.min_range_samples} values.
+          With fewer, <code>_min</code> and <code>_max</code> are the readings themselves.
+        </dd>
+        <dt><code>texture_n</code>, <code>sand_pct</code>, <code>silt_pct</code>, <code>clay_pct</code>, <code>texture_class</code></dt>
+        <dd>Median sand, silt, and clay, scaled to add up to 100, and the USDA texture class for those values.</dd>
+        <dt><code>phosphorus_*</code>, <code>potassium_*</code>, <code>calcium_*</code>, <code>magnesium_*</code></dt>
+        <dd>The number of samples and the median in ppm. Labs use different extraction methods, so these are rough guides.</dd>
+      </dl>
+      <p class="small">A blank cell means there is no value for that species yet.</p>
+    </details>
   </div>
 
   <div class="narrow block">
@@ -130,4 +171,11 @@ const updated = meta.generated_at
   .steps strong, .cites strong { font-weight: 600; color: var(--charcoal); }
   .cites { margin: 18px 0 0; padding-left: 20px; font-weight: 300; font-size: 17px; line-height: 1.6; color: var(--ink-soft); display: flex; flex-direction: column; gap: 10px; }
   .cites a, .small a, .lede a { color: var(--sage-ink); }
+  .dl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 18px 0 12px; }
+  .cols { margin-top: 16px; font-size: 17px; color: var(--ink-soft); }
+  .cols summary { cursor: pointer; font-family: var(--f-head); font-weight: 600; font-size: 15px; color: var(--charcoal); }
+  .cols dl { margin: 12px 0 0; display: grid; gap: 4px; }
+  .cols dt { margin-top: 10px; }
+  .cols dd { margin: 2px 0 0; font-weight: 300; line-height: 1.55; }
+  .cols code { font-family: var(--f-data); font-size: 14px; }
 </style>

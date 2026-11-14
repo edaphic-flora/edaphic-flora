@@ -88,6 +88,10 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
       <p class="small" id="remaining"></p>
       <p class="small">New samples show up on species pages after the weekly site refresh.</p>
       <div id="samples" class="samples"></div>
+      <p id="dl-row" class="dl-row" hidden>
+        <button type="button" id="dl-btn" class="btn btn-sage btn-sm">Download my samples (CSV)</button>
+        <span class="small">Every value you entered, including your location and notes. Up to 10 downloads a day.</span>
+      </p>
     </section>
 
     <p id="msg" class="msg" role="status" aria-live="polite"></p>
@@ -97,7 +101,7 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
 <script>
   import {
     signInConfigured, watchUser, needsVerification, signInWithGoogle, signInWithEmail, createAccount,
-    resendVerification, resetPassword, signOut, refreshUser, api, authMessage, safeNext,
+    resendVerification, resetPassword, signOut, refreshUser, api, apiDownload, authMessage, safeNext,
   } from '../lib/firebase.js';
 
   const $ = (id) => document.getElementById(id);
@@ -178,6 +182,7 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     const box = $('samples');
     box.replaceChildren();
     if (!list.length) {
+      $('dl-row').hidden = true;
       const p = document.createElement('p');
       p.className = 'empty';
       p.textContent = "You haven't added any soil tests yet.";
@@ -232,7 +237,20 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     $('remaining').textContent = me.data.disabled ? '' : `You can add ${n} more ${n === 1 ? 'sample' : 'samples'} today.`;
     if (list.ok) renderSamples(list.data.samples || []);
     else say(list.data?.error || 'Could not load your samples.', 'error');
+    $('dl-row').hidden = !!me.data.disabled || !list.ok || !(list.data.samples || []).length;
   }
+
+  // ---- download my samples (CSV)
+  $('dl-btn').addEventListener('click', async () => {
+    $('dl-btn').disabled = true;
+    say('Preparing your download…');
+    const r = await apiDownload('/api/export/my-samples', 'edaphic-flora-my-samples.csv');
+    $('dl-btn').disabled = false;
+    if (!r.ok) return say(r.data?.error || 'Could not download your samples. Please try again.', 'error');
+    const n = Number(r.headers.get('x-row-count'));
+    const left = Number(r.headers.get('x-exports-left'));
+    say(`Downloaded ${n} ${n === 1 ? 'sample' : 'samples'}. You can download ${left} more ${left === 1 ? 'time' : 'times'} today.`);
+  });
 
   if (!signInConfigured) show('st-off', 'Sign in');
 
@@ -382,6 +400,7 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
   .samples :global(.empty) { color: var(--bark); }
   .samples :global(.del-ask) { white-space: nowrap; font-size: 15px; }
   .samples :global(.danger) { color: #9b3d22; }
+  .dl-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 18px; }
   .msg { margin-top: 18px; min-height: 1.4em; font-size: 17px; }
   .msg[data-kind='error'] { color: #9b3d22; }
 </style>
