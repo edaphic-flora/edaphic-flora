@@ -14,7 +14,9 @@ site/
 ├── scripts/fetch-photos.mjs finds photos on iNaturalist / Wikimedia, saves them to Neon
 ├── sql/contribute.sql      sign-in + submit: reference tables, site_api functions, site_writer role
 ├── sql/export.sql          "Download my samples (CSV)": site_api.export_my_samples
-├── netlify/functions/      lookup.mjs (species search, zip), api.mjs (signed-in submit), export.mjs (my samples CSV)
+├── sql/admin.sql           moderation: admin_api functions, site_admin role, site_admins list
+├── netlify/functions/      lookup.mjs (species search, zip), api.mjs (signed-in submit), export.mjs (my samples CSV),
+│                           admin.mjs (/admin/ moderation, admins only)
 ├── netlify/lib/            token check, validation, texture (shared with the contribute page)
 ├── test/                   `npm test` unit tests; test/db/ checks the database functions
 ├── public/                 logos, favicon, og image, robots.txt
@@ -115,6 +117,54 @@ from the repo root, `Rscript site/test/db/contribute_functions_test.R` and `Rscr
 (database functions, run in a transaction that is rolled back; the export test applies `sql/export.sql` inside it).
 Locally, `npx netlify dev` from `site/` serves the site and the functions on http://localhost:8888.
 
+## Moderating (/admin/)
+
+`/admin/` is the site's version of the app's Admin tab. It isn't linked from any page and isn't indexed. Sign in on
+`/account/` with an admin account, then open `edaphicflora.org/admin/` (or `dev--edaphicflora.netlify.app/admin/`).
+
+- **Samples**: newest first, with notes and flag state. Search by plant, notes or `#id`, or show one contributor or
+  only flagged samples. **Flag** (optional reason) or **Unflag**.
+- **Contributors**: everyone with samples, with counts. **Flag all** flags every unflagged sample from one person
+  (existing reasons are kept). **Disable** stops new samples and report reading; tick the box to also flag their
+  samples, so they stay hidden if the account is re-enabled. You can't disable yourself.
+- **Disabled accounts**: who, when, by whom and why. **Re-enable** lets them contribute again; flags stay.
+- **Audit log**: every change, newest first. Filter by action; search by user id, record id or text.
+
+Flagged samples and every sample from a disabled account drop out of the `public_site` views, so they leave species
+pages at the next weekly rebuild (run the build hook to do it sooner). The contributor sees "flagged for review" on
+`/account/` straight away. Nothing deletes or edits a sample, and every change writes an `audit_log` row as the app
+did (`flag`, `unflag`, `bulk_flag`, `disable_user`, `enable_user`, with the admin's contributor id).
+
+**Who is an admin:** a verified sign-in whose email is in both lists, like the app's "Polished admin and
+`ADMIN_EMAILS`" rule:
+
+1. `ADMIN_EMAILS` in Netlify (comma-separated, any case). `netlify/functions/admin.mjs` checks it before it opens a
+   database connection; everyone else gets a 403.
+2. The `site_admins` table, checked again by every `admin_api` function in `sql/admin.sql`.
+
+The function connects as `site_admin`, its own login that can only call `admin_api` functions (no table access, no
+emails or locations returned). It is kept apart from `site_writer` on purpose: every signed-in request uses the
+`site_writer` string, and Netlify's free plan shows every variable to builds, so that string leaking must never allow
+moderation. To add or remove an admin, change both lists.
+
+**Setup** (once per Neon branch, dev first):
+
+1. Run `sql/admin.sql` as the database owner, after `contribute.sql`.
+2. Create the `site_admin` login and add your email to `site_admins` (SQL at the bottom of `admin.sql`), then run
+   `admin.sql` once more so it grants `site_admin` its rights.
+3. In Netlify, add `SITE_ADMIN_DATABASE_URL` (the `site_admin` connection string; the `dev` branch deploy can point at
+   the Neon dev branch) and `ADMIN_EMAILS`.
+
+Before that, or without the page, moderate with SQL in Neon as the owner and add the `audit_log` row yourself:
+`UPDATE soil_samples SET flagged = TRUE, flag_reason = '...' WHERE id = ...;` to flag,
+`INSERT INTO disabled_users (user_id, disabled_by, reason) VALUES (...);` to disable, and
+`DELETE FROM disabled_users WHERE user_id = '...';` to re-enable.
+
+Tests: `npm test` includes `test/admin.test.mjs` (the `ADMIN_EMAILS` check, refusal before the database, request
+checks). From the repo root, `Rscript site/test/db/admin_functions_test.R` loads `admin.sql` inside a transaction
+that is rolled back and checks every function as a role with `site_admin`'s rights, so it works on a branch where
+`admin.sql` hasn't been run yet.
+
 ## One-time setup
 
 **Neon**
@@ -144,6 +194,8 @@ Locally, `npx netlify dev` from `site/` serves the site and the functions on htt
    `PUBLIC_FIREBASE_API_KEY`, `PUBLIC_FIREBASE_AUTH_DOMAIN` and `PUBLIC_FIREBASE_PROJECT_ID` (the app's
    `FIREBASE_*` values; public by design). In Firebase > Authentication > Settings > Authorized domains, add
    `edaphicflora.org`, `www.edaphicflora.org` and `dev--edaphicflora.netlify.app`.
+8. Moderation: run `sql/admin.sql`, create the `site_admin` login, add yourself to `site_admins`, and add
+   `SITE_ADMIN_DATABASE_URL` and `ADMIN_EMAILS` in Netlify (details under "Moderating" above).
 
 ## Everyday workflow
 
