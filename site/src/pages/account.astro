@@ -81,6 +81,11 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
         <p id="home-msg" class="small" role="status" aria-live="polite"></p>
       </section>
 
+      <a href="/my-garden/" class="card pad garden-link">
+        <span class="h3">My garden</span>
+        <span class="small">See which moths, butterflies, specialist bees and birds your plants support, and what to plant next. →</span>
+      </a>
+
       <div class="head-row">
         <h2 class="h3">Your soil tests</h2>
         <a href="/contribute/" id="add-btn" class="btn btn-gold btn-sm">Add a soil test</a>
@@ -389,6 +394,8 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
   .who { margin-top: 14px; }
   .note { margin-top: 16px; padding: 14px 16px; border-radius: 10px; background: rgba(211, 155, 53, 0.16); color: var(--charcoal); }
   .home-loc { margin-top: 22px; }
+  .garden-link { display: grid; gap: 4px; margin-top: 14px; text-decoration: none; color: inherit; }
+  .garden-link:hover { border-color: var(--sage); }
   .loc-row { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin-top: 12px; }
   .loc-row .fld { margin-bottom: 0; min-width: 180px; }
   .loc-row .input, .loc-row .select { font-size: 17px; padding: 11px 13px; }

@@ -1,0 +1,571 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base
+  title="My garden"
+  description="See which moths, butterflies, specialist bees and birds the plants in your soil tests can support."
+  active="account"
+  noindex
+>
+  <div class="wrap mg">
+    <span class="eyebrow">Your account</span>
+    <h1 class="h1">My garden</h1>
+    <p class="lede">The moths, butterflies, specialist bees and birds that the plants in your soil tests can support.</p>
+
+    <div id="gate" class="card pad gate">
+      <p id="gate-text">Loading…</p>
+      <a id="gate-link" class="btn btn-gold" href="/account/?next=/my-garden/" hidden>Sign in to continue</a>
+    </div>
+
+    <div id="garden" hidden>
+      <p id="scope" class="scope"></p>
+      <div class="layout">
+        <aside class="card pad plants" aria-labelledby="plants-h">
+          <h2 class="h3" id="plants-h">Your plants</h2>
+          <p class="plant-count"><span id="n-plants" class="mono"></span> species</p>
+          <div id="plant-list" class="plant-list"></div>
+          <div id="nonnative"></div>
+          <a href="/contribute/" class="btn btn-gold btn-sm full add">Add a soil test</a>
+          <p class="small aside-note">Your garden is every plant in your soil tests. You can remove samples on <a href="/account/">your account page</a>.</p>
+        </aside>
+
+        <div class="main">
+          <p id="low" class="note" hidden>Add more plants to see a fuller picture of what your garden supports.</p>
+          <div class="hero">
+            <span id="supported" class="hero-n mono"></span>
+            <span class="hero-t">wildlife species supported by your garden</span>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Wildlife groups" id="tabs"></div>
+          <div id="panels"></div>
+
+          <section class="card pad sources" aria-labelledby="src-h">
+            <h2 class="h3" id="src-h">Sources and methods</h2>
+            <ul>
+              <li><strong>Moths and butterflies:</strong> caterpillar host plants adapted from Tallamy and Shropshire (2009), Tallamy et al. (2020) and the National Wildlife Federation's Native Plant Finder.</li>
+              <li><strong>Specialist bees:</strong> adapted from Fowler (2016) and Jarrod Fowler's specialist bee lists.</li>
+              <li><strong>Birds:</strong> adapted from Audubon's Plants for Birds and Tallamy (2021), <em>The Nature of Oaks</em>.</li>
+              <li id="src-occ" hidden><strong>Wildlife by state:</strong> butterfly, moth and bee records from <a href="https://www.gbif.org" rel="noopener" target="_blank">GBIF.org</a> (CC BY); bird records from <a href="https://ebird.org" rel="noopener" target="_blank">eBird</a> (Cornell Lab of Ornithology).</li>
+            </ul>
+            <p><strong>How plants count.</strong> Native plants, and plants with no record in your state, count at the genus level, because host plant records are mostly kept by genus. Introduced plants count only wildlife recorded on that exact species. Invasive plants don't count.</p>
+            <p id="src-geo"></p>
+            <p class="small">Wildlife data curated by Edaphic Flora. Not for redistribution.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  </div>
+</Base>
+
+<script>
+  import { signInConfigured, watchUser, needsVerification, api } from '../lib/firebase.js';
+  import {
+    GROUPS, LIFE_FORMS, familyLabel, familyBlurb, familyLinks, genusLabel, meterPercent, donutDash,
+    plantName, groupPlants, introducedSupport, recTitle,
+  } from '../lib/garden.js';
+  import { titleCaseCommon } from '../lib/names.js';
+  import { STATE_NAME } from '../data/states.js';
+  import invasiveUrls from '../data/state-invasive-urls.json';
+
+  const $ = (id) => document.getElementById(id);
+  const SVG = 'http://www.w3.org/2000/svg';
+
+  // Small DOM builder: strings become text nodes, never HTML
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else el.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid);
+    return el;
+  }
+  function s(tag, attrs) {
+    const el = document.createElementNS(SVG, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    return el;
+  }
+  const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+  const listText = (items) =>
+    items.length <= 2 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
+  function gate(text, linkText, href) {
+    $('gate').hidden = false;
+    $('garden').hidden = true;
+    $('gate-text').textContent = text;
+    $('gate-link').hidden = !linkText;
+    if (linkText) {
+      $('gate-link').textContent = linkText;
+      $('gate-link').href = href;
+    }
+  }
+
+  // ---------- charts
+  // A ring for one ratio: covered out of total, the figure in the middle
+  function donut(covered, total, size, label) {
+    const r = 46;
+    const svg = s('svg', { viewBox: '0 0 120 120', width: size, height: size, role: 'img', 'aria-label': label, class: 'ring' });
+    svg.append(
+      s('circle', { cx: 60, cy: 60, r, class: 'ring-track' }),
+      s('circle', { cx: 60, cy: 60, r, class: 'ring-fill', 'stroke-dasharray': donutDash(covered, total, r), transform: 'rotate(-90 60 60)' }),
+    );
+    const big = s('text', { x: 60, y: 62, class: 'ring-n', 'text-anchor': 'middle' });
+    big.textContent = fmt(covered);
+    const small = s('text', { x: 60, y: 82, class: 'ring-of', 'text-anchor': 'middle' });
+    small.textContent = `of ${fmt(total)}`;
+    svg.append(big, small);
+    return svg;
+  }
+
+  // A thin bar for one ratio in a list of them
+  function meter(covered, total, label) {
+    const fill = h('span');
+    fill.style.width = `${meterPercent(covered, total)}%`;
+    return h('div', { class: 'meter', role: 'img', 'aria-label': label }, fill);
+  }
+
+  // ---------- names
+  let speciesPages = new Map();
+  let genusNames = {};
+  let byKey = new Map();
+
+  function plantEl(species, cls) {
+    const p = byKey.get(species);
+    const name = p ? plantName(p) : species;
+    const slug = speciesPages.get(species.toLowerCase());
+    const label = h('span', { class: 'pn' }, name);
+    const sci = name !== species ? h('span', { class: 'sci' }, species) : null;
+    const inner = slug ? h('a', { href: `/species/${slug}/` }, label, sci) : h('span', {}, label, sci);
+    return h('div', { class: cls || 'plant' }, inner);
+  }
+
+  function genusText(genus) {
+    const label = genusLabel(genus, genusNames);
+    return label ? `${label} (${genus})` : `${genus} species`;
+  }
+
+  // ---------- your plants (aside)
+  function renderPlants(data) {
+    const { genera, introduced, invasive } = groupPlants(data.plants, genusNames);
+    $('n-plants').textContent = fmt(data.plants.length);
+
+    const list = $('plant-list');
+    list.replaceChildren();
+    if (!genera.length) {
+      list.append(h('p', { class: 'small' }, 'None of your plants are native here. See the lists below.'));
+    }
+    for (const g of genera) {
+      if (g.plants.length === 1) {
+        list.append(plantEl(g.plants[0].species));
+      } else {
+        list.append(h('details', { class: 'genus' },
+          h('summary', {}, h('span', { class: 'pn' }, g.label), h('span', { class: 'n' }, String(g.plants.length))),
+          g.plants.map((p) => plantEl(p.species, 'plant sub'))));
+      }
+    }
+
+    const box = $('nonnative');
+    box.replaceChildren();
+    const stateUrl = data.state ? invasiveUrls[data.state] : null;
+    if (invasive.length) {
+      box.append(h('details', { class: 'nn inv' },
+        h('summary', {}, h('span', { class: 'pill p-inv' }, 'Invasive'), h('span', { class: 'n' }, String(invasive.length))),
+        h('p', { class: 'small nn-note' }, `Listed as invasive${data.state ? ` in ${STATE_NAME[data.state] || data.state}` : ''}. These don't count toward wildlife support.`),
+        invasive.map((p) => {
+          const row = plantEl(p.species, 'plant sub');
+          row.append(h('div', { class: 'meta' }, p.federal ? 'Federal noxious weed' : p.designation || 'Invasive'));
+          if (stateUrl) row.append(h('a', { class: 'meta-link', href: stateUrl, target: '_blank', rel: 'noopener' }, 'Removal and management'));
+          return row;
+        })));
+    }
+    if (introduced.length) {
+      box.append(h('details', { class: 'nn intro' },
+        h('summary', {}, h('span', { class: 'pill p-intro' }, 'Introduced'), h('span', { class: 'n' }, String(introduced.length))),
+        h('p', { class: 'small nn-note' }, 'Introduced plants count only wildlife recorded on that exact species.'),
+        introduced.map((p) => {
+          const row = plantEl(p.species, 'plant sub');
+          row.append(h('div', { class: 'meta' }, introducedSupport(p)));
+          return row;
+        })));
+    }
+  }
+
+  // ---------- tabs
+  const TABS = [{ id: 'overview', label: 'Overview' }, ...GROUPS.map((g) => ({ id: g.id, label: g.label }))];
+  function selectTab(id, focus) {
+    for (const t of TABS) {
+      const btn = $(`tab-${t.id}`);
+      const on = t.id === id;
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      btn.tabIndex = on ? 0 : -1;
+      $(`panel-${t.id}`).hidden = !on;
+      if (on && focus) btn.focus();
+    }
+    history.replaceState(null, '', id === 'overview' ? location.pathname : `#${id}`);
+  }
+  function renderTabs() {
+    const bar = $('tabs');
+    bar.replaceChildren();
+    for (const t of TABS) {
+      const b = h('button', { type: 'button', role: 'tab', id: `tab-${t.id}`, 'aria-controls': `panel-${t.id}`, class: 'tab' }, t.label);
+      b.addEventListener('click', () => selectTab(t.id));
+      b.addEventListener('keydown', (e) => {
+        const i = TABS.findIndex((x) => x.id === t.id);
+        const j = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
+        if (j === null) return;
+        e.preventDefault();
+        selectTab(TABS[(j + TABS.length) % TABS.length].id, true);
+      });
+      bar.append(b);
+    }
+  }
+
+  // ---------- overview
+  function renderOverview(data, groups, where) {
+    const panel = h('section', { id: 'panel-overview', role: 'tabpanel', 'aria-labelledby': 'tab-overview', class: 'panel' });
+    const tiles = h('div', { class: 'tiles' });
+    for (const g of GROUPS) {
+      const d = groups[g.type] || { covered: 0, total: 0 };
+      const label = `${fmt(d.covered)} of ${fmt(d.total)} ${g.noun} species${where}`;
+      const tile = h('button', { type: 'button', class: 'tile card' },
+        donut(d.covered, d.total, 116, `Your garden supports ${label}`),
+        h('span', { class: 'tile-t' }, g.label),
+        h('span', { class: 'tile-s' }, d.total ? `${Math.round((100 * d.covered) / d.total)}% supported` : 'No records'));
+      tile.addEventListener('click', () => selectTab(g.id, true));
+      tiles.append(tile);
+    }
+    panel.append(tiles);
+
+    // Recommended additions
+    const head = h('div', { class: 'rec-head' }, h('h2', { class: 'h3' }, 'Recommended additions'));
+    panel.append(head);
+    const cats = LIFE_FORMS.filter((lf) => data.recs[lf.key]?.length);
+    if (!data.state) {
+      panel.append(h('p', { class: 'note' }, 'Save a home state on ', h('a', { href: '/account/' }, 'your account page'),
+        ' to see native plants that would add the most wildlife.'));
+      return panel;
+    }
+    if (!cats.length) {
+      panel.append(h('p', { class: 'small' }, 'No more recommendations: your garden already has every native genus we have wildlife records for.'));
+      return panel;
+    }
+    const sel = h('select', { class: 'select', id: 'lf', 'aria-label': 'Plant type' }, cats.map((c) => h('option', { value: c.key }, c.label)));
+    head.append(sel);
+    const stateName = STATE_NAME[data.state] || data.state;
+    panel.append(h('p', { class: 'small rec-intro' },
+      `Plant genera native to ${stateName}, ranked by how many wildlife species they would add that your garden doesn't support yet. Open one to see its native species.`));
+    const ol = h('ol', { class: 'recs' });
+    panel.append(ol);
+    const draw = () => {
+      ol.replaceChildren(...(data.recs[sel.value] || []).map((r) => recItem(r, stateName)));
+    };
+    sel.addEventListener('change', draw);
+    draw();
+    return panel;
+  }
+
+  function recItem(r, stateName) {
+    const split = [
+      r.lep && `${fmt(r.lep)} ${r.lep === 1 ? 'moth or butterfly' : 'moths and butterflies'}`,
+      r.bee && `${fmt(r.bee)} ${r.bee === 1 ? 'bee' : 'bees'}`,
+      r.bird && `${fmt(r.bird)} ${r.bird === 1 ? 'bird' : 'birds'}`,
+    ].filter(Boolean);
+    const title = recTitle(r, genusNames);
+    const natives = r.natives || [];
+    const body = h('div', { class: 'rec-body' },
+      h('p', { class: 'small' }, h('strong', {}, `${fmt(r.native_count)} ${r.genus} species native to ${stateName}`),
+        r.native_count > natives.length ? ` (showing ${natives.length})` : ''),
+      h('ul', { class: 'natives' }, natives.map((n) => {
+        const slug = speciesPages.get(n.species.toLowerCase());
+        const cn = titleCaseCommon(n.common_name);
+        const inner = [cn ? h('span', { class: 'pn' }, cn) : null, h('span', { class: 'sci' }, n.species)];
+        return h('li', {}, slug ? h('a', { href: `/species/${slug}/` }, inner) : inner);
+      })));
+    return h('li', {}, h('details', { class: 'rec card' },
+      h('summary', {},
+        h('span', { class: 'rec-main' },
+          h('span', { class: 'rec-title' }, title),
+          r.life_form ? h('span', { class: 'pill p-lf' }, r.life_form) : null,
+          r.keystone ? h('span', { class: 'pill p-key' }, 'Keystone genus') : null,
+          h('span', { class: 'sci rec-genus' }, r.genus)),
+        h('span', { class: 'rec-n' },
+          h('span', { class: 'mono plus' }, `+${fmt(r.total)}`), ' wildlife species',
+          split.length ? h('span', { class: 'rec-split' }, listText(split)) : null)),
+      body));
+  }
+
+  // ---------- one wildlife group
+  function familyRow(f) {
+    const label = familyLabel(f.family);
+    const blurb = familyBlurb(f.family);
+    const links = familyLinks(f.family);
+    const names = f.plants.map((sp) => (byKey.get(sp) ? plantName(byKey.get(sp)) : sp)).sort((a, b) => a.localeCompare(b));
+    const shown = names.slice(0, 6);
+    const yours = names.length > 6 ? `${shown.join(', ')} and ${names.length - 6} more` : listText(shown);
+    return h('li', { class: 'fam' },
+      h('div', { class: 'fam-head' },
+        h('span', { class: 'fam-name' },
+          h('a', { href: links.wikipedia, target: '_blank', rel: 'noopener' }, label),
+          label !== f.family ? h('span', { class: 'sci' }, f.family) : null),
+        h('span', { class: 'fig mono' }, `${fmt(f.covered)} / ${fmt(f.total)}`)),
+      meter(f.covered, f.total, `${fmt(f.covered)} of ${fmt(f.total)} ${label} supported`),
+      blurb ? h('p', { class: 'blurb' }, blurb) : null,
+      names.length ? h('p', { class: 'who' }, h('strong', {}, 'Your plants: '), yours) : null,
+      f.add.length ? h('p', { class: 'who' }, h('strong', {}, 'Plants to add: '), listText(f.add.map(genusText))) : null,
+      h('a', { class: 'photos', href: links.inaturalist, target: '_blank', rel: 'noopener' }, 'Photos on iNaturalist'));
+  }
+
+  function renderGroup(g, d, where) {
+    const panel = h('section', { id: `panel-${g.id}`, role: 'tabpanel', 'aria-labelledby': `tab-${g.id}`, class: 'panel', hidden: true });
+    if (!d || !d.total) {
+      panel.append(h('p', { class: 'small' }, `No ${g.noun} records${where}.`));
+      return panel;
+    }
+    const fams = d.families.filter((f) => f.total > 0);
+    const supported = fams.filter((f) => f.covered > 0);
+    const rest = fams.filter((f) => f.covered === 0);
+    panel.append(h('div', { class: 'group-head' },
+      donut(d.covered, d.total, 132, `Your garden supports ${fmt(d.covered)} of ${fmt(d.total)} ${g.noun} species${where}`),
+      h('div', {},
+        h('p', { class: 'group-t' }, h('span', { class: 'mono' }, fmt(d.covered)), ` of ${fmt(d.total)} ${g.noun} species${where} are supported by your garden.`),
+        h('p', { class: 'small' }, `${supported.length} of ${fams.length} families. Family names link to Wikipedia.`))));
+    if (supported.length) panel.append(h('ul', { class: 'fams' }, supported.map(familyRow)));
+    else panel.append(h('p', { class: 'note' }, `None of your plants support ${g.label.toLowerCase()} yet. The families below show plants that would.`));
+    if (rest.length) {
+      const det = h('details', { class: 'rest', open: supported.length ? null : true },
+        h('summary', {}, `${rest.length} ${rest.length === 1 ? 'family' : 'families'} your plants don't support yet`),
+        h('ul', { class: 'fams' }, rest.map(familyRow)));
+      panel.append(det);
+    }
+    return panel;
+  }
+
+  // ---------- page
+  function render(data) {
+    genusNames = data.genus_names || {};
+    byKey = new Map(data.plants.map((p) => [p.species, p]));
+    const stateName = data.state ? STATE_NAME[data.state] || data.state : null;
+    const where = data.state_filtered ? ` recorded in ${stateName}` : '';
+
+    const scope = $('scope');
+    scope.replaceChildren();
+    if (data.state_filtered) {
+      scope.append(`Counting wildlife recorded in ${stateName}. `, h('a', { href: '/account/' }, 'Change your home state'));
+    } else if (data.state) {
+      scope.append(`There aren't enough wildlife records for ${stateName} yet, so totals count every species in our data. Plant recommendations are for ${stateName}. `,
+        h('a', { href: '/account/' }, 'Change your home state'));
+    } else {
+      scope.append('Counting every species in our data. ', h('a', { href: '/account/' }, 'Save a home state'),
+        ' to count only wildlife recorded there and to get plant recommendations.');
+    }
+    $('src-occ').hidden = !data.state_filtered;
+    $('src-geo').textContent = data.state_filtered
+      ? `Totals count only species recorded in ${stateName} in GBIF and eBird occurrence records. Plant and wildlife records are strongest for the eastern US, so western states may show lower numbers.`
+      : 'Totals count every species in the data, which comes mostly from eastern US research.';
+
+    if (!data.plants.length) {
+      gate('Your garden is empty. Add a soil test with the plants growing in it, and this page shows the wildlife they support.',
+        'Add a soil test', '/contribute/');
+      return;
+    }
+
+    renderPlants(data);
+    $('low').hidden = data.plants.length > 2;
+    $('supported').textContent = fmt(data.supported);
+
+    const groups = Object.fromEntries((data.groups || []).map((g) => [g.type, g]));
+    renderTabs();
+    const panels = $('panels');
+    panels.replaceChildren(renderOverview(data, groups, where), ...GROUPS.map((g) => renderGroup(g, groups[g.type], where)));
+    const fromHash = TABS.find((t) => `#${t.id}` === location.hash);
+    selectTab(fromHash ? fromHash.id : 'overview');
+
+    $('gate').hidden = true;
+    $('garden').hidden = false;
+  }
+
+  async function speciesIndex() {
+    try {
+      const r = await fetch('/species-index.json');
+      if (!r.ok) return new Map();
+      const rows = await r.json();
+      return new Map(rows.map((x) => [String(x.n).toLowerCase(), x.s]));
+    } catch {
+      return new Map();
+    }
+  }
+
+  const here = `/my-garden/${location.hash}`;
+  if (!signInConfigured) gate("My Garden isn't available on this copy of the site yet.");
+  watchUser(async (user) => {
+    if (!signInConfigured) return;
+    if (!user) return gate('Sign in to see what wildlife your plants support.', 'Sign in to continue', `/account/?next=${encodeURIComponent(here)}`);
+    if (needsVerification(user)) return gate('Please confirm your email address first.', 'Go to your account', `/account/?next=${encodeURIComponent(here)}`);
+    gate('Loading your garden…');
+    const [res, pages] = await Promise.all([api('/api/garden'), speciesIndex()]);
+    if (!res.ok) return gate(res.data?.error || 'Could not load your garden. Please reload the page.');
+    speciesPages = pages;
+    render(res.data);
+  });
+
+  // `npm run dev` only (removed from builds): show a saved site_api.my_garden
+  // result without signing in, e.g. __gardenPreview(await (await fetch(url)).json())
+  if (import.meta.env.DEV) {
+    window.__gardenPreview = async (data) => {
+      speciesPages = await speciesIndex();
+      render(data);
+    };
+  }
+</script>
+
+<style>
+  .mg { padding-top: clamp(40px, 6vw, 72px); padding-bottom: 40px; }
+  .mg h1 { margin-top: 10px; }
+  .mg .lede { margin-top: 14px; max-width: 720px; }
+  .gate { margin-top: 22px; max-width: 620px; display: grid; gap: 14px; justify-items: start; }
+  .scope { margin-top: 18px; font-size: 16px; color: var(--ink-soft); }
+  .scope :global(a), .aside-note a, .mg :global(.note a) { color: var(--sage-ink); font-weight: 600; }
+  .layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 26px; margin-top: 18px; align-items: start; }
+  .full { width: 100%; }
+
+  /* ---- your plants */
+  .plant-count { margin-top: 6px; color: var(--bark); }
+  .plant-count .mono { font-size: 30px; font-weight: 500; color: var(--charcoal); }
+  .plant-list { margin-top: 12px; max-height: 420px; overflow-y: auto; border-top: 1px solid var(--line); }
+  .plants :global(.plant) { padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.3; }
+  .plants :global(.plant.sub) { padding-left: 14px; font-size: 15px; }
+  .plants :global(.plant a) { text-decoration: none; color: inherit; }
+  .plants :global(.plant a:hover .pn) { text-decoration: underline; text-underline-offset: 3px; }
+  .plants :global(.pn) { display: block; }
+  .plants :global(.sci) { display: block; font-size: 12px; color: var(--ink-muted); margin-top: 1px; }
+  .plants :global(details > summary) {
+    display: flex; align-items: center; gap: 8px; padding: 8px 2px; cursor: pointer; list-style: none;
+    border-bottom: 1px solid var(--line); font-family: var(--f-head); font-weight: 600; font-size: 14px;
+  }
+  .plants :global(details > summary::-webkit-details-marker) { display: none; }
+  .plants :global(details > summary::before) {
+    content: ''; width: 7px; height: 7px; border-right: 2px solid var(--sage-ink); border-bottom: 2px solid var(--sage-ink);
+    transform: rotate(-45deg); transition: transform 0.15s ease; flex-shrink: 0; margin-right: 2px;
+  }
+  .plants :global(details[open] > summary::before) { transform: rotate(45deg); }
+  .plants :global(summary .n) {
+    margin-left: auto; font-family: var(--f-data); font-weight: 400; font-size: 12px; color: var(--bark);
+    background: var(--sand); border-radius: 10px; padding: 1px 8px;
+  }
+  .plants :global(.genus .pn) { display: inline; }
+  #nonnative { margin-top: 10px; }
+  .plants :global(.nn > summary) { border-bottom: 1px solid var(--line); }
+  .plants :global(.nn-note) { margin: 8px 0 4px; font-size: 14px; }
+  .plants :global(.meta) { font-size: 13.5px; color: var(--bark); margin-top: 3px; }
+  .plants :global(.meta-link) { display: inline-block; font-family: var(--f-head); font-size: 12.5px; font-weight: 600; color: var(--gold-ink); margin-top: 3px; }
+  .mg :global(.p-inv) { background: var(--gold); color: var(--charcoal); }
+  .mg :global(.p-intro) { background: var(--brown); color: var(--limestone); }
+  .mg :global(.p-lf) { background: var(--sand); color: var(--charcoal); }
+  .mg :global(.p-key) { background: rgba(211, 155, 53, 0.18); color: var(--gold-deep); }
+  .add { margin-top: 18px; }
+  .aside-note { margin-top: 12px; font-size: 14px; }
+
+  /* ---- main */
+  .mg :global(.note) { padding: 13px 16px; border-radius: 10px; background: rgba(211, 155, 53, 0.14); color: var(--charcoal); font-size: 16px; margin-bottom: 16px; }
+  .hero { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 4px 0 6px; }
+  .hero-n { font-size: clamp(48px, 7vw, 64px); font-weight: 500; line-height: 1; color: var(--sage-ink); }
+  .hero-t { font-family: var(--f-head); font-weight: 600; font-size: 17px; }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0 18px; }
+  .tabs :global(.tab) {
+    font-family: var(--f-head); font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 20px;
+    border: 1px solid var(--line-strong); background: var(--paper); color: var(--charcoal); cursor: pointer;
+  }
+  .tabs :global(.tab:hover) { border-color: var(--sage); }
+  .tabs :global(.tab[aria-selected='true']) { background: var(--charcoal); border-color: var(--charcoal); color: var(--limestone); }
+
+  /* rings and meters */
+  .mg :global(.ring) { display: block; }
+  .mg :global(.ring-track) { fill: none; stroke: #dfe6dc; stroke-width: 14; }
+  .mg :global(.ring-fill) { fill: none; stroke: var(--sage); stroke-width: 14; }
+  .mg :global(.ring-n) { font-family: var(--f-data); font-size: 25px; font-weight: 500; fill: var(--charcoal); }
+  .mg :global(.ring-of) { font-family: var(--f-data); font-size: 12px; fill: var(--bark); }
+  .mg :global(.meter) { height: 8px; border-radius: 4px; background: #dfe6dc; overflow: hidden; margin-top: 8px; }
+  .mg :global(.meter > span) { display: block; height: 100%; border-radius: 4px; background: var(--sage); }
+
+  #panels :global(.panel) { min-width: 0; }
+  #panels :global(.tiles) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  #panels :global(.tile) {
+    display: grid; justify-items: center; gap: 6px; padding: 16px 10px 14px; cursor: pointer;
+    font: inherit; color: inherit; transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  #panels :global(.tile:hover) { box-shadow: 0 10px 24px rgba(55, 61, 60, 0.1); transform: translateY(-2px); }
+  #panels :global(.tile-t) { font-family: var(--f-head); font-weight: 600; font-size: 15px; margin-top: 4px; }
+  #panels :global(.tile-s) { font-size: 14px; color: var(--bark); }
+
+  #panels :global(.rec-head) { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+  #panels :global(.rec-head .select) { padding: 10px 14px; }
+  #panels :global(.rec-intro) { margin: 8px 0 14px; }
+  #panels :global(.recs) { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  #panels :global(.rec > summary) {
+    display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; padding: 14px 18px;
+    cursor: pointer; list-style: none;
+  }
+  #panels :global(.rec > summary::-webkit-details-marker) { display: none; }
+  #panels :global(.rec-main) { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  #panels :global(.rec-main::before) {
+    content: ''; width: 7px; height: 7px; border-right: 2px solid var(--sage-ink); border-bottom: 2px solid var(--sage-ink);
+    transform: rotate(-45deg); transition: transform 0.15s ease; margin-right: 4px;
+  }
+  #panels :global(.rec[open] .rec-main::before) { transform: rotate(45deg); }
+  #panels :global(.rec-title) { font-family: var(--f-head); font-weight: 600; font-size: 17px; }
+  #panels :global(.rec-genus) { flex-basis: 100%; font-size: 13px; color: var(--ink-muted); padding-left: 15px; }
+  #panels :global(.rec-n) { text-align: right; font-size: 15px; color: var(--ink-soft); min-width: 190px; }
+  #panels :global(.plus) { font-size: 18px; font-weight: 500; color: var(--sage-ink); }
+  #panels :global(.rec-split) { display: block; font-size: 13.5px; color: var(--bark); }
+  #panels :global(.rec-body) { padding: 0 18px 16px 33px; border-top: 1px solid var(--line); padding-top: 12px; }
+  #panels :global(.natives) { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 18px; }
+  #panels :global(.natives li) { padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 15.5px; line-height: 1.3; }
+  #panels :global(.natives a) { color: inherit; text-decoration: none; }
+  #panels :global(.natives a:hover .pn), #panels :global(.natives a:hover .sci) { text-decoration: underline; }
+  #panels :global(.natives .pn) { display: block; color: var(--sage-ink); font-weight: 600; }
+  #panels :global(.natives .sci) { font-size: 12.5px; color: var(--ink-muted); }
+
+  #panels :global(.group-head) { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  #panels :global(.group-t) { font-family: var(--f-head); font-weight: 600; font-size: 18px; line-height: 1.35; max-width: 460px; }
+  #panels :global(.group-t .mono) { color: var(--sage-ink); }
+  #panels :global(.group-head .small) { margin-top: 6px; }
+  #panels :global(.fams) { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  #panels :global(.fam) { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  #panels :global(.fam-head) { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  #panels :global(.fam-name a) { font-family: var(--f-head); font-weight: 600; font-size: 15.5px; color: var(--charcoal); text-decoration: none; }
+  #panels :global(.fam-name a:hover) { text-decoration: underline; text-underline-offset: 3px; }
+  #panels :global(.fam-name .sci) { display: block; font-size: 12px; color: var(--ink-muted); margin-top: 1px; }
+  #panels :global(.fig) { font-size: 14px; white-space: nowrap; }
+  #panels :global(.blurb) { font-size: 14.5px; color: var(--bark); font-style: italic; margin-top: 8px; line-height: 1.35; }
+  #panels :global(.who) { font-size: 15px; margin-top: 6px; line-height: 1.4; }
+  #panels :global(.who strong) { font-family: var(--f-head); font-size: 12.5px; font-weight: 600; }
+  #panels :global(.photos) { display: inline-block; margin-top: 8px; font-family: var(--f-head); font-weight: 600; font-size: 12.5px; color: var(--sage-ink); }
+  #panels :global(.rest) { margin-top: 18px; }
+  #panels :global(.rest > summary) { cursor: pointer; font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--sage-ink); margin-bottom: 12px; }
+
+  .sources { margin-top: 34px; font-size: 15.5px; line-height: 1.5; color: var(--ink-soft); }
+  .sources ul { margin: 10px 0 12px; padding-left: 20px; display: grid; gap: 4px; }
+  .sources p { margin-top: 8px; }
+  .sources a { color: var(--sage-ink); }
+  .msg { margin-top: 18px; min-height: 1.4em; font-size: 17px; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .plants { order: 2; }
+    .plant-list { max-height: 320px; }
+    #panels :global(.tiles) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    #panels :global(.rec > summary) { flex-direction: column; }
+    #panels :global(.rec-n) { text-align: left; min-width: 0; padding-left: 15px; }
+    #panels :global(.rec-body) { padding-left: 18px; }
+    #panels :global(.fams) { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #panels :global(.tile), #panels :global(.tile:hover) { transition: none; transform: none; }
+  }
+</style>
