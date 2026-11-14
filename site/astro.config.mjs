@@ -12,7 +12,8 @@ export default defineConfig({
   vite: { build: { assetsInlineLimit: 0 } },
   integrations: [
     sitemap({
-      filter: (page) => !page.includes('/404') && !page.includes('/account/') && !page.includes('/admin/'),
+      filter: (page) =>
+        !page.includes('/404') && !page.includes('/account/') && !page.includes('/admin/') && !page.includes('/my-garden/'),
     }),
   ],
 });

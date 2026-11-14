@@ -94,6 +94,8 @@ Supplementary invasive species distribution data used to enhance state-level cov
 
 The public site publishes only per-plant counts and highlight flags (moth and butterfly species count, specialist bee count, songbird value, bird food, keystone genus, hummingbird plant) through the `public_site.wildlife_*` views in `site/sql/public_views.sql`. Interaction lists and wildlife species names are not published.
 
+Signed-in people also see My Garden (`/my-garden/`, `site/sql/garden.sql`): for the plants in their own soil tests, how many wildlife species per group and per family those plants support, filtered to their home state with the GBIF and eBird occurrence data, plus native plant genera that would add the most. Like the app's dashboard, it shows counts, family names and plant names only.
+
 ## Geocoding
 
 - **Source**: OpenStreetMap via Nominatim

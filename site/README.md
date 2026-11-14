@@ -15,8 +15,9 @@ site/
 ├── sql/contribute.sql      sign-in + submit: reference tables, site_api functions, site_writer role
 ├── sql/export.sql          "Download my samples (CSV)": site_api.export_my_samples
 ├── sql/admin.sql           moderation: admin_api functions, site_admin role, site_admins list
+├── sql/garden.sql          My Garden: site_api.my_garden (wildlife counts for a signed-in person's plants)
 ├── netlify/functions/      lookup.mjs (species search, zip), api.mjs (signed-in submit), export.mjs (my samples CSV),
-│                           admin.mjs (/admin/ moderation, admins only)
+│                           admin.mjs (/admin/ moderation, admins only), garden.mjs (My Garden)
 ├── netlify/lib/            token check, validation, texture (shared with the contribute page)
 ├── test/                   `npm test` unit tests; test/db/ checks the database functions
 ├── public/                 logos, favicon, og image, robots.txt
@@ -164,6 +165,31 @@ Tests: `npm test` includes `test/admin.test.mjs` (the `ADMIN_EMAILS` check, refu
 checks). From the repo root, `Rscript site/test/db/admin_functions_test.R` loads `admin.sql` inside a transaction
 that is rolled back and checks every function as a role with `site_admin`'s rights, so it works on a branch where
 `admin.sql` hasn't been run yet.
+
+## My Garden (signed-in wildlife dashboard)
+
+`/my-garden/` (linked from `/account/`) is the Shiny app's My Garden tab on the site: which moths, butterflies,
+specialist bees and birds the plants in a person's soil tests can support. It shows a ring per group, a meter per
+family (with the person's plants that support it and up to 3 plant genera to add), their plants sorted into native,
+introduced and invasive for their home state, and up to 10 recommended plant genera native to that state per plant type.
+
+- `netlify/functions/garden.mjs` (`GET /api/garden`) checks the Firebase token, then calls `site_api.my_garden`
+  (`sql/garden.sql`) as `site_writer`. Its helpers live in a `garden_private` schema that `site_writer` can't use.
+- Same exposure as the app gave signed-in people: counts per group and family, family names, the person's own plant
+  names and plant genera. Never wildlife species names, ids, interaction lists or sources (the wildlife tables are
+  proprietary). The database test checks the output against every wildlife name and id for the state.
+- Same rules as the app: invasive plants (federal, or listed in the home state) count for nothing; native plants and
+  plants with no record in the state count at genus level; introduced plants count only wildlife recorded on that
+  exact species and aren't named under families. Totals count only wildlife recorded in the home state when it has
+  occurrence records for 50 or more species (GBIF, eBird); otherwise every species in the data.
+- Small changes from the app: "both" (native and introduced in the state) counts as native, as on species pages;
+  "+N wildlife species" on a recommendation counts only species the garden doesn't support yet; the genera to add
+  for each family are natives of the home state, like the recommendations.
+- Setup: run `sql/garden.sql` as the database owner after `sql/contribute.sql`, on the Neon dev branch, then main
+  (before merging the page to `main`). Safe to re-run.
+- Tests: `test/garden.test.mjs` (in `npm test`) and, from the repo root, `Rscript site/test/db/garden_functions_test.R`.
+- Local preview without signing in: in `npm run dev` only, the page has `window.__gardenPreview(data)`, which draws
+  a saved `site_api.my_garden` result (keep such files in the gitignored `src/data/generated/`).
 
 ## One-time setup
 
