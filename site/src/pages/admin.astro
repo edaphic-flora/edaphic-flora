@@ -37,6 +37,25 @@ import Base from '../layouts/Base.astro';
         samples or read reports. Nothing here deletes data, and every change goes in the audit log.
       </p>
 
+      <section class="site-box" aria-labelledby="site-h">
+        <h2 class="h3" id="site-h">The public site</h2>
+        <p id="new-note" class="small" hidden></p>
+        <p class="small">
+          Public pages and the data file refresh every Monday. Rebuild sooner when a flagged or deleted sample needs to
+          come off them now. A rebuild takes a few minutes; up to 8 a month, an hour apart.
+        </p>
+        <p class="small" id="site-times"></p>
+        <div class="site-row">
+          <button type="button" id="rebuild" class="btn btn-sage btn-sm">Rebuild the site now</button>
+          <button type="button" id="backup" class="btn btn-sage btn-sm">Download a backup</button>
+        </div>
+        <div id="site-ask"></div>
+        <p class="small">
+          A backup is also saved every Monday and the newest eight are kept. The file holds emails and sample
+          locations, so store it somewhere private.
+        </p>
+      </section>
+
       <div class="tabs" role="tablist" aria-label="Moderation">
         <button type="button" role="tab" id="tab-samples" aria-controls="p-samples" data-tab="samples">Samples</button>
         <button type="button" role="tab" id="tab-contributors" aria-controls="p-contributors" data-tab="contributors">Contributors</button>
@@ -89,7 +108,7 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <script>
-  import { signInConfigured, watchUser, needsVerification, signOut, api } from '../lib/firebase.js';
+  import { signInConfigured, watchUser, needsVerification, signOut, api, apiDownload } from '../lib/firebase.js';
 
   const $ = (id) => document.getElementById(id);
   const say = (text, kind = 'info') => {
@@ -170,6 +189,68 @@ import Base from '../layouts/Base.astro';
     if (!r.ok) say(r.data?.error || 'That did not work. Please try again.', 'error');
     return r;
   }
+
+  // ---- the public site: new samples since the last visit, rebuild, backup
+  const SEEN_KEY = 'ef.admin.lastSeenSample';
+  async function loadSite() {
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem(SEEN_KEY)) || 0;
+    } catch {
+      seen = 0;
+    }
+    const r = await api(`/api/admin/new?after=${seen}`);
+    if (!r.ok) return;
+    const d = r.data;
+    const note = $('new-note');
+    note.hidden = false;
+    note.textContent = !seen
+      ? 'New samples since your last visit will be counted here from now on.'
+      : d.new > 0
+        ? `${plural(d.new, 'new sample')} since your last visit (newest first in the list below).`
+        : 'No new samples since your last visit.';
+    note.classList.toggle('has-new', seen > 0 && d.new > 0);
+    $('site-times').textContent = [
+      d.last_rebuild ? `Last rebuild from this page: ${when(d.last_rebuild)}.` : 'No rebuild from this page yet.',
+      d.last_backup ? `Last backup: ${when(d.last_backup)}.` : 'No backup yet.',
+    ].join(' ');
+    try {
+      localStorage.setItem(SEEN_KEY, String(d.latest_id));
+    } catch {
+      /* private browsing: the count just starts over next time */
+    }
+  }
+
+  $('rebuild').addEventListener('click', () => {
+    const host = $('site-ask');
+    const close = () => host.replaceChildren();
+    host.replaceChildren(
+      confirmBox({
+        prompt: 'Rebuild the public site now? It takes a few minutes and counts toward the 8 a month.',
+        action: 'Rebuild',
+        onCancel: close,
+        onConfirm: async () => {
+          const r = await post('/api/admin/rebuild');
+          if (!r.ok) return false;
+          close();
+          say(`Rebuild started. The public pages update in a few minutes. ${plural(r.data.left, 'rebuild')} left this month.`);
+          loadSite();
+          return true;
+        },
+      })
+    );
+  });
+
+  $('backup').addEventListener('click', async () => {
+    const b = $('backup');
+    b.disabled = true;
+    say('Preparing the backup…');
+    const r = await apiDownload('/api/admin/backup', 'edaphic-flora-backup.json');
+    b.disabled = false;
+    if (!r.ok) return say(r.data?.error || 'The backup did not download. Please try again.', 'error');
+    say('Backup downloaded. It holds emails and locations, so keep it private.');
+    loadSite();
+  });
 
   // ---- overview numbers
   let me = null;
@@ -524,6 +605,7 @@ import Base from '../layouts/Base.astro';
       return show('st-denied');
     }
     show('st-admin');
+    loadSite();
     loaded.clear();
     const start = location.hash.slice(1);
     openTab(TABS.includes(start) ? start : 'samples');
@@ -540,6 +622,13 @@ import Base from '../layouts/Base.astro';
   .stats dt { font-family: var(--f-head); font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: var(--ink-muted); }
   .stats dd { margin: 4px 0 0; font-size: 22px; }
   .explain { margin-top: 14px; max-width: 760px; }
+  .site-box { margin-top: 22px; padding: 16px 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; max-width: 760px; }
+  .site-box p { margin-top: 8px; }
+  .site-box .has-new { color: var(--charcoal); font-weight: 600; }
+  .site-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .site-box :global(.ask) { display: grid; gap: 8px; max-width: 420px; margin-top: 12px; }
+  .site-box :global(.ask p) { font-size: 15px; margin-top: 0; }
+  .site-box :global(.ask-row) { display: flex; gap: 12px; align-items: center; }
 
   .tabs { display: flex; gap: 4px; margin-top: 26px; border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; }
   .tabs button {

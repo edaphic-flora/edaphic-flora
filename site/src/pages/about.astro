@@ -76,8 +76,8 @@ const updated = meta.generated_at
     <h2 class="h2s">Download the community soil data</h2>
     <p class="lede" style="margin-top:14px">
       We share the community soil numbers as one CSV file, with one row for each species that has at least one sample.
-      It holds the same values and sample counts shown on the species pages. Individual samples, contributors, and
-      locations stay private. The file is rebuilt with the site each week.
+      It holds the same values and sample counts shown on the species pages. Contributors, locations, sample dates, and notes
+      stay private. The file is rebuilt with the site each week.
     </p>
     <p class="dl">
       <a class="btn btn-sage btn-sm" href={`/data/${COMMUNITY_FILE}`} download>Download the CSV</a>
@@ -130,7 +130,7 @@ const updated = meta.generated_at
       <li><strong>Birds:</strong> bird and plant associations adapted from the Audubon native plants database.</li>
       <li><strong>Soil samples:</strong> contributed by Edaphic Flora users.</li>
       <li>
-        <strong>Photos:</strong> taken by <a href="https://www.inaturalist.org/" rel="noopener">iNaturalist</a> observers and
+        <strong>Photos:</strong> taken by <a href="https://www.inaturalist.org/" rel="noopener">iNaturalist</a> observers and{' '}
         <a href="https://commons.wikimedia.org/" rel="noopener">Wikimedia Commons</a> contributors and shared under Creative
         Commons licenses (CC0, CC BY, CC BY-SA, CC BY-NC, CC BY-NC-SA) or in the public domain. Each species page credits the
         photographer and license and links to the original. If one of your photos appears here and you'd like it credited
@@ -149,7 +149,7 @@ const updated = meta.generated_at
     <h2 class="h2s">Who's behind it</h2>
     <p class="lede" style="margin-top:14px">
       Edaphic Flora is an open-source project maintained by Todd Testerman, a microbiologist and ecological landscape
-      designer in Connecticut. Questions, corrections, and data partnerships are welcome at
+      designer in Connecticut. Questions, corrections, and data partnerships are welcome at{' '}
       <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
     </p>
   </div>

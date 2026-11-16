@@ -12,6 +12,10 @@
 // Species already checked are skipped. Species where nothing was found are
 // tried again after PHOTO_RECHECK_DAYS. Rows marked locked are never touched.
 //
+// Before the tiers, the site owner's own iNaturalist observations are checked:
+// a species the owner has photographed uses the owner's photo, replacing a
+// looked-up one (see lib/owner-photos.mjs). Locked rows still win.
+//
 // Environment:
 //   PHOTOS_DATABASE_URL  connection that can write ref_species_photos
 //                        (falls back to DATABASE_URL)
@@ -21,10 +25,13 @@
 //   PHOTO_LICENSES       comma list (default cc0,pd,cc-by,cc-by-sa,cc-by-nc,cc-by-nc-sa)
 //   PHOTO_DRY_RUN        "true" = list what would be looked up, change nothing
 //   PHOTO_FIXTURES       testing only: JSON file of name -> result instead of the network
+//   PHOTO_OWNER_LOGIN    iNaturalist login whose photos come first
+//                        (default toddtesterman; "none" skips this step)
 
 import fs from 'node:fs/promises';
 import pg from 'pg';
 import { makePhotoLookup, normalizeName, DEFAULT_LICENSES } from './lib/photo-lookup.mjs';
+import { fetchOwnerObservations, pickOwnerPhotos } from './lib/owner-photos.mjs';
 
 const log = (...a) => console.log('[fetch-photos]', ...a);
 const env = process.env;
@@ -34,6 +41,8 @@ const RECHECK_DAYS = Math.max(1, parseInt(env.PHOTO_RECHECK_DAYS || '90', 10));
 const LICENSES = env.PHOTO_LICENSES ? env.PHOTO_LICENSES.split(',').map((s) => s.trim()) : DEFAULT_LICENSES;
 const DRY = env.PHOTO_DRY_RUN === 'true';
 const USER_AGENT = 'EdaphicFlora/1.0 (https://edaphicflora.org; edaphicflora@gmail.com) species photo lookup';
+const OWNER_LOGIN = env.PHOTO_OWNER_LOGIN || 'toddtesterman';
+const OWNER_NAME = 'Todd Testerman';
 
 // species_reference and species_state_status scan every taxon, so each is
 // computed once (MATERIALIZED), and the state branch only runs when tiers 4
@@ -101,6 +110,46 @@ async function makeLookup() {
   };
 }
 
+// The owner's own photos first. Skipped with fixtures (no network) and never
+// fatal: if iNaturalist is unreachable the normal lookups still run.
+async function ownerPass(client) {
+  if (OWNER_LOGIN === 'none' || env.PHOTO_FIXTURES) return;
+  let picks;
+  try {
+    const observations = await fetchOwnerObservations({ login: OWNER_LOGIN, userAgent: USER_AGENT });
+    picks = pickOwnerPhotos(observations, { ownerName: OWNER_NAME });
+  } catch (err) {
+    log(`owner photos skipped: ${err.message}`);
+    return;
+  }
+  if (!picks.size) return;
+  const keys = [...picks.keys()];
+  const { rows: known } = await client.query(
+    `SELECT r.species_key, p.photo_id, coalesce(p.locked, FALSE) AS locked
+       FROM public_site.species_reference r
+       LEFT JOIN ref_species_photos p USING (species_key)
+      WHERE r.species_key = ANY($1)`,
+    [keys]
+  );
+  let changed = 0;
+  for (const row of known) {
+    const pick = picks.get(row.species_key);
+    // Hand-picked rows stay, and so does a photo that is already the owner's
+    if (row.locked || (row.photo_id && pick.photoIds.has(String(row.photo_id)))) continue;
+    changed++;
+    if (DRY) {
+      log(`  owner photo for ${row.species_key}`);
+      continue;
+    }
+    const rec = pick.record;
+    await client.query(UPSERT_SQL, [
+      row.species_key, rec.source, rec.photo_id, rec.page_url, rec.image_url, rec.large_url,
+      rec.width, rec.height, rec.license, rec.creator, rec.attribution, rec.inat_taxon_id, rec.matched_name, 0,
+    ]);
+  }
+  log(`owner photos (${OWNER_LOGIN}): ${picks.size} species photographed, ${known.length} on the site, ${changed} ${DRY ? 'would change' : 'updated'}`);
+}
+
 async function main() {
   const url = env.PHOTOS_DATABASE_URL || env.DATABASE_URL;
   if (!url) {
@@ -114,6 +163,8 @@ async function main() {
   try {
     const exists = await client.query(`SELECT to_regclass('public.ref_species_photos') AS t`);
     if (!exists.rows[0].t) throw new Error('ref_species_photos does not exist yet. Run sql/species_photos.sql first.');
+
+    await ownerPass(client);
 
     const { rows } = await client.query(CANDIDATES_SQL, [LIMIT, MAX_TIER, RECHECK_DAYS]);
     const byTier = rows.reduce((m, r) => ((m[r.tier] = (m[r.tier] || 0) + 1), m), {});

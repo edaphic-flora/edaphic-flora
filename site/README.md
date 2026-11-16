@@ -60,8 +60,23 @@ Run it locally (`npm run fetch-photos`, 400 species per run by default, about 1.
 weekly GitHub workflow do 2,500 at a time. `PHOTO_LIMIT=1000 npm run fetch-photos` changes the batch size;
 `PHOTO_DRY_RUN=true` lists what it would look up. Species with no usable photo are retried after 90 days.
 
-To use your own photo for a species, insert it with `locked = TRUE` (example at the bottom of
-`sql/species_photos.sql`); the script never replaces locked rows.
+### Your own photos come first
+
+- **From iNaturalist.** Before its normal lookups, `fetch-photos` reads the plant observations of the site owner's
+  iNaturalist account (`PHOTO_OWNER_LOGIN`, default `toddtesterman`). A species the owner has photographed uses
+  that photo in place of a looked-up one (`scripts/lib/owner-photos.mjs`: confirmed observations first, then the
+  newest). These photos need no open license; they are stored with license `arr` and credited "all rights reserved".
+- **From a file.** `node scripts/add-own-photo.mjs "Viola sororia" "C:/path/photo.jpg"` writes two web-sized
+  copies to `public/photos/own/` (640 and 1600 px wide, location and camera data stripped) and saves a locked row,
+  so nothing replaces it. Needs `DATABASE_URL` (or `PHOTOS_DATABASE_URL`) for the row.
+  `--scene short-name <file>` does the same for a garden view that is not one species (files only); list it in
+  `src/lib/sitePhotos.js` to use it on the home page.
+- Locked rows are never replaced by either step.
+
+Photos in `public/photos/own/` are the owner's, all rights reserved: the code license does not cover them.
+
+The share card (`public/og-default.png`, shown when the site is linked on social media) is drawn from
+`scripts/og-card/card.html`; the command to render it is at the top of that file.
 
 With no `DATABASE_URL`, the build uses `src/data/sample/species.json` and shows a gold "sample data" ribbon. A
 production build without `DATABASE_URL` fails on purpose so sample numbers never go live.
@@ -165,6 +180,24 @@ Tests: `npm test` includes `test/admin.test.mjs` (the `ADMIN_EMAILS` check, refu
 checks). From the repo root, `Rscript site/test/db/admin_functions_test.R` loads `admin.sql` inside a transaction
 that is rolled back and checks every function as a role with `site_admin`'s rights, so it works on a branch where
 `admin.sql` hasn't been run yet.
+
+### Rebuilds, backups and new samples
+
+The "public site" box at the top of `/admin/`:
+
+- **New since your last visit.** The page remembers (in the browser) the newest sample it showed and counts the
+  ones added since.
+- **Rebuild the site now.** Calls the Netlify build hook, so a flagged or deleted sample leaves the public pages in
+  minutes, not at the next Monday refresh. Each rebuild is a production deploy (15 credits), so the database allows
+  one an hour and eight in 30 days, and logs each as `site_rebuild`. Needs `NETLIFY_BUILD_HOOK` in Netlify: the
+  same build hook URL the weekly GitHub workflow uses. Without it the button says so and nothing is logged.
+- **Backups.** `netlify/functions/backup.mjs` runs every Monday 09:17 UTC on the production site and saves one
+  JSON file (samples, accounts, preferences, moderation lists, logs; no reference data) to the private Netlify
+  Blobs store `backups`, keeping the newest eight. "Download a backup" on `/admin/` gives a fresh copy. Every
+  backup is logged as `backup`. The file holds emails and locations: keep it private. To fetch a stored one:
+  `npx netlify blobs:list backups`, then `npx netlify blobs:get backups backup-YYYY-MM-DD.json > backup.json`.
+
+Tests: `test/admin-site.test.mjs`, `test/backup.test.mjs`, and the same database test as above.
 
 ## My Garden (signed-in wildlife dashboard)
 

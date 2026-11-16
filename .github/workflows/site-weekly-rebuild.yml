@@ -37,13 +37,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v5
+      # Actions are pinned to the commit behind each tag
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
+
+      # Installed in its own step, with no secret in reach and no package
+      # install scripts (the photo script only needs plain JavaScript packages)
+      - name: Install packages
+        working-directory: site
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Find species photos
         working-directory: site
@@ -55,7 +62,6 @@ jobs:
             echo "PHOTOS_DATABASE_URL secret is not set yet; skipping photos."
             exit 0
           fi
-          npm ci --no-audit --no-fund
           npm run fetch-photos
 
       - name: Trigger Netlify build hook

@@ -57,6 +57,9 @@ const MAX_BODY = 4096;
 const ORIGIN_OK = /^(https:\/\/(www\.)?edaphicflora\.org|https:\/\/([a-z0-9-]+--)?edaphicflora\.netlify\.app|http:\/\/localhost:(8888|4321))$/;
 const SAMPLE_ACTION = /^\/api\/admin\/samples\/(\d{1,9})\/(flag|unflag)$/;
 
+// Netlify build hook URLs only: the admin function never posts anywhere else
+const BUILD_HOOK_RE = /^https:\/\/api\.netlify\.com\/build_hooks\/[A-Za-z0-9]+$/;
+
 const NOT_ADMIN = 'This page is for site administrators.';
 const NOT_IN_DB =
   'Your email is in ADMIN_EMAILS but not in the database admin list. Add it to site_admins (see site/sql/admin.sql).';
@@ -70,6 +73,9 @@ function routeOf(method, path) {
     'GET /api/admin/contributors': 'contributors',
     'GET /api/admin/disabled': 'disabled',
     'GET /api/admin/audit': 'audit',
+    'GET /api/admin/new': 'new_since',
+    'GET /api/admin/backup': 'backup',
+    'POST /api/admin/rebuild': 'rebuild',
     'POST /api/admin/users/flag': 'flag_user',
     'POST /api/admin/users/disable': 'disable',
     'POST /api/admin/users/enable': 'enable',
@@ -84,11 +90,13 @@ const num = (v) => (v == null ? null : Number(v));
  * @param {(req: Request) => Promise<{uid: string, email: string}>} [deps.verify]
  * @param {(url: string, fn: Function) => Promise<any>} [deps.connect]
  * @param {Record<string, string|undefined>} [deps.env]
+ * @param {typeof fetch} [deps.fetchImpl] used only to call the Netlify build hook
  */
 export function createAdminHandler({
   verify = (req) => verifyFirebaseToken(req, { projectId: process.env.PUBLIC_FIREBASE_PROJECT_ID }),
   connect = withClient,
   env = process.env,
+  fetchImpl = globalThis.fetch,
 } = {}) {
   return async (req) => {
     const origin = req.headers.get('origin');
@@ -122,8 +130,15 @@ export function createAdminHandler({
       throw e;
     }
 
+    // A rebuild needs the build hook; say so before logging a request for one
+    if (route.name === 'rebuild' && !BUILD_HOOK_RE.test(env.NETLIFY_BUILD_HOOK || '')) {
+      return json({ error: 'Rebuilds are not set up yet: add NETLIFY_BUILD_HOOK in Netlify.', code: 'not_configured' }, 503);
+    }
+
     try {
-      return await connect(env.SITE_ADMIN_DATABASE_URL, (c) => run(c, route.name, [who.uid, who.email], args, who));
+      return await connect(env.SITE_ADMIN_DATABASE_URL, (c) =>
+        run(c, route.name, [who.uid, who.email], args, who, { hook: env.NETLIFY_BUILD_HOOK, fetchImpl })
+      );
     } catch (e) {
       if (e.code === '42501' && /not a site admin/.test(e.message || '')) {
         return json({ error: NOT_IN_DB, code: 'not_admin_db' }, 403);
@@ -155,11 +170,13 @@ async function readArgs(req, route, qs) {
         limit: optionalInt(qs.get('limit'), { max: 500 }) ?? 100,
       };
     }
+    if (route.name === 'new_since') return { after: optionalInt(qs.get('after')) ?? 0 };
     return {};
   }
 
-  // POST: unflag needs no body; the rest send small JSON objects
+  // POST: unflag and rebuild need no body; the rest send small JSON objects
   if (route.name === 'unflag') return { id: route.id };
+  if (route.name === 'rebuild') return {};
   if (!(req.headers.get('content-type') || '').includes('application/json')) {
     throw Object.assign(new InputError('Send JSON.'), { status: 415 });
   }
@@ -184,10 +201,41 @@ async function readArgs(req, route, qs) {
   return { user, reason, flagSamples: body.flag_samples === true }; // disable
 }
 
-async function run(c, name, admin, a, who) {
+async function run(c, name, admin, a, who, { hook, fetchImpl } = {}) {
   const one = async (sql, params) => (await c.query(sql, [...admin, ...params])).rows[0].r;
 
   switch (name) {
+    case 'new_since':
+      return json(await one('SELECT admin_api.new_since($1, $2, $3) AS r', [a.after]));
+
+    case 'rebuild': {
+      // The database checks the admin, enforces the limits and logs the request
+      const r = await one('SELECT admin_api.request_rebuild($1, $2) AS r', []);
+      if (r.status === 'too_soon') {
+        return json({ error: `The site was rebuilt less than an hour ago. Try again in ${r.minutes} minutes.`, code: 'too_soon' }, 429);
+      }
+      if (r.status === 'monthly_limit') {
+        return json({ error: `That is ${r.limit} rebuilds in 30 days, the limit that keeps the site inside its Netlify credits.`, code: 'monthly_limit' }, 429);
+      }
+      let res;
+      try {
+        res = await fetchImpl(hook, { method: 'POST', body: '{}' });
+      } catch {
+        res = null;
+      }
+      if (!res || !res.ok) {
+        console.error('build hook failed:', res ? res.status : 'no response');
+        return json({ error: 'Netlify did not accept the rebuild request. Check the build hook.' }, 502);
+      }
+      return json({ left: r.left });
+    }
+
+    case 'backup': {
+      const r = await one('SELECT admin_api.backup_export($1, $2, $3) AS r', ['admin page download']);
+      const day = new Date().toISOString().slice(0, 10);
+      return json(r, 200, { 'Content-Disposition': `attachment; filename="edaphic-flora-backup-${day}.json"` });
+    }
+
     case 'me': {
       const r = await one('SELECT admin_api.whoami($1, $2) AS r', []);
       return json({ email: who.email, ...r });

@@ -2,6 +2,7 @@
 //
 //   GET    /api/me            -> { email, disabled, remaining_today, extractions_left, home: { zip, state, city } }
 //   PUT    /api/me            { zip, state } -> { home: { zip, state, city } }   saves the home location
+//   DELETE /api/me            -> { samples }              deletes the account's data (the page then deletes the sign-in)
 //   GET    /api/samples       -> { samples: [...] }       the person's own samples
 //   POST   /api/samples       -> 201 { ids, ecoregion, warnings }
 //   DELETE /api/samples/:id   -> 204
@@ -29,6 +30,7 @@ export default async (req) => {
   const route =
     path === '/api/me' && req.method === 'GET' ? 'me'
     : path === '/api/me' && req.method === 'PUT' ? 'prefs'
+    : path === '/api/me' && req.method === 'DELETE' ? 'delete_account'
     : path === '/api/samples' && req.method === 'GET' ? 'list'
     : path === '/api/samples' && req.method === 'POST' ? 'create'
     : sampleId && req.method === 'DELETE' ? 'delete'
@@ -116,6 +118,17 @@ export default async (req) => {
       if (route === 'delete') {
         const { rows: [r] } = await c.query('SELECT site_api.delete_my_sample($1, $2) AS ok', [u.user_id, Number(sampleId)]);
         return r.ok ? json(null, 204) : json({ error: 'That sample was not found.' }, 404);
+      }
+
+      // Deletes the database side of the account. The page then deletes the
+      // Firebase sign-in itself (only the signed-in browser can do that).
+      if (route === 'delete_account') {
+        const { rows: [r] } = await c.query('SELECT site_api.delete_my_account($1, $2) AS r', [u.user_id, who.uid]);
+        if (r.r.status === 'ok') return json({ samples: r.r.samples });
+        if (r.r.status === 'disabled') {
+          return json({ code: 'disabled', error: 'This account is disabled, so it cannot be deleted here. Email us and we will do it.' }, 403);
+        }
+        return json({ error: 'Please sign out and sign in again.' }, 403);
       }
 
       // create

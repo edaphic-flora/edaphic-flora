@@ -4,14 +4,15 @@
 //
 // Reads a soil lab report (PDF or photo) with Claude so the contribute form
 // can be filled in for the person to check. Same limits as the Shiny app: 3
-// per person and 20 overall per day (enforced in the database), and the file
-// is never stored. No Netlify rate-limit rule here: the free plan allows two,
-// and lookup.mjs and api.mjs use them.
+// per person and 20 overall per day (enforced in the database), and neither
+// the file nor its name is stored. A slot is given back only when the API
+// call was not billed (see notBilled). No Netlify rate-limit rule here: the
+// free plan allows two, and lookup.mjs and api.mjs use them.
 
 import Anthropic from '@anthropic-ai/sdk';
 import { verifyFirebaseToken, AuthError } from '../lib/auth.mjs';
 import { withClient, json } from '../lib/db.mjs';
-import { EXTRACT_MODEL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, MAX_FILE_BYTES, MAX_TEXT_CHARS, MEDIA_TYPES, cleanExtraction } from '../lib/extract.mjs';
+import { EXTRACT_MODEL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, MAX_FILE_BYTES, MAX_TEXT_CHARS, MEDIA_TYPES, cleanExtraction, notBilled } from '../lib/extract.mjs';
 
 const ORIGIN_OK = /^(https:\/\/(www\.)?edaphicflora\.org|https:\/\/([a-z0-9-]+--)?edaphicflora\.netlify\.app|http:\/\/localhost:(8888|4321))$/;
 const MAX_BODY = Math.ceil((MAX_FILE_BYTES * 4) / 3) + 4096;
@@ -46,7 +47,6 @@ export default async (req) => {
   const isText = mediaType === 'text/plain';
   const data = typeof body?.data === 'string' ? body.data : '';
   const reportText = typeof body?.text === 'string' ? body.text.trim() : '';
-  const filename = typeof body?.filename === 'string' ? body.filename.slice(0, 120) : 'report';
   if (!MEDIA_TYPES.includes(mediaType)) {
     return json({ error: 'Upload a PDF, a photo, or an RTF, TXT or CSV file.' }, 400);
   }
@@ -64,7 +64,8 @@ export default async (req) => {
   try {
     ({ userId, claim } = await withClient(db, async (c) => {
       const { rows: [u] } = await c.query('SELECT * FROM site_api.resolve_user($1, $2)', [who.uid, who.email]);
-      const { rows: [r] } = await c.query('SELECT site_api.claim_extraction($1, $2) AS r', [u.user_id, filename]);
+      // The log keeps the file type, not the file name (names can be personal)
+      const { rows: [r] } = await c.query('SELECT site_api.claim_extraction($1, $2) AS r', [u.user_id, mediaType]);
       return { userId: u.user_id, claim: r.r };
     }));
   } catch (e) {
@@ -83,9 +84,14 @@ export default async (req) => {
 
   const release = () =>
     withClient(db, (c) => c.query('SELECT site_api.release_extraction($1, $2)', [userId, claim.id])).catch(() => {});
+  // Marks the slot as used for good (release only removes unfinished rows)
+  const finish = (tokens) =>
+    withClient(db, (c) => c.query('SELECT site_api.finish_extraction($1, $2, $3)', [userId, claim.id, tokens])).catch((e) =>
+      console.error('extract log failed:', e.message)
+    );
 
   const fileBlock = isText
-    ? { type: 'document', source: { type: 'text', media_type: 'text/plain', data: reportText }, title: filename }
+    ? { type: 'document', source: { type: 'text', media_type: 'text/plain', data: reportText } }
     : mediaType === 'application/pdf'
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
       : { type: 'image', source: { type: 'base64', media_type: mediaType, data } };
@@ -103,7 +109,8 @@ export default async (req) => {
       messages: [{ role: 'user', content: [fileBlock, { type: 'text', text: EXTRACTION_PROMPT }] }],
     });
   } catch (e) {
-    await release();
+    if (notBilled(e)) await release();
+    else await finish(0);
     if (e instanceof Anthropic.BadRequestError) {
       // Usually our request, not the person's file: log the API's reason
       console.error('extract rejected by API:', e.message);
@@ -125,15 +132,14 @@ export default async (req) => {
       raw = null;
     }
   }
+  // The call was billed whether or not the answer is usable (a refusal, a
+  // cut-off answer), so the slot stays used either way.
+  const tokens = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+  await finish(tokens);
   if (!raw) {
-    await release();
+    console.error('extract unusable answer:', response.stop_reason);
     return json({ error: 'The report could not be read. Try a clearer photo, or enter the values by hand.' }, 422);
   }
-
-  const tokens = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-  await withClient(db, (c) => c.query('SELECT site_api.finish_extraction($1, $2, $3)', [userId, claim.id, tokens])).catch((e) =>
-    console.error('extract log failed:', e.message)
-  );
 
   const out = cleanExtraction(raw, { today: new Date().toISOString().slice(0, 10) });
   return json({ ...out, extractions_left: claim.remaining });

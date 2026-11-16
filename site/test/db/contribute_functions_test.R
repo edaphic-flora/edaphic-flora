@@ -89,6 +89,19 @@ tryCatch({
   check("can delete own sample", q("SELECT site_api.delete_my_sample('test-fb-uid-1', $1) AS ok", other)$ok)
   check("deleting it twice finds nothing", !q("SELECT site_api.delete_my_sample('test-fb-uid-1', $1) AS ok", other)$ok)
 
+  # Adding and deleting in a loop can't reset the daily cap (60 created a day)
+  q("SELECT * FROM site_api.resolve_user('test-fb-uid-3', 'churn@example.invalid')")
+  churn_ok <- TRUE
+  for (i in 1:3) {
+    churn_ok <- churn_ok && status(submit("test-fb-uid-3", sp[1:20], confirm = TRUE)) == "ok"
+    for (id in q("SELECT id FROM site_api.my_samples('test-fb-uid-3')")$id) {
+      q("SELECT site_api.delete_my_sample('test-fb-uid-3', $1) AS ok", id)
+    }
+  }
+  check("add 20 and delete them, three times over, is allowed", churn_ok)
+  r <- jsonlite::fromJSON(submit("test-fb-uid-3", sp[21], confirm = TRUE)$r)
+  check("a 61st sample created in a day is refused, even with none left stored", r$status == "rate_limited" && r$remaining == 0)
+
   x("RESET ROLE")
   row <- q("SELECT s.created_by, s.location_lat, s.location_long, s.ecoregion_l4, s.texture_class, s.outcome, s.date::text AS d
               FROM soil_samples s WHERE s.created_by = 'test-fb-uid-1' ORDER BY s.id LIMIT 1")
@@ -103,7 +116,54 @@ tryCatch({
   x("SET ROLE tmp_site_writer_test")
   check("disabled account is reported", q("SELECT disabled FROM site_api.resolve_user('test-fb-uid-1', '')")$disabled)
   check("disabled account cannot submit", status(submit("test-fb-uid-1", sp[24], confirm = TRUE)) == "disabled")
+
+  # ---- a brand-new visitor: first sign-in, home location, first soil test,
+  # ---- report reading, then deleting the account
+  nv <- q("SELECT * FROM site_api.resolve_user('test-new-visitor', 'new.visitor@example.invalid')")
+  check("new visitor: first sign-in makes an account with a full daily allowance",
+        nv$user_id == "test-new-visitor" && !nv$disabled && nv$remaining_today == 20)
+  check("new visitor: nothing saved yet",
+        nrow(q("SELECT * FROM site_api.my_samples('test-new-visitor')")) == 0 &&
+          nrow(q("SELECT * FROM site_api.get_prefs('test-new-visitor')")) == 0 &&
+          q("SELECT site_api.extractions_left('test-new-visitor') AS n")$n == 3)
+  hp <- jsonlite::fromJSON(q("SELECT site_api.save_prefs('test-new-visitor', '06511', '')::text AS r")$r)
+  check("new visitor: can save a home zip", hp$status == "ok" && hp$home_state == "CT")
+  first <- jsonlite::fromJSON(submit("test-new-visitor", sp[1:2])$r)
+  check("new visitor: first soil test saves", first$status == "ok" && length(first$ids) == 2)
+  check("new visitor: sees their samples and has 18 left today",
+        nrow(q("SELECT * FROM site_api.my_samples('test-new-visitor')")) == 2 &&
+          q("SELECT remaining_today FROM site_api.resolve_user('test-new-visitor', 'new.visitor@example.invalid')")$remaining_today == 18)
+  cl <- jsonlite::fromJSON(q("SELECT site_api.claim_extraction('test-new-visitor', 'application/pdf')::text AS r")$r)
+  check("new visitor: can read a report", cl$status == "ok" && cl$remaining == 2)
+  x(sprintf("SELECT site_api.finish_extraction('test-new-visitor', %d, 1200)", cl$id))
+
+  check("delete account: someone else's sign-in cannot delete it",
+        jsonlite::fromJSON(q("SELECT site_api.delete_my_account('test-new-visitor', 'test-fb-uid-2')::text AS r")$r)$status == "unknown_user")
+  check("delete account: a disabled account is refused",
+        jsonlite::fromJSON(q("SELECT site_api.delete_my_account('test-fb-uid-1', 'test-fb-uid-1')::text AS r")$r)$status == "disabled")
+  del <- jsonlite::fromJSON(q("SELECT site_api.delete_my_account('test-new-visitor', 'test-new-visitor')::text AS r")$r)
+  check("delete account: reports the samples it removed", del$status == "ok" && del$samples == 2)
+  check("delete account: nothing is left to see, and a second try finds no account",
+        nrow(q("SELECT * FROM site_api.my_samples('test-new-visitor')")) == 0 &&
+          jsonlite::fromJSON(q("SELECT site_api.delete_my_account('test-new-visitor', 'test-new-visitor')::text AS r")$r)$status == "unknown_user")
   x("RESET ROLE")
+  left <- q("SELECT (SELECT count(*) FROM soil_samples WHERE created_by = 'test-new-visitor')::int AS samples,
+                    (SELECT count(*) FROM site_users WHERE user_id = 'test-new-visitor')::int AS links,
+                    (SELECT count(*) FROM user_preferences WHERE user_id = 'test-new-visitor')::int AS prefs,
+                    (SELECT count(*) FROM pdf_extractions WHERE user_id = 'test-new-visitor')::int AS reads,
+                    (SELECT count(*) FROM pdf_extractions WHERE user_id = 'deleted account' AND extracted_at >= CURRENT_DATE)::int AS kept_reads,
+                    (SELECT count(*) FROM audit_log WHERE user_id = 'test-new-visitor' AND action = 'delete_account')::int AS logged")
+  check("delete account: samples, sign-in link, home location gone; report log kept without the id; deletion logged",
+        left$samples == 0 && left$links == 0 && left$prefs == 0 && left$reads == 0 && left$kept_reads >= 1 && left$logged == 1)
+  # An account from the earlier app (a made-up one: real accounts are not touched)
+  x("INSERT INTO legacy_users (email_lower, polished_uid) VALUES ('legacy.delete@example.invalid', 'test-legacy-polished')")
+  x("SET ROLE tmp_site_writer_test")
+  lg <- q("SELECT * FROM site_api.resolve_user('test-legacy-delete', 'Legacy.Delete@example.invalid')")
+  gone <- jsonlite::fromJSON(q("SELECT site_api.delete_my_account($1, 'test-legacy-delete')::text AS r", lg$user_id)$r)
+  x("RESET ROLE")
+  check("delete account: an app-era account loses its stored email too",
+        lg$user_id == "test-legacy-polished" && gone$status == "ok" &&
+          nrow(q("SELECT 1 FROM legacy_users WHERE email_lower = 'legacy.delete@example.invalid'")) == 0)
   check("site_reader cannot call site_api", !q("SELECT has_function_privilege('site_reader', 'site_api.my_samples(text)', 'EXECUTE') AS ok")$ok)
 
   # ---- home location

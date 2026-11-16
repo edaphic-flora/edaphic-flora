@@ -6,7 +6,7 @@ import { sitePhotos } from '../lib/sitePhotos.js';
 
 const tiles = sitePhotos.mosaic.slice(0, 5);
 const examples = featured(2);
-const credits = tiles.map((s) => `${s.photoCredit.creator} (${s.photoCredit.licenseLabel})`).join(', ');
+const credits = [...new Set(tiles.map((s) => `${s.photoCredit.creator} (${s.photoCredit.licenseLabel})`))].join(', ');
 ---
 <section class="hm">
   <div class="wrap hm-in">
@@ -29,15 +29,19 @@ const credits = tiles.map((s) => `${s.photoCredit.creator} (${s.photoCredit.lice
       )}
     </div>
     <div class="hm-mosaic">
-      {tiles.map((s, i) => (
-        <a href={s.url} class={`tile t${i}`} title={s.photoCredit.text}>
-          <img src={i === 0 ? s.photo.large : s.photo.src} alt={`${s.displayName} (${s.scientific_name})`} loading={i < 2 ? 'eager' : 'lazy'} decoding="async" referrerpolicy="no-referrer" />
-          <span class="cap">{s.displayName}</span>
-        </a>
-      ))}
+      {tiles.map((s, i) => {
+        // Species tiles link to their page; garden views (scenes) have no page
+        const Tile = s.url ? 'a' : 'div';
+        return (
+          <Tile href={s.url || undefined} class={`tile t${i}`} title={s.photoCredit.text}>
+            <img src={i === 0 ? s.photo.large : s.photo.src} alt={s.alt || `${s.displayName} (${s.scientific_name})`} loading={i < 2 ? 'eager' : 'lazy'} decoding="async" referrerpolicy="no-referrer" />
+            <span class="cap">{s.displayName}</span>
+          </Tile>
+        );
+      })}
     </div>
   </div>
-  <p class="wrap hm-credits">Photos via iNaturalist and Wikimedia Commons: {credits}.</p>
+  <p class="wrap hm-credits">Photos: {credits}.</p>
   <svg class="horizon" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true">
     <path d="M0 40 C 180 18, 360 58, 540 38 S 900 14, 1080 36 S 1320 56, 1440 34 L1440 120 L0 120 Z" fill="#9c8a66" />
     <path d="M0 64 C 220 48, 420 80, 640 62 S 1000 44, 1200 66 S 1380 74, 1440 60 L1440 120 L0 120 Z" fill="#6f6248" />

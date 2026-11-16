@@ -1,8 +1,8 @@
 # Terms of Service
 
-**Last updated: 2026-05-11**
+**Last updated: 2026-11-15**
 
-Welcome to Edaphic Flora! By using this application, you agree to these terms.
+Welcome to Edaphic Flora! By using Edaphic Flora, you agree to these terms.
 
 ## What Edaphic Flora Is
 
@@ -23,7 +23,7 @@ By submitting soil data, you grant Edaphic Flora a non-exclusive, worldwide, roy
 - Share your data under the CC BY-NC 4.0 license (see below)
 
 ### Data Licensing
-All submitted soil data is shared with the community under the [Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/).
+Submitted soil data (soil values by species, without your identity, location, sample dates, or notes) is shared with the community under the [Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/).
 
 This means others can:
 - View, download, and use the data
@@ -87,7 +87,7 @@ We may:
 
 ## Termination
 
-We may suspend or terminate accounts that violate these terms. You may delete your account at any time.
+We may suspend or terminate accounts that violate these terms. You may delete your account at any time from your account page.
 
 ## Governing Law
 
@@ -102,4 +102,4 @@ edaphicflora@gmail.com
 
 ---
 
-*By using Edaphic Flora, you acknowledge that you have read and agree to these Terms of Service and our [Privacy Policy](PRIVACY.md).*
+*By using Edaphic Flora, you acknowledge that you have read and agree to these Terms of Service and our [Privacy Policy](https://edaphicflora.org/privacy/).*

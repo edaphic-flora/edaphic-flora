@@ -65,3 +65,7 @@ edaphic-flora.github.io/
 # Alpha feedback (local only)
 feedback/
 .positai
+
+# One-off scripts and data that name people, addresses or accounts (local only)
+scripts/private/
+data/private/

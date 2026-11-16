@@ -51,7 +51,8 @@ const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Soil and p
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogUrl} />
 
-    {jsonLd.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+    {/* "<" is escaped so no value can close the script tag */}
+    {jsonLd.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj).replace(/</g, '\\u003c')} />)}
   </head>
   <body>
     <a class="skip sr-only" href="#main">Skip to content</a>

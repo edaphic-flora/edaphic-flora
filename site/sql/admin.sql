@@ -341,6 +341,83 @@ BEGIN
   RETURN jsonb_build_object('status', 'ok');
 END $$;
 
+-- -----------------------------------------------------------------------------
+-- New since the last visit, site rebuilds, backups
+-- -----------------------------------------------------------------------------
+
+-- Samples added after the newest one this admin has seen (the page remembers
+-- that id in the browser), and when the site was last rebuilt and backed up.
+CREATE OR REPLACE FUNCTION admin_api.new_since(p_firebase_uid TEXT, p_email TEXT, p_after_id INT)
+RETURNS JSONB
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_actor TEXT := admin_api._actor(p_firebase_uid, p_email);
+BEGIN
+  RETURN jsonb_build_object(
+    'new', (SELECT count(*) FROM soil_samples WHERE id > coalesce(p_after_id, 0)),
+    'latest_id', (SELECT coalesce(max(id), 0) FROM soil_samples),
+    'last_rebuild', (SELECT max(created_at) AT TIME ZONE 'UTC' FROM audit_log WHERE action = 'site_rebuild'),
+    'last_backup', (SELECT max(created_at) AT TIME ZONE 'UTC' FROM audit_log WHERE action = 'backup'));
+END $$;
+
+-- Record a request to rebuild the public site; the Netlify function then calls
+-- the build hook. A rebuild is a production deploy (15 of the 300 monthly
+-- Netlify credits), so they are limited: one an hour, eight in 30 days.
+CREATE OR REPLACE FUNCTION admin_api.request_rebuild(p_firebase_uid TEXT, p_email TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  c_min_gap   CONSTANT INTERVAL := interval '1 hour';
+  c_per_month CONSTANT INT := 8;
+  v_actor TEXT := admin_api._actor(p_firebase_uid, p_email);
+  v_now   TIMESTAMP := now() AT TIME ZONE 'UTC';
+  v_last  TIMESTAMP;
+  v_month INT;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext('admin_api.rebuild'));
+  SELECT max(created_at), count(*) FILTER (WHERE created_at > v_now - interval '30 days')
+    INTO v_last, v_month
+    FROM audit_log WHERE action = 'site_rebuild';
+  IF v_last IS NOT NULL AND v_last > v_now - c_min_gap THEN
+    RETURN jsonb_build_object('status', 'too_soon',
+      'minutes', ceil(extract(epoch FROM (v_last + c_min_gap - v_now)) / 60)::int);
+  END IF;
+  IF v_month >= c_per_month THEN
+    RETURN jsonb_build_object('status', 'monthly_limit', 'limit', c_per_month);
+  END IF;
+  INSERT INTO audit_log (action, table_name, record_id, user_id, details)
+  VALUES ('site_rebuild', NULL, NULL, v_actor, 'Rebuild of the public site requested (edaphicflora.org)');
+  RETURN jsonb_build_object('status', 'ok', 'left', c_per_month - v_month - 1);
+END $$;
+
+-- Everything people have contributed, the accounts and the logs, as one JSON
+-- document for a backup. Reference data (taxonomy, traits, photos) is left
+-- out: it can be loaded again from its sources. It holds emails and sample
+-- locations, so every call is written to the audit log. Called by the weekly
+-- backup function (netlify/functions/backup.mjs) and the /admin/ download.
+CREATE OR REPLACE FUNCTION admin_api.backup_export(p_firebase_uid TEXT, p_email TEXT, p_reason TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_actor TEXT := admin_api._actor(p_firebase_uid, p_email);
+BEGIN
+  INSERT INTO audit_log (action, table_name, record_id, user_id, details)
+  VALUES ('backup', NULL, NULL, v_actor,
+          format('Backup taken: %s (edaphicflora.org)', left(coalesce(nullif(btrim(p_reason), ''), 'manual'), 40)));
+  RETURN jsonb_build_object(
+    'format', 'edaphic-flora-backup-1',
+    'taken_at', now(),
+    'tables', jsonb_build_object(
+      'soil_samples',     (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM soil_samples t),
+      'site_users',       (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM site_users t),
+      'legacy_users',     (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM legacy_users t),
+      'user_preferences', (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM user_preferences t),
+      'disabled_users',   (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM disabled_users t),
+      'site_admins',      (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM site_admins t),
+      'pdf_extractions',  (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM pdf_extractions t),
+      'audit_log',        (SELECT coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM audit_log t)));
+END $$;
+
 -- Only the site_admin login may call these, and not the two helpers (the
 -- functions call those with the owner's rights). site_writer and site_reader
 -- get nothing in this schema.

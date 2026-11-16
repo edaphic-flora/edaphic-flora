@@ -60,11 +60,16 @@ function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
+// Control characters other than tab and line breaks never belong in text, and
+// Postgres refuses NUL outright, so they are dropped.
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const clean = (s) => s.replace(CONTROL, '');
+
 // Optional short text: trimmed, null when empty.
 function text(v, max) {
   if (blank(v)) return null;
   if (typeof v !== 'string') return undefined;
-  const t = v.trim();
+  const t = clean(v).trim();
   if (!t) return null;
   return chars(t) <= max ? t : undefined;
 }
@@ -242,8 +247,8 @@ export function validateSubmission(body, { today } = {}) {
   let notes = null;
   if (!blank(body.notes)) {
     if (typeof body.notes !== 'string') errors.push('Notes were not understood.');
-    else if (chars(body.notes.trim()) > MAX_NOTES) errors.push('Notes must be 1,000 characters or fewer.');
-    else notes = body.notes.trim() || null;
+    else if (chars(clean(body.notes).trim()) > MAX_NOTES) errors.push('Notes must be 1,000 characters or fewer.');
+    else notes = clean(body.notes).trim() || null;
   }
 
   if (body.confirm_duplicates !== undefined && typeof body.confirm_duplicates !== 'boolean') {

@@ -30,7 +30,7 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
             <input class="input" type="password" id="password" autocomplete="current-password" minlength="8" required />
           </label>
           <p id="terms-note" class="small" hidden>
-            By creating an account you agree to the <a href="/terms/">terms of service</a> and the
+            By creating an account you agree to the <a href="/terms/">terms of service</a> and the{' '}
             <a href="/privacy/">privacy policy</a>.
           </p>
           <button type="submit" id="email-submit" class="btn btn-gold full">Sign in</button>
@@ -60,7 +60,7 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     <section id="st-home" hidden>
       <p class="small who">Signed in as <span id="who" class="mono"></span>. <button type="button" class="link signout">Sign out</button></p>
       <p id="disabled-note" class="note" hidden>
-        This account can't add new samples. If you think that's a mistake, email
+        This account can't add new samples. If you think that's a mistake, email{' '}
         <a href="mailto:edaphicflora@gmail.com">edaphicflora@gmail.com</a>.
       </p>
       <section class="card pad home-loc" aria-labelledby="home-h">
@@ -97,6 +97,24 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
         <button type="button" id="dl-btn" class="btn btn-sage btn-sm">Download my samples (CSV)</button>
         <span class="small">Every value you entered, including your location and notes. Up to 10 downloads a day.</span>
       </p>
+
+      <section class="danger" aria-labelledby="del-h">
+        <h2 class="h3" id="del-h">Delete your account</h2>
+        <p class="small">
+          Deletes your sign-in, your home location and every soil test you added. Your samples leave the public pages
+          at the next weekly refresh. This can't be undone, so download your samples first if you want a copy.
+        </p>
+        <button type="button" id="del-start" class="btn btn-sm del-btn">Delete my account</button>
+        <div id="del-ask" class="del-ask" hidden>
+          <label class="fld">Type DELETE to confirm
+            <input class="input" id="del-word" type="text" autocomplete="off" spellcheck="false" maxlength="10" />
+          </label>
+          <div class="del-row">
+            <button type="button" id="del-go" class="btn btn-sm del-btn" disabled>Delete everything</button>
+            <button type="button" id="del-cancel" class="link">Cancel</button>
+          </div>
+        </div>
+      </section>
     </section>
 
     <p id="msg" class="msg" role="status" aria-live="polite"></p>
@@ -107,6 +125,7 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
   import {
     signInConfigured, watchUser, needsVerification, signInWithGoogle, signInWithEmail, createAccount,
     resendVerification, resetPassword, signOut, refreshUser, api, apiDownload, authMessage, safeNext,
+    signedInRecently, deleteSignIn,
   } from '../lib/firebase.js';
 
   const $ = (id) => document.getElementById(id);
@@ -257,10 +276,57 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     say(`Downloaded ${n} ${n === 1 ? 'sample' : 'samples'}. You can download ${left} more ${left === 1 ? 'time' : 'times'} today.`);
   });
 
+  // ---- delete my account
+  let deleted = false;
+  const delReset = () => {
+    $('del-ask').hidden = true;
+    $('del-start').hidden = false;
+    $('del-word').value = '';
+    $('del-go').disabled = true;
+  };
+  $('del-start').addEventListener('click', async () => {
+    say('');
+    // Firebase refuses to delete a sign-in that is not recent. Check before
+    // anything is deleted, so the data and the sign-in go together.
+    if (!(await signedInRecently())) {
+      return say('For your safety, sign out and sign in again, then delete your account within a few minutes.', 'error');
+    }
+    $('del-start').hidden = true;
+    $('del-ask').hidden = false;
+    $('del-word').focus();
+  });
+  $('del-word').addEventListener('input', () => {
+    $('del-go').disabled = $('del-word').value.trim() !== 'DELETE';
+  });
+  $('del-cancel').addEventListener('click', delReset);
+  $('del-go').addEventListener('click', async () => {
+    $('del-go').disabled = true;
+    say('Deleting your account…');
+    const r = await api('/api/me', { method: 'DELETE' });
+    if (!r.ok) {
+      delReset();
+      return say(r.data?.error || 'Your account could not be deleted. Please try again.', 'error');
+    }
+    deleted = true;
+    try {
+      await deleteSignIn();
+    } catch {
+      // The data is gone; only the empty sign-in is left
+      await signOut().catch(() => {});
+      show('st-signin', 'Account deleted');
+      return say('Your data is deleted. To remove the sign-in itself, sign in once more and delete the account again.', 'error');
+    }
+    show('st-signin', 'Account deleted');
+    say('Your account and your soil tests are deleted.');
+  });
+
   if (!signInConfigured) show('st-off', 'Sign in');
 
   watchUser(async (user) => {
     if (!signInConfigured) return;
+    // Right after deleting an account, keep its confirmation on screen
+    if (!user && deleted) return;
+    deleted = false;
     say('');
     if (!user) {
       show('st-signin', creating ? 'Create an account' : 'Sign in');
@@ -408,6 +474,14 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
   .samples :global(.del-ask) { white-space: nowrap; font-size: 15px; }
   .samples :global(.danger) { color: #9b3d22; }
   .dl-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 18px; }
+  .danger { margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--line-strong); max-width: 620px; }
+  .danger p { margin-top: 8px; }
+  .del-btn { margin-top: 12px; background: transparent; color: #9b3d22; border: 1.5px solid #9b3d22; }
+  .del-btn:hover:not(:disabled) { background: #9b3d22; color: var(--limestone); }
+  .del-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .del-ask { margin-top: 12px; display: grid; gap: 4px; max-width: 320px; }
+  .del-row { display: flex; gap: 14px; align-items: center; }
+  .del-row .link { margin-top: 12px; }
   .msg { margin-top: 18px; min-height: 1.4em; font-size: 17px; }
   .msg[data-kind='error'] { color: #9b3d22; }
 </style>

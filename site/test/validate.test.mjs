@@ -148,3 +148,10 @@ test('no em dashes in any message', () => {
   const emDash = String.fromCharCode(0x2014);
   for (const m of [...r.errors, ...r.warnings]) assert.ok(!m.includes(emDash), m);
 });
+
+test('control characters are dropped from notes and cultivar (Postgres refuses NUL)', () => {
+  const nul = String.fromCharCode(0);
+  const bell = String.fromCharCode(7);
+  assert.equal(ok({ notes: `raised${nul} bed${bell}\nsecond line` }).value.notes, 'raised bed\nsecond line');
+  assert.equal(ok({ notes: nul }).value.notes, null);
+});

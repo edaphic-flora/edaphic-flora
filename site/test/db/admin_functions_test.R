@@ -220,6 +220,41 @@ tryCatch({
   a1 <- tcall("audit_entries", NA, NA, NA, 1L)
   a2 <- tcall("audit_entries", NA, NA, a1$id, 1L)
   check("audit: paging with before_id", nrow(a1) == 1 && nrow(a2) == 1 && a2$id < a1$id)
+
+  # ---- new since the last visit, rebuilds, backups
+  check("new_since, request_rebuild and backup_export refuse a non-admin",
+        refused("SELECT admin_api.new_since($1, $2, 0)", FB, nobody) &&
+          refused("SELECT admin_api.request_rebuild($1, $2)", FB, nobody) &&
+          refused("SELECT admin_api.backup_export($1, $2, 'x')", FB, nobody))
+  ns <- jcall("new_since", as.integer(t1))
+  check("new_since counts the samples added after the last one seen",
+        ns$new >= 5 && ns$latest_id >= max(oids) && jcall("new_since", as.integer(ns$latest_id))$new == 0)
+
+  # Start from no rebuilds on record (rolled back with everything else)
+  x("RESET ROLE"); x("DELETE FROM audit_log WHERE action = 'site_rebuild'"); x("SET ROLE tmp_site_admin_test")
+  r1 <- jcall("request_rebuild")
+  check("first rebuild is allowed and logged, 7 left this month", r1$status == "ok" && r1$left == 7)
+  r2 <- jcall("request_rebuild")
+  check("a second rebuild within the hour is refused", r2$status == "too_soon" && r2$minutes >= 59 && r2$minutes <= 60)
+  ok7 <- TRUE
+  for (i in 1:7) {
+    x("RESET ROLE"); x("UPDATE audit_log SET created_at = created_at - interval '2 hours' WHERE action = 'site_rebuild'"); x("SET ROLE tmp_site_admin_test")
+    ok7 <- ok7 && jcall("request_rebuild")$status == "ok"
+  }
+  x("RESET ROLE"); x("UPDATE audit_log SET created_at = created_at - interval '2 hours' WHERE action = 'site_rebuild'"); x("SET ROLE tmp_site_admin_test")
+  r9 <- jcall("request_rebuild")
+  check("eight rebuilds in 30 days are allowed, the ninth is refused", ok7 && r9$status == "monthly_limit" && r9$limit == 8)
+  ns2 <- jcall("new_since", 0L)
+  check("new_since reports the last rebuild", !is.null(ns2$last_rebuild) && !is.na(ns2$last_rebuild))
+
+  b <- jcall("backup_export", "test run")
+  tabs <- c("soil_samples", "site_users", "legacy_users", "user_preferences", "disabled_users", "site_admins", "pdf_extractions", "audit_log")
+  check("backup holds every contributed table", b$format == "edaphic-flora-backup-1" && all(tabs %in% names(b$tables)))
+  check("backup includes the samples with their locations, and the accounts",
+        all(c(tids, oids) %in% b$tables$soil_samples$id) && "location_lat" %in% names(b$tables$soil_samples) &&
+          ADMIN %in% b$tables$site_admins$email_lower)
+  ab <- tcall("audit_entries", "backup", NA, NA, 5L)
+  check("every backup is written to the audit log", nrow(ab) >= 1 && grepl("test run", ab$details[1]) && ab$user_id[1] == ACTOR)
   x("RESET ROLE")
 
   # ---- the other logins get nothing here

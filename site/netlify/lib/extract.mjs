@@ -43,7 +43,16 @@ Add to extraction_warnings if:
 - Multiple samples exist in the report
 - Any values seem unusual or potentially misread
 - Units are ambiguous
-- Data appears incomplete`;
+- Data appears incomplete
+
+Personal details:
+- Leave the customer's name, mailing or site address, email, phone number and account number out of every field, including notes and warnings`;
+
+// A failed call gives the person's daily slot back only when the API answered
+// with an error status (400, 429, 5xx...): those are not billed. With no
+// status (a timeout or a dropped connection) the request may still have run
+// and been billed, so the slot stays used.
+export const notBilled = (err) => Number.isInteger(err?.status) && err.status >= 400;
 
 const NUMBER_KEYS = [...SOIL_FIELDS.map((f) => f.key), 'texture_sand', 'texture_silt', 'texture_clay'];
 

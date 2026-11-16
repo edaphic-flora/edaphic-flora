@@ -81,3 +81,16 @@ test('model warnings are kept, trimmed and capped', () => {
   assert.ok(out.warnings.length <= 10);
   assert.equal(cleanExtraction(null).found, 0);
 });
+
+test('a failed call frees the daily slot only when the API answered with an error status', async () => {
+  const { notBilled } = await import('../netlify/lib/extract.mjs');
+  for (const status of [400, 401, 413, 429, 500, 529]) assert.equal(notBilled({ status }), true, String(status));
+  // Timeouts and dropped connections carry no status: the request may have run
+  assert.equal(notBilled(new Error('Request timed out.')), false);
+  assert.equal(notBilled({ status: undefined }), false);
+  assert.equal(notBilled(null), false);
+});
+
+test('prompt tells the model to leave personal details out', () => {
+  assert.match(EXTRACTION_PROMPT, /name, mailing or site address, email, phone number/);
+});

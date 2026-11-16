@@ -8,9 +8,12 @@
 -- Design:
 --   * The site's Netlify functions verify the Firebase sign-in, then call the
 --     SECURITY DEFINER functions in the site_api schema. The site_writer login
---     can ONLY call those functions: it has no access to any table, so if its
---     connection string ever leaked it could not read locations, emails or
---     anyone's samples, and every write is capped and audited.
+--     can ONLY call those functions: it has no access to any table, and every
+--     write is capped and audited. The functions trust the user id they are
+--     given (the Netlify function gets it from the verified sign-in), so a
+--     leaked connection string could still act as a contributor whose id or
+--     email it knows: read that person's own export, add or delete their
+--     samples. It could not list accounts, emails or other people's data.
 --   * Identity: soil_samples.created_by holds the Shiny app's Polished user id.
 --     On first sign-in on the site, a Firebase account is linked to its Polished
 --     id by verified email (legacy_users), so a contributor keeps one identity
@@ -153,6 +156,11 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   c_daily_per_user CONSTANT INT := 20;
   c_daily_global   CONSTANT INT := 300;
+  -- Ceilings on samples CREATED in 24 hours, deleted ones included (counted
+  -- from audit_log), so adding and deleting in a loop can't reset the caps.
+  -- Three times the caps leaves room to delete a mistake and enter it again.
+  c_created_per_user CONSTANT INT := 60;
+  c_created_global   CONSTANT INT := 900;
   v_n      INT;
   v_recent INT;
   v_global INT;
@@ -193,6 +201,17 @@ BEGIN
   END IF;
   SELECT count(*) INTO v_global FROM soil_samples WHERE created_at > now() - interval '24 hours';
   IF v_global + v_n > c_daily_global THEN
+    RETURN jsonb_build_object('status', 'busy');
+  END IF;
+  SELECT count(*) INTO v_recent FROM audit_log
+   WHERE user_id = p_user_id AND action = 'create' AND table_name = 'soil_samples'
+     AND created_at > now() - interval '24 hours';
+  IF v_recent + v_n > c_created_per_user THEN
+    RETURN jsonb_build_object('status', 'rate_limited', 'remaining', 0);
+  END IF;
+  SELECT count(*) INTO v_global FROM audit_log
+   WHERE action = 'create' AND table_name = 'soil_samples' AND created_at > now() - interval '24 hours';
+  IF v_global + v_n > c_created_global THEN
     RETURN jsonb_build_object('status', 'busy');
   END IF;
 
@@ -357,6 +376,40 @@ BEGIN
   SELECT 'delete', 'soil_samples', d.id, p_user_id, 'entry deleted (edaphicflora.org)' FROM d
   RETURNING record_id INTO v_deleted;
   RETURN v_deleted IS NOT NULL;
+END $$;
+
+-- Delete the signed-in person's account: their samples, home location, the
+-- sign-in link and (for people who used the earlier app) the stored email.
+-- The Netlify function passes the id and Firebase uid from the verified
+-- sign-in. What stays: audit log rows, which hold the contributor id but no
+-- email, and report-reading log rows with the id removed (so the daily limits
+-- can't be reset by deleting an account). A disabled account is refused, so
+-- deleting and signing up again is not a way around being disabled.
+CREATE OR REPLACE FUNCTION site_api.delete_my_account(p_user_id TEXT, p_firebase_uid TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_samples INT;
+BEGIN
+  IF p_user_id IS NULL OR p_firebase_uid IS NULL
+     OR NOT EXISTS (SELECT 1 FROM site_users WHERE firebase_uid = p_firebase_uid AND user_id = p_user_id) THEN
+    RETURN jsonb_build_object('status', 'unknown_user');
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('site_api.submit:' || p_user_id));
+  IF EXISTS (SELECT 1 FROM disabled_users WHERE user_id = p_user_id) THEN
+    RETURN jsonb_build_object('status', 'disabled');
+  END IF;
+
+  WITH d AS (DELETE FROM soil_samples WHERE created_by = p_user_id RETURNING id)
+  SELECT count(*) INTO v_samples FROM d;
+  DELETE FROM user_preferences WHERE user_id = p_user_id;
+  UPDATE pdf_extractions SET user_id = 'deleted account', filename = '' WHERE user_id = p_user_id;
+  DELETE FROM legacy_users WHERE polished_uid = p_user_id;
+  DELETE FROM site_users WHERE user_id = p_user_id;
+  INSERT INTO audit_log (action, table_name, record_id, user_id, details)
+  VALUES ('delete_account', 'site_users', NULL, p_user_id,
+          format('Account deleted by its owner with %s samples (edaphicflora.org)', v_samples));
+  RETURN jsonb_build_object('status', 'ok', 'samples', v_samples);
 END $$;
 
 -- -----------------------------------------------------------------------------

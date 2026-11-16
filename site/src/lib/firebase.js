@@ -13,6 +13,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  deleteUser,
   signOut as fbSignOut,
 } from 'firebase/auth';
 
@@ -63,6 +64,16 @@ export async function createAccount(email, password) {
 export const resendVerification = () => sendEmailVerification(getA().currentUser, backTo());
 export const resetPassword = (email) => sendPasswordResetEmail(getA(), email, backTo());
 export const signOut = () => fbSignOut(getA());
+
+// Deleting an account: Firebase only removes a sign-in that happened recently,
+// so the page checks that first, before any data is deleted.
+export async function signedInRecently(maxSeconds = 300) {
+  const u = getA().currentUser;
+  if (!u) return false;
+  const r = await u.getIdTokenResult();
+  return (Date.now() - new Date(r.authTime).getTime()) / 1000 <= maxSeconds;
+}
+export const deleteSignIn = () => deleteUser(getA().currentUser);
 
 // After clicking the email link in another tab: pick up the verified status
 export async function refreshUser() {
@@ -136,8 +147,5 @@ export function authMessage(e) {
   return 'Sign-in did not work. Please try again.';
 }
 
-// ?next= only to a path on this site (one leading slash, no backslashes)
-export function safeNext(params) {
-  const n = params.get('next') || '';
-  return /^\/(?![/\\])[^\\\r\n]*$/.test(n) ? n : null;
-}
+// ?next= only to a path on this site (in its own file so it can be tested)
+export { safeNext } from './safeNext.js';

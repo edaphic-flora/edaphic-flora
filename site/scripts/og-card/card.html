@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Source for public/og-default.png, the 1200 x 630 card shown when the site is
+  shared. Render it with headless Chrome or Edge from the site/ folder:
+
+    chrome --headless=new --hide-scrollbars --force-device-scale-factor=1 \
+      --window-size=1200,630 --screenshot=public/og-default.png \
+      scripts/og-card/card.html
+
+  The words match the home page hero. The photo is one of the site owner's own.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face { font-family: Montserrat; font-weight: 600; src: url('../../node_modules/@fontsource/montserrat/files/montserrat-latin-600-normal.woff2') format('woff2'); }
+      @font-face { font-family: Rokkitt; font-weight: 300; src: url('../../node_modules/@fontsource/rokkitt/files/rokkitt-latin-300-normal.woff2') format('woff2'); }
+      @font-face { font-family: Rokkitt; font-weight: 400; src: url('../../node_modules/@fontsource/rokkitt/files/rokkitt-latin-400-normal.woff2') format('woff2'); }
+      * { box-sizing: border-box; margin: 0; }
+      html, body { width: 1200px; height: 630px; overflow: hidden; }
+      body { background: #efead6; color: #373d3c; display: grid; grid-template-columns: 690px 510px; position: relative; }
+      .copy { padding: 56px 40px 0 64px; display: flex; flex-direction: column; }
+      .logo { height: 64px; width: auto; align-self: flex-start; }
+      .kicker { margin-top: 62px; font-family: Rokkitt, serif; font-style: italic; font-weight: 400; font-size: 30px; color: #586d61; }
+      h1 { margin-top: 14px; font-family: Montserrat, sans-serif; font-weight: 600; font-size: 62px; line-height: 1.08; letter-spacing: -1.2px; }
+      .url { margin-top: 30px; font-family: Rokkitt, serif; font-weight: 400; font-size: 28px; color: #586d61; }
+      .photo { height: 630px; overflow: hidden; }
+      .photo img { width: 100%; height: 100%; object-fit: cover; object-position: 38% 50%; display: block; }
+      /* Soil layers along the bottom, as on the home page */
+      .horizon { position: absolute; left: 0; bottom: 0; width: 690px; height: 86px; display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="copy">
+      <img class="logo" src="../../public/logo-wide-charcoal.svg" alt="" />
+      <p class="kicker">The soil database for what you grow</p>
+      <h1>Know the soil a plant actually grows in.</h1>
+      <p class="url">edaphicflora.org</p>
+    </div>
+    <div class="photo"><img src="../../public/photos/own/caltha-palustris-1600.jpg" alt="" /></div>
+    <svg class="horizon" viewBox="0 0 690 86" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 26 C 90 10, 180 40, 270 24 S 450 6, 540 22 S 650 38, 690 20 L690 86 L0 86 Z" fill="#9c8a66" />
+      <path d="M0 46 C 110 34, 210 58, 320 44 S 500 30, 600 48 S 670 54, 690 42 L690 86 L0 86 Z" fill="#6f6248" />
+      <path d="M0 66 C 120 56, 240 76, 360 64 S 560 54, 690 68 L690 86 L0 86 Z" fill="#4c4234" />
+    </svg>
+  </body>
+</html>
