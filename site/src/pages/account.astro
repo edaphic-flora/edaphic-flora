@@ -276,8 +276,16 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     say(`Downloaded ${n} ${n === 1 ? 'sample' : 'samples'}. You can download ${left} more ${left === 1 ? 'time' : 'times'} today.`);
   });
 
+  // Empties the sign-in form (the email and password typed earlier) and puts
+  // it back in "Sign in" mode
+  function clearSignInForm() {
+    $('email-form').reset();
+    setMode(false);
+  }
+
   // ---- delete my account
   let deleted = false;
+  let hadUser = false;
   const delReset = () => {
     $('del-ask').hidden = true;
     $('del-start').hidden = false;
@@ -313,9 +321,11 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
     } catch {
       // The data is gone; only the empty sign-in is left
       await signOut().catch(() => {});
+      clearSignInForm();
       show('st-signin', 'Account deleted');
       return say('Your data is deleted. To remove the sign-in itself, sign in once more and delete the account again.', 'error');
     }
+    clearSignInForm();
     show('st-signin', 'Account deleted');
     say('Your account and your soil tests are deleted.');
   });
@@ -325,13 +335,20 @@ const stateOptions = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
   watchUser(async (user) => {
     if (!signInConfigured) return;
     // Right after deleting an account, keep its confirmation on screen
-    if (!user && deleted) return;
+    if (!user && deleted) {
+      hadUser = false;
+      return;
+    }
     deleted = false;
     say('');
     if (!user) {
+      // Signed out just now: don't leave the last email and password in the form
+      if (hadUser) clearSignInForm();
+      hadUser = false;
       show('st-signin', creating ? 'Create an account' : 'Sign in');
       return;
     }
+    hadUser = true;
     if (needsVerification(user)) {
       $('verify-email').textContent = user.email || 'your email';
       show('st-verify', 'Confirm your email');
