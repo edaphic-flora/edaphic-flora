@@ -20,6 +20,7 @@ import { Content } from '../../../PRIVACY.md';
   .legal :global(li) { margin-top: 6px; }
   .legal :global(a) { color: var(--sage-ink); text-decoration: underline; text-underline-offset: 3px; }
   .legal :global(table) { margin-top: 14px; border-collapse: collapse; width: 100%; font-size: 16px; }
-  .legal :global(th), .legal :global(td) { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line-strong); }
+  .legal :global(th), .legal :global(td) { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line-strong); overflow-wrap: anywhere; }
+  @media (max-width: 400px) { .legal :global(th), .legal :global(td) { padding: 8px 6px; } .legal :global(table) { font-size: 15px; } }
   .legal :global(th) { font-family: var(--f-head); font-weight: 600; font-size: 14px; }
 </style>

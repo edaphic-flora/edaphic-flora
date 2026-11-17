@@ -15,3 +15,7 @@ export const IS_PRODUCTION = process.env.CONTEXT === 'production';
 
 // pH axis used by the soil snapshot bars
 export const PH_SCALE = { min: 4.0, max: 8.5 };
+
+// Organic matter axis on the soil snapshot, in percent. Most mineral soils fall
+// well inside it; 20% and up is where labs start calling a soil organic.
+export const OM_SCALE = { min: 0, max: 20 };

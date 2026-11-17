@@ -1,5 +1,5 @@
 ---
-import { CONTRIBUTE_URL, PH_SCALE } from '../config.js';
+import { CONTRIBUTE_URL, PH_SCALE, OM_SCALE } from '../config.js';
 import { thresholds } from '../lib/data.js';
 import { plural } from '../lib/names.js';
 const { sp } = Astro.props;
@@ -14,6 +14,12 @@ const phMarks = s?.ph && s.ph.p10 == null ? [...new Set([s.ph.lo ?? s.ph.p50, s.
 const early = ready && [s.ph, s.organic_matter].some((m) => m && m.p10 == null);
 const pos = (v) => Math.max(0, Math.min(100, ((v - PH_SCALE.min) / (PH_SCALE.max - PH_SCALE.min)) * 100));
 const pct = (v) => `${pos(v).toFixed(1)}%`;
+// Organic matter sits on its own 0 to 20% axis; anything higher rests at the right end.
+const omPos = (v) => Math.max(0, Math.min(100, ((v - OM_SCALE.min) / (OM_SCALE.max - OM_SCALE.min)) * 100));
+const omPct = (v) => `${omPos(v).toFixed(1)}%`;
+const om = s?.organic_matter;
+const omMarks = om && om.p10 == null ? [...new Set([om.lo ?? om.p50, om.hi ?? om.p50])] : [];
+const omTicks = [0, 5, 10, 15, 20].map((v) => ({ at: omPct(v), num: v === OM_SCALE.max ? `${v}%+` : `${v}%` }));
 const usdaPh = u?.ph_min != null && u?.ph_max != null ? { min: u.ph_min, max: u.ph_max } : null;
 const ticks = [4.0, 5.5, 7.0, 8.5].map((v) => ({ v, at: pct(v), num: v.toFixed(1), word: v === 4 ? 'acidic' : v === 7 ? 'neutral' : v === 8.5 ? 'alkaline' : '' }));
 const nutrients = ready
@@ -80,15 +86,24 @@ const refBits = [
           <div class="card pad">
             <div class="b-t">Organic matter</div>
             {s.organic_matter.p10 != null ? (
-              <>
-                <div class="mono big">{s.organic_matter.p50.toFixed(1)}%</div>
-                <div class="sub">middle 80%: {s.organic_matter.p10.toFixed(1)} to {s.organic_matter.p90.toFixed(1)}% · {plural(s.organic_matter.n, 'sample')}</div>
-              </>
+              <div class="mono big">{om.p50.toFixed(1)}% <span class="big-lbl">median</span></div>
             ) : (
-              <>
-                <div class="mono big">{readings(s.organic_matter, '%')}</div>
-                <div class="sub">{plural(s.organic_matter.n, 'sample')}</div>
-              </>
+              <div class="mono big">{readings(om, '%')}</div>
+            )}
+            <div class="ph om">
+              <div class="ph-grad om-grad"></div>
+              {om.p10 != null && <div class="ph-range" style={`left:${omPct(om.p10)};width:${(omPos(om.p90) - omPos(om.p10)).toFixed(1)}%`}></div>}
+              {om.p10 != null ? (
+                <div class="ph-mark" style={`left:${omPct(om.p50)}`}></div>
+              ) : (
+                omMarks.map((v) => <div class="ph-mark" style={`left:${omPct(v)}`}></div>)
+              )}
+            </div>
+            <div class="ticks om-ticks">{omTicks.map((t) => <span style={`left:${t.at}`}>{t.num}</span>)}</div>
+            {om.p10 != null ? (
+              <div class="sub">middle 80%: {om.p10.toFixed(1)} to {om.p90.toFixed(1)}% · {plural(om.n, 'sample')}</div>
+            ) : (
+              <div class="sub">{plural(om.n, 'sample')}</div>
             )}
           </div>
         )}
@@ -107,7 +122,7 @@ const refBits = [
           <div class="b-t nut-hd">Key nutrients <span class="sub">median, ppm</span></div>
           <div class="nut-grid">
             {nutrients.map(([name, v]) => (
-              <div class="nut-row"><span>{name}</span><span class="mono">{v.p50.toLocaleString()} ppm <span class="n">· {plural(v.n, 'sample')}</span></span></div>
+              <div class="nut-row"><span class="nut-name">{name}</span><span class="mono nut-v">{v.p50.toLocaleString('en-US')} ppm</span><span class="n">{plural(v.n, 'sample')}</span></div>
             ))}
           </div>
           <p class="caveat">Labs use different extraction methods (for example Mehlich-3 and Modified Morgan), so treat nutrient values as rough guides.</p>
@@ -138,8 +153,9 @@ const refBits = [
 </section>
 
 <style>
+  section { container-type: inline-size; }
   .sec-h { font-weight: 600; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.3px; }
-  .based { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--sage-ink); background: rgba(122, 154, 134, 0.16); padding: 7px 13px; border-radius: 20px; margin-top: 18px; }
+  .based { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-muted); background: rgba(122, 154, 134, 0.16); padding: 7px 13px; border-radius: 20px; margin-top: 18px; }
   .block { margin-top: 16px; }
   .b-hd { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
   .b-t { font-family: var(--f-head); font-weight: 600; font-size: 16px; }
@@ -153,12 +169,14 @@ const refBits = [
   .ph-mark { position: absolute; top: -4px; width: 3px; height: 22px; border-radius: 2px; background: var(--gold); transform: translateX(-1px); }
   .ph-usda { position: absolute; bottom: -9px; height: 4px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--brown) 0 6px, transparent 6px 10px); }
   .ph-usda.solid { top: 0; bottom: 0; height: auto; border-radius: 6px; background: rgba(107, 93, 73, 0.45); border: 2px solid var(--brown); }
-  .ticks { position: relative; height: 16px; margin-top: 18px; font-family: var(--f-data); font-size: 10.5px; color: var(--bark); }
+  .ticks { position: relative; height: 16px; margin-top: 18px; font-family: var(--f-data); font-size: 11.5px; color: var(--bark); }
   .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
   .ticks span:first-child { transform: none; }
   .ticks span:last-child { transform: translateX(-100%); }
   .ticks i { font-style: normal; }
   @media (max-width: 480px) { .ticks i { display: none; } }
+  /* The card can be narrow on a wide screen too (two-column tablet layout) */
+  @container (max-width: 520px) { .ticks i { display: none; } }
   .key { margin-top: 14px; font-size: 14px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .sw { display: inline-block; width: 16px; height: 8px; border-radius: 3px; margin-left: 8px; }
   .sw:first-child { margin-left: 0; }
@@ -167,15 +185,20 @@ const refBits = [
   .sw-usda { height: 4px; background: repeating-linear-gradient(90deg, var(--brown) 0 6px, transparent 6px 10px); }
   .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 14px; }
   .big { font-size: 26px; margin-top: 8px; }
+  .big-lbl { font-family: var(--f-body); font-size: 14px; color: var(--ink-muted); }
+  .ph.om { height: 12px; margin-top: 14px; }
+  .om-grad { background: linear-gradient(90deg, #d9c9a3, #a98f62, #6b5d49, #3f372c); opacity: 0.45; }
+  .om-ticks { margin-top: 10px; margin-bottom: 6px; }
   .sub { font-size: 14px; color: var(--ink-muted); margin-top: 4px; font-weight: 400; }
   .tex { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 14px; }
   .tex-lbl { display: flex; justify-content: space-between; font-size: 14px; color: var(--bark); margin-top: 8px; }
   .nut { margin-top: 14px; padding: 8px; }
   .nut-hd { padding: 12px 14px 6px; font-size: 15px; }
-  .nut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
-  .nut-row { padding: 12px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 16px; color: var(--ink-soft); }
-  .nut-row .mono { color: var(--charcoal); white-space: nowrap; }
-  .nut-row .n { color: var(--ink-muted); font-size: 12px; }
+  .nut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .nut-row { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .nut-name { font-size: 15px; color: var(--ink-soft); }
+  .nut-v { font-size: 18px; color: var(--charcoal); }
+  .nut-row .n { color: var(--ink-muted); font-size: 13.5px; }
   .early { margin-top: 10px; font-size: 15px; color: var(--bark); line-height: 1.45; }
   .caveat { font-size: 14.5px; color: var(--bark); padding: 4px 14px 12px; line-height: 1.45; }
   .empty { margin-top: 18px; background: var(--paper); border: 1px dashed rgba(211, 155, 53, 0.65); border-radius: 16px; padding: clamp(26px, 4vw, 40px); text-align: center; }

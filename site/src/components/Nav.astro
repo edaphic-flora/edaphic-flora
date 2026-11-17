@@ -15,7 +15,7 @@ const links = [
     </a>
     <nav aria-label="Main">
       {links.map((l) => (
-        <a href={l.href} class:list={[{ on: active === l.key }]} aria-current={active === l.key ? 'page' : undefined}>
+        <a href={l.href} class:list={[{ on: active === l.key, home: l.key === 'home' }]} aria-current={active === l.key ? 'page' : undefined}>
           {l.label}
         </a>
       ))}
@@ -50,4 +50,10 @@ const links = [
     }
     nav::-webkit-scrollbar { display: none; }
   }
+  /* Narrow phones: the logo already links home, so the Home link gives up its room */
+  @media (max-width: 480px) {
+    nav a.home { display: none; }
+    nav { gap: 18px; justify-content: space-between; }
+  }
+  @media (max-width: 340px) { nav { gap: 12px; } nav a { font-size: 12.5px; letter-spacing: 0.2px; } }
 </style>

@@ -37,7 +37,7 @@ export const STATUS_STYLE = {
   native: { label: 'Native', bg: '#93AF9C', fg: '#373D3C' },
   both: { label: 'Native + introduced', bg: '#9DAF92', fg: '#373D3C' },
   introduced: { label: 'Introduced', bg: '#6B5D49', fg: '#F7F4E8' },
-  invasive: { label: 'Invasive', bg: '#D39B35', fg: '#373D3C' },
+  invasive: { label: 'Invasive', bg: '#D39B35', fg: '#2E3433' },
 };
 
 function countLabel(codes) {

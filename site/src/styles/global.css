@@ -93,11 +93,13 @@ p { margin: 0; }
   padding: 14px 24px; border-radius: 9px; border: none; cursor: pointer;
   text-decoration: none; white-space: nowrap; transition: background 0.15s ease;
 }
-.btn-gold { background: var(--gold); color: var(--charcoal); }
+.btn-gold { background: var(--gold); color: var(--charcoal-deep); }
 .btn-gold:hover { background: var(--gold-hover); }
 .btn-sage { background: var(--sage-fill); color: var(--charcoal); }
 .btn-sage:hover { background: #a3bcab; }
 .btn-sm { font-size: 13.5px; padding: 10px 18px; border-radius: 7px; }
+/* Very narrow screens: a long button label wraps instead of pushing the page sideways */
+@media (max-width: 400px) { .btn { white-space: normal; text-align: center; } }
 .link {
   font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--sage-ink);
   text-decoration: underline; text-underline-offset: 4px; cursor: pointer;
@@ -156,8 +158,8 @@ p { margin: 0; }
 .sp-card .soil-tag { font-size: 14px; }
 .sp-card .soil-tag.ready { color: var(--sage-ink); }
 .sp-card .soil-tag.needs { color: var(--gold-ink); }
-.sp-card h3 { font-weight: 600; font-size: 18px; margin-top: 11px; line-height: 1.25; }
-.sp-card .sci { font-size: 15px; color: var(--ink-muted); margin-top: 3px; }
+.sp-card h3 { font-weight: 600; font-size: 18px; margin-top: 11px; line-height: 1.25; overflow-wrap: anywhere; }
+.sp-card .sci { font-size: 15px; color: var(--ink-muted); margin-top: 3px; overflow-wrap: anywhere; }
 .sp-card .foot { font-size: 14px; color: var(--bark); margin-top: 9px; }
 
 @media (max-width: 560px) {
@@ -165,7 +167,7 @@ p { margin: 0; }
   .sp-card .swatch { height: 140px; }
   .sp-card .body { padding: 11px 12px 13px; }
   .sp-card .meta { gap: 5px; }
-  .sp-card .pill { font-size: 9px; padding: 2px 6px; }
+  .sp-card .pill { font-size: 10.5px; padding: 2px 6px; }
   .sp-card .soil-tag { font-size: 12.5px; }
   .sp-card h3 { font-size: 15.5px; margin-top: 8px; }
   .sp-card .sci { font-size: 13px; }
