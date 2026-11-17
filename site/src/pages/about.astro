@@ -6,6 +6,7 @@ import { CONTACT_EMAIL, GITHUB_URL } from '../config.js';
 import { COMMUNITY_FILE } from '../../netlify/lib/csv.mjs';
 import { sitePhotos } from '../lib/sitePhotos.js';
 import { photoSize } from '../lib/photos.js';
+import { SOURCES } from '../lib/sources.js';
 const banner = sitePhotos.about;
 const bannerSize = banner && photoSize(banner.photo, 1280);
 const t = thresholds;
@@ -124,10 +125,10 @@ const updated = meta.generated_at
         <strong>Taxonomy:</strong> Govaerts, R. et al. (2021). The World Checklist of Vascular Plants, a continuously updated
         resource for exploring global plant diversity. <em>Scientific Data</em> 8, 215 (CC BY 4.0).
       </li>
-      <li><strong>Invasive and noxious listings:</strong> official state lists from invasive species councils, departments of agriculture, and natural resource agencies. Each species page links to the relevant state list.</li>
-      <li><strong>Moths and butterflies:</strong> caterpillar host plant associations from Tallamy, D.W. and Shropshire, K.J. (National Wildlife Federation).</li>
-      <li><strong>Specialist bees:</strong> native bee and host plant associations from Jarrod Fowler.</li>
-      <li><strong>Birds:</strong> bird and plant associations adapted from the Audubon native plants database.</li>
+      <li><strong>Invasive and noxious listings:</strong> official state lists from invasive species councils, departments of agriculture, and natural resource agencies. Species pages link to the relevant state list wherever a species is listed.</li>
+      <li><strong>Moths and butterflies:</strong> caterpillar host plant associations from Tallamy, D.W. and Shropshire, K.J. (<a href={SOURCES.nwf} rel="noopener">National Wildlife Federation</a>).</li>
+      <li><strong>Specialist bees:</strong> native bee and host plant associations from <a href={SOURCES.fowler} rel="noopener">Jarrod Fowler</a>.</li>
+      <li><strong>Birds:</strong> bird and plant associations adapted from the <a href={SOURCES.audubon} rel="noopener">Audubon native plants database</a>.</li>
       <li><strong>Soil samples:</strong> contributed by Edaphic Flora users.</li>
       <li>
         <strong>Photos:</strong> taken by <a href="https://www.inaturalist.org/" rel="noopener">iNaturalist</a> observers and{' '}

@@ -1,5 +1,6 @@
 ---
 import { STATES, STATE_NAME, stateStatus, countLabel, invasiveLink } from '../lib/data.js';
+import { SOURCES, usdaProfile, bonapGenusMaps } from '../lib/sources.js';
 const { sp } = Astro.props;
 const LABEL = { native: 'Native', both: 'Native and introduced', introduced: 'Introduced', invasive: 'Listed invasive' };
 const tiles = STATES.map((s) => {
@@ -10,6 +11,10 @@ const groups = ['native', 'both', 'introduced', 'invasive']
   .map((k) => ({ k, label: LABEL[k], items: tiles.filter((t) => t.st === k) }))
   .filter((g) => g.items.length);
 const src = sp.state_source === 'BONAP' ? 'BONAP' : sp.state_source === 'USDA' ? 'USDA PLANTS' : sp.state_source ? 'BONAP and USDA PLANTS' : null;
+// The source names, each linked to where the record comes from
+const usdaUrl = sp.usda_symbol ? usdaProfile(sp.usda_symbol) : SOURCES.usda;
+const srcLinks = src ? src.split(' and ').map((n) => [n, n === 'BONAP' ? SOURCES.bonap : usdaUrl]) : [];
+const genusMaps = src && src.includes('BONAP') ? bonapGenusMaps(sp.genus) : null;
 const inv = Object.fromEntries((sp.invasive || []).map((i) => [i.state, i]));
 const summary = [
   sp.nativeCodes.length && `Native in ${countLabel(sp.nativeCodes)}`,
@@ -38,7 +43,12 @@ const lookup = Object.fromEntries(
   </div>
   <p class="sum">
     {sumText}
-    {src && <span class="src"> Source: {src}{sp.invasiveCodes.length ? ' and state invasive lists' : ''}.</span>}
+    {src && (
+      <span class="src">
+        {' '}Source: {srcLinks.map(([n, u], i) => <>{i > 0 && ' and '}<a href={u} rel="noopener">{n}</a></>)}{sp.invasiveCodes.length ? ' and state invasive lists' : ''}.
+        {genusMaps && <>{' '}<a href={genusMaps} rel="noopener">BONAP county maps for <em class="sci">{sp.genus}</em></a>.</>}
+      </span>
+    )}
   </p>
   <p class="yours" id="state-line" aria-live="polite" hidden></p>
 
@@ -62,26 +72,30 @@ const lookup = Object.fromEntries(
     <span><i class="tile none"></i>No record</span>
   </div>
 
+  {(sp.invasive || []).length > 0 && (
+    <div class="listed">
+      <h3 class="listed-h">Listed invasive or noxious</h3>
+      <ul class="inv">
+        {sp.invasive.map((i) => {
+          const url = i.url || invasiveLink(i.state);
+          const where = i.state === 'US' ? 'Federal' : STATE_NAME[i.state] || i.state;
+          return (
+            <li>
+              {where}: {i.designation}{i.source && ` (${i.source})`}
+              {url && <> · <a href={url} rel="noopener">{i.state === 'US' ? 'federal list' : `${where} list`}</a></>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  )}
+
   {groups.length > 0 && (
     <details>
       <summary>List by state</summary>
       {groups.map((g) => (
         <p><strong>{g.label}:</strong> {g.items.map((t) => t.name).join(', ')}.</p>
       ))}
-      {(sp.invasive || []).length > 0 && (
-        <ul class="inv">
-          {sp.invasive.map((i) => {
-            const url = i.url || invasiveLink(i.state);
-            const where = i.state === 'US' ? 'Federal' : STATE_NAME[i.state] || i.state;
-            return (
-              <li>
-                {where}: {i.designation}{i.source && ` (${i.source})`}
-                {url && <> · <a href={url} rel="noopener">state list</a></>}
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </details>
   )}
 </section>
@@ -128,6 +142,9 @@ const lookup = Object.fromEntries(
   .pick .select { padding: 9px 12px; font-size: 13px; }
   .sum { margin-top: 12px; font-size: 17px; color: var(--ink-soft); }
   .src { color: var(--bark); font-size: 15px; }
+  .src a { color: var(--sage-ink); }
+  .listed { margin-top: 18px; font-size: 16px; color: var(--ink-soft); }
+  .listed-h { font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--charcoal); }
   .yours { margin-top: 10px; display: inline-block; font-family: var(--f-head); font-weight: 600; font-size: 14px; background: rgba(211, 155, 53, 0.16); color: var(--gold-deep); padding: 8px 14px; border-radius: 20px; }
   .yours a { color: inherit; }
   .map { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; margin-top: 18px; max-width: 520px; }
@@ -148,6 +165,6 @@ const lookup = Object.fromEntries(
   summary { cursor: pointer; font-family: var(--f-head); font-weight: 600; font-size: 14px; color: var(--sage-ink); }
   details p { margin-top: 10px; line-height: 1.55; }
   details strong { font-weight: 600; color: var(--charcoal); }
-  .inv { margin: 12px 0 0; padding-left: 20px; line-height: 1.6; }
-  .inv a { color: var(--sage-ink); }
+  .inv { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
+  .inv a { color: var(--sage-ink); white-space: nowrap; }
 </style>

@@ -1,4 +1,5 @@
 ---
+import { SOURCES } from '../lib/sources.js';
 const { sp } = Astro.props;
 const w = sp.wildlife;
 const count = (k) => (k ? `${k} species` : "None recorded");
@@ -30,7 +31,11 @@ const highlights = w
         : 'No wildlife records for this species yet.'}
     </p>
   )}
-  <p class="src">Sources: Tallamy and Shropshire (National Wildlife Federation) for moths and butterflies, Jarrod Fowler for specialist bees, Audubon for birds.</p>
+  <p class="src">
+    Sources: <a href={SOURCES.nwf} rel="noopener">Tallamy and Shropshire (National Wildlife Federation)</a> for moths and butterflies,{' '}
+    <a href={SOURCES.fowler} rel="noopener">Jarrod Fowler</a> for specialist bees,{' '}
+    <a href={SOURCES.audubon} rel="noopener">Audubon</a> for birds.
+  </p>
 </div>
 
 <style>
@@ -45,4 +50,5 @@ const highlights = w
   .note { font-size: 14.5px; color: var(--bark); margin-top: 12px; line-height: 1.45; }
   .none { font-size: 16px; color: var(--ink-soft); margin-top: 12px; line-height: 1.5; }
   .src { font-size: 14px; color: var(--bark); margin-top: 14px; line-height: 1.6; }
+  .src a { color: var(--sage-ink); }
 </style>

@@ -1,6 +1,8 @@
 # Weekly refresh for edaphicflora.org:
 #   1. finds photos for up to 2,500 more species (iNaturalist, then Wikimedia)
-#   2. rebuilds the site so new soil samples and photos show up
+#   2. tests the outbound links (state invasive lists, data sources, policies);
+#      a dead link fails the run, so GitHub emails you, and the rebuild still happens
+#   3. rebuilds the site so new soil samples and photos show up
 #
 # Setup (one time):
 #   1. Netlify > Site configuration > Build & deploy > Build hooks > Add build hook
@@ -63,6 +65,13 @@ jobs:
             exit 0
           fi
           npm run fetch-photos
+
+      # Fails the run when a link is plainly dead (404 or a vanished domain).
+      # The rebuild below still happens.
+      - name: Check outbound links
+        if: ${{ always() }}
+        working-directory: site
+        run: npm run check-links
 
       - name: Trigger Netlify build hook
         if: ${{ always() && (github.event_name == 'schedule' || inputs.rebuild) }}

@@ -8,6 +8,7 @@ import SpeciesCard from '../../components/SpeciesCard.astro';
 import { species, related, countLabel, STATUS_STYLE, isSample } from '../../lib/data.js';
 import { CONTRIBUTE_URL, SITE_URL, SITE_NAME } from '../../config.js';
 import { photoSize } from '../../lib/photos.js';
+import { SOURCES, usdaProfile } from '../../lib/sources.js';
 
 export function getStaticPaths() {
   return species.map((sp) => ({ params: { slug: sp.slug }, props: { sp } }));
@@ -121,7 +122,8 @@ const jsonLd = [
       <WildlifeCard sp={sp} />
       <TraitsCard sp={sp} />
       <p class="srcs">
-        Status: BONAP (Kartesz 2015) and state invasive lists · Traits: USDA PLANTS · Soil: community contributed{isSample && ' · Sample values are illustrative'}.
+        Status: <a href={SOURCES.bonap} rel="noopener">BONAP</a> (Kartesz 2015) and state invasive lists · Traits:{' '}
+        <a href={sp.usda_symbol ? usdaProfile(sp.usda_symbol) : SOURCES.usda} rel="noopener">USDA PLANTS</a> · Soil: community contributed{isSample && ' · Sample values are illustrative'}.
       </p>
     </aside>
   </div>
@@ -167,6 +169,7 @@ const jsonLd = [
   .contrib h3 { font-weight: 600; font-size: 19px; }
   .contrib p { font-weight: 300; font-size: 16.5px; color: var(--ink-soft); margin-top: 6px; }
   .srcs { font-size: 14px; color: var(--bark); line-height: 1.55; padding: 0 4px; }
+  .srcs a { color: var(--sage-ink); }
   .related { margin-top: clamp(48px, 6vw, 72px); }
   .sec-h { font-weight: 600; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.2px; }
 </style>

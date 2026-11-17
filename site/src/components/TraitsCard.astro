@@ -1,4 +1,5 @@
 ---
+import { usdaProfile } from '../lib/sources.js';
 const { sp } = Astro.props;
 const u = sp.usda || {};
 const rows = [
@@ -25,7 +26,7 @@ const rows = [
     <p class="none">No USDA PLANTS record matched this name.</p>
   )}
   {sp.usda_symbol && (
-    <p class="src"><a href={`https://plants.usda.gov/plant-profile/${sp.usda_symbol}`} rel="noopener">USDA PLANTS profile →</a></p>
+    <p class="src"><a href={usdaProfile(sp.usda_symbol)} rel="noopener">USDA PLANTS profile →</a></p>
   )}
 </div>
 

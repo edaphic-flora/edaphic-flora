@@ -49,7 +49,7 @@ We use the following services that may process your data:
 | Service | Purpose | Their Privacy Policy |
 |---------|---------|---------------------|
 | Firebase (Google) | Authentication | [Google Privacy Policy](https://policies.google.com/privacy) |
-| Neon | Database hosting | [Neon Privacy Policy](https://neon.tech/privacy) |
+| Neon | Database hosting | [Neon Privacy Policy](https://neon.com/privacy-policy) |
 | Netlify | Website hosting (edaphicflora.org) | [Netlify Privacy Policy](https://www.netlify.com/privacy/) |
 | Anthropic Claude | AI extraction of soil reports | [Anthropic Privacy Policy](https://www.anthropic.com/privacy) |
 | iNaturalist, Wikimedia Commons | Plant photos load from their servers, which see your IP address | [iNaturalist](https://www.inaturalist.org/pages/privacy), [Wikimedia](https://foundation.wikimedia.org/wiki/Policy:Privacy_policy) |

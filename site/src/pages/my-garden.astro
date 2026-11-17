@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { SOURCES } from '../lib/sources.js';
 ---
 <Base
   title="My garden"
@@ -42,9 +43,9 @@ import Base from '../layouts/Base.astro';
           <section class="card pad sources" aria-labelledby="src-h">
             <h2 class="h3" id="src-h">Sources and methods</h2>
             <ul>
-              <li><strong>Moths and butterflies:</strong> caterpillar host plants adapted from Tallamy and Shropshire (2009), Tallamy et al. (2020) and the National Wildlife Federation's Native Plant Finder.</li>
-              <li><strong>Specialist bees:</strong> adapted from Fowler (2016) and Jarrod Fowler's specialist bee lists.</li>
-              <li><strong>Birds:</strong> adapted from Audubon's Plants for Birds and Tallamy (2021), <em>The Nature of Oaks</em>.</li>
+              <li><strong>Moths and butterflies:</strong> caterpillar host plants adapted from Tallamy and Shropshire (2009), Tallamy et al. (2020) and the National Wildlife Federation's <a href={SOURCES.nwf} rel="noopener" target="_blank">Native Plant Finder</a>.</li>
+              <li><strong>Specialist bees:</strong> adapted from Fowler (2016) and Jarrod Fowler's <a href={SOURCES.fowler} rel="noopener" target="_blank">specialist bee lists</a>.</li>
+              <li><strong>Birds:</strong> adapted from Audubon's <a href={SOURCES.audubon} rel="noopener" target="_blank">Plants for Birds</a> and Tallamy (2021), <em>The Nature of Oaks</em>.</li>
               <li id="src-occ" hidden><strong>Wildlife by state:</strong> butterfly, moth and bee records from <a href="https://www.gbif.org" rel="noopener" target="_blank">GBIF.org</a> (CC BY); bird records from <a href="https://ebird.org" rel="noopener" target="_blank">eBird</a> (Cornell Lab of Ornithology).</li>
             </ul>
             <p><strong>How plants count.</strong> Native plants, and plants with no record in your state, count at the genus level, because host plant records are mostly kept by genus. Introduced plants count only wildlife recorded on that exact species. Invasive plants don't count.</p>

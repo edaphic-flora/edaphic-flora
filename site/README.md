@@ -297,6 +297,7 @@ repo outside OneDrive (for example `C:\dev\edaphic-flora`) avoids it; GitHub is 
 - **Home page and banner photos:** species slugs in `src/lib/sitePhotos.js` (home mosaic, feature cards, call-to-action band, About banner, 404). Each list falls back to the next slug if a species drops out.
 - **Where app buttons go:** `APP_URL` in `src/config.js`.
 - **About page, credits:** `src/pages/about.astro`.
+- **Links to outside sources:** the named sources (BONAP, USDA PLANTS, wildlife sources) are in `src/lib/sources.js`; the 50 state invasive lists are in `src/data/state-invasive-urls.json`. `npm run check-links` tests them, plus the links in `PRIVACY.md` and `TERMS.md`. The weekly workflow runs it: a dead link fails that run (GitHub emails you) and the rebuild still happens. Fix the address in the file it names. A genus with no county-map page at BONAP goes in `src/data/bonap-genus-missing.json`.
 - **Thresholds:** `public_site.settings` in `sql/public_views.sql` (re-run the file after changing).
 
 To regenerate the sample file from a test database: `EXPORT_LABEL=sample EXPORT_OUT=src/data/sample/species.json npm run export-data`.
