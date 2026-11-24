@@ -73,13 +73,29 @@ jobs:
         working-directory: site
         run: npm run check-links
 
+      # The address is checked on every run, so a badly pasted secret shows up
+      # even when no rebuild was asked for. Stray spaces, line breaks and quotes
+      # around it are dropped first.
       - name: Trigger Netlify build hook
-        if: ${{ always() && (github.event_name == 'schedule' || inputs.rebuild) }}
+        if: ${{ always() }}
         env:
           HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+          REBUILD: ${{ github.event_name == 'schedule' || inputs.rebuild }}
         run: |
+          HOOK="$(printf '%s' "$HOOK" | tr -d '[:space:]"'"'"'')"
           if [ -z "$HOOK" ]; then
             echo "NETLIFY_BUILD_HOOK secret is not set yet; skipping rebuild."
+            exit 0
+          fi
+          case "$HOOK" in
+            https://api.netlify.com/build_hooks/?*) ;;
+            *)
+              echo "::error::NETLIFY_BUILD_HOOK is set but is not a Netlify build hook address. It should start with https://api.netlify.com/build_hooks/ . Copy it again from Netlify (Project configuration, Build & deploy, Build hooks) and save the secret again."
+              exit 1
+              ;;
+          esac
+          if [ "$REBUILD" != "true" ]; then
+            echo "Build hook address looks right. No rebuild was asked for."
             exit 0
           fi
           curl -fsS -X POST -d '{}' "$HOOK"

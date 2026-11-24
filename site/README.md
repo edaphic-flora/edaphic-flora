@@ -298,6 +298,7 @@ repo outside OneDrive (for example `C:\dev\edaphic-flora`) avoids it; GitHub is 
 - **Where app buttons go:** `APP_URL` in `src/config.js`.
 - **About page, credits:** `src/pages/about.astro`.
 - **Links to outside sources:** the named sources (BONAP, USDA PLANTS, wildlife sources) are in `src/lib/sources.js`; the 50 state invasive lists are in `src/data/state-invasive-urls.json`. `npm run check-links` tests them, plus the links in `PRIVACY.md` and `TERMS.md`. The weekly workflow runs it: a dead link fails that run (GitHub emails you) and the rebuild still happens. Fix the address in the file it names. A genus with no county-map page at BONAP goes in `src/data/bonap-genus-missing.json`.
+- **Lock file:** `package-lock.json` has to install with npm 10, which GitHub's runner and Netlify use. After changing a dependency, run `npx npm@10 ci --dry-run --ignore-scripts`. If it lists packages missing from the lock file, run `npx npm@10 install --package-lock-only` and check again.
 - **Thresholds:** `public_site.settings` in `sql/public_views.sql` (re-run the file after changing).
 
 To regenerate the sample file from a test database: `EXPORT_LABEL=sample EXPORT_OUT=src/data/sample/species.json npm run export-data`.
